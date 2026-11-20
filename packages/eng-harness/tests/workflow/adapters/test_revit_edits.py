@@ -48,6 +48,7 @@ def test_edit_mapping(
 
     async def body(manager: ServerManager, launcher: helpers.RecordingLauncher) -> None:
         ledger = WriteLedger(tmp_path / "run")
+        target = await helpers.warm_bound_target(manager, launcher)
         sent: list[tuple[str, dict[str, Any]]] = []
 
         async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
@@ -109,6 +110,7 @@ def test_edit_mapping(
                 bound_path=helpers.BOUND,
                 references={3001: "col-3001"},
                 element_ids=None,
+                target=target,
             )
             assert sent
             assert sent[0][0] == "revit_duplicate_family_type"
@@ -141,6 +143,7 @@ def test_edit_mapping(
                 bound_path=helpers.BOUND,
                 references={3001: "col-3001"},
                 element_ids=None,
+                target=target,
             )
             assert sent[0][1]["valueType"] == "double"
             return
@@ -163,6 +166,7 @@ def test_edit_mapping(
                 bound_path=helpers.BOUND,
                 references={3001: "col-3001"},
                 element_ids=[3001],
+                target=target,
             )
             assert sent[0][1]["typeId"] == 2001
             return
@@ -188,6 +192,7 @@ def test_edit_mapping(
                 bound_path=helpers.BOUND,
                 references={3001: "col-3001"},
                 element_ids=[3001],
+                target=target,
             )
             assert sent[0][1]["valueType"] == "double"
             return
@@ -216,6 +221,7 @@ def test_edit_mapping(
             bound_path=helpers.BOUND,
             references={3001: "col-3001"},
             element_ids=[3001],
+            target=target,
         )
         assert sent[0][1]["unit"] == "mm"
 
@@ -297,6 +303,7 @@ def test_shared_type_refused(tmp_path: Path) -> None:
 
     async def body(manager: ServerManager, launcher: helpers.RecordingLauncher) -> None:
         ledger = WriteLedger(tmp_path / "run")
+        target = await helpers.warm_bound_target(manager, launcher)
         writes: list[str] = []
 
         async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
@@ -354,6 +361,7 @@ def test_shared_type_refused(tmp_path: Path) -> None:
             bound_path=helpers.BOUND,
             references={3001: "col-3001", 3002: "col-3002"},
             element_ids=None,
+            target=target,
         )
         assert writes == ["revit_set_type_parameter_values"]
 
@@ -367,6 +375,7 @@ def test_duplicate_no_overrides(tmp_path: Path) -> None:
 
     async def body(manager: ServerManager, launcher: helpers.RecordingLauncher) -> None:
         ledger = WriteLedger(tmp_path / "run")
+        target = await helpers.warm_bound_target(manager, launcher)
         writes: list[str] = []
 
         async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
@@ -424,6 +433,7 @@ def test_duplicate_no_overrides(tmp_path: Path) -> None:
             bound_path=helpers.BOUND,
             references={3001: "col-3001"},
             element_ids=None,
+            target=target,
         )
         assert writes == ["revit_duplicate_family_type"]
         # Reply carries new_type_id (AC16).

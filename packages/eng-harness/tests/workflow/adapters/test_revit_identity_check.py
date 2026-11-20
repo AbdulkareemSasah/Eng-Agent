@@ -23,6 +23,7 @@ def test_unique_id_verified_before_write(tmp_path: Path) -> None:
 
     async def body(manager: ServerManager, launcher: helpers.RecordingLauncher) -> None:
         ledger = WriteLedger(tmp_path / "run")
+        target = await helpers.warm_bound_target(manager, launcher)
         writes: list[str] = []
 
         async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
@@ -48,6 +49,7 @@ def test_unique_id_verified_before_write(tmp_path: Path) -> None:
                 bound_path=helpers.BOUND,
                 references={3001: "col-OTHER"},
                 element_ids=[3001],
+                target=target,
             )
         assert mismatch.value.detail.code is ErrorCode.CONFLICT
         assert not writes
@@ -63,6 +65,7 @@ def test_unique_id_verified_before_write(tmp_path: Path) -> None:
             bound_path=helpers.BOUND,
             references={3001: "col-3001"},
             element_ids=[3001],
+            target=target,
         )
         assert writes == ["revit_set_element_parameter_values"]
         assert ledger.path.exists()
@@ -77,6 +80,7 @@ def test_missing_element_reference_refuses(tmp_path: Path) -> None:
 
     async def body(manager: ServerManager, launcher: helpers.RecordingLauncher) -> None:
         ledger = WriteLedger(tmp_path / "run")
+        target = await helpers.warm_bound_target(manager, launcher)
         writes: list[str] = []
 
         async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
@@ -102,6 +106,7 @@ def test_missing_element_reference_refuses(tmp_path: Path) -> None:
                 bound_path=helpers.BOUND,
                 references={},  # element 3001 absent
                 element_ids=[3001],
+                target=target,
             )
         assert missing.value.detail.code is ErrorCode.INVALID_ARGUMENT
         assert missing.value.detail.field == "references"

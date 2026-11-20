@@ -347,14 +347,26 @@ async def prepare_and_send_write(
     bound_path: Path,
     references: Mapping[int, str],
     element_ids: Sequence[int] | None,
+    target: HostTarget,
 ) -> Mapping[str, Any]:
-    """Active-document and unique_id checks, ledger append, then the host write (AC12 to AC14)."""
+    """Active-document and unique_id checks, ledger append, then the host write (AC12 to AC14).
+
+    `target` is the bound instance (`Binding.target` / opened MCP pid; spec 0002 §4.5.2). Never invent a pid.
+    """
     meta = await call("revit_get_model_metadata", {}, CallEffect.READ)
     meta_body = parse_revit_reply(dict(meta)).body
     path = meta_body.get("path")
     check_active_document(str(path) if isinstance(path, str) else None, bound_path)
 
     if element_ids:
+        # AC12: every written element must have a unique_id reference before compare-and-send.
+        missing = sum(1 for eid in element_ids if int(eid) not in references)
+        if missing:
+            raise ContractError(
+                ErrorCode.INVALID_ARGUMENT,
+                f"{missing} element id(s) lack a unique_id reference",
+                field="references",
+            )
         details = await call(
             "revit_get_element_details",
             {"elementIds": [int(x) for x in element_ids]},
@@ -364,17 +376,15 @@ async def prepare_and_send_write(
         items = body.get("items")
         if not isinstance(items, list):
             raise ContractError(ErrorCode.HOST_ERROR, "element details reply has no items")
-        needed = {int(eid): references[int(eid)] for eid in element_ids if int(eid) in references}
+        needed = {int(eid): references[int(eid)] for eid in element_ids}
         verify_unique_ids([row for row in items if isinstance(row, Mapping)], needed)
 
     args = dict(host_args)
-    # Ledger target uses the MCP server process id shape (HostTarget.pid >= 1); HostInstance.pid
-    # stays None for document hosts (spec 0011 section 4.12). Tests supply no live pid: use 1.
     entry = LedgerEntry(
         op_id=op_id,
         tool=tool,
         args_sha256=payload_sha256(args),
-        target=HostTarget(product="revit", pid=1),
+        target=target,
         pre_image_ref=None,
         sent_at=SystemClock().now(),
     )

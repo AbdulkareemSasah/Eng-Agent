@@ -36,6 +36,7 @@ def test_active_document_checked(tmp_path: Path) -> None:
 
     async def body_bad(manager: ServerManager, launcher: helpers.RecordingLauncher) -> None:
         ledger = WriteLedger(bad_dir / "run-ledger")
+        target = await helpers.warm_bound_target(manager, launcher)
         writes: list[str] = []
 
         async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
@@ -55,6 +56,7 @@ def test_active_document_checked(tmp_path: Path) -> None:
                 bound_path=helpers.BOUND,
                 references={3001: "col-3001"},
                 element_ids=[3001],
+                target=target,
             )
         assert wrong.value.detail.code is ErrorCode.PRECONDITION_FAILED
         assert wrong.value.detail.precondition is Precondition.model_open
@@ -70,6 +72,7 @@ def test_active_document_checked(tmp_path: Path) -> None:
 
     async def body_ok(manager: ServerManager, launcher: helpers.RecordingLauncher) -> None:
         ledger = WriteLedger(ok_dir / "run-ledger")
+        target = await helpers.warm_bound_target(manager, launcher)
         writes: list[str] = []
 
         async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
@@ -88,6 +91,7 @@ def test_active_document_checked(tmp_path: Path) -> None:
             bound_path=helpers.BOUND,
             references={3001: "col-3001"},
             element_ids=[3001],
+            target=target,
         )
         assert writes == ["revit_set_element_parameter_values"]
 
