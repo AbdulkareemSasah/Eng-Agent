@@ -329,3 +329,83 @@ def test_zero_utilization_true_needs_engineer(tmp_path: Path) -> None:
             assert any("exactly zero" in a.lower() or "may be missing" in a.lower() for a in zero[0].assumptions)
 
     anyio.run(body)
+
+
+def test_rest_calculate_happy_path(tmp_path: Path) -> None:
+    """AC11/AC12: open project, calculate_rest succeeds; verdicts present; draft true; offline_stub false."""
+    from eng_harness.adapters.idea import _calculate as calculate
+
+    control = tmp_path / "control.json"
+    config = _idea_config(tmp_path, control, route="rest")
+    model = make_ideacon(tmp_path / "joint.ideaCon")
+    store = _store(tmp_path)
+
+    async def body() -> None:
+        async with ServerManager(config, tmp_path / "run") as manager:
+            opened = await manager.call("idea", "main", "idea_open_project", {"path": str(model)}, CallEffect.WRITE)
+            assert opened.is_error is False
+            result = await calculate.calculate_rest(
+                sessions=manager,
+                server="idea",
+                role="main",
+                connection_ids=[1],
+                design_code=_DESIGN_CODE,
+                load_map_confirmed=False,
+                approved=True,
+                store=store,
+                ids=SeededIdSource(b"idea-calc-rest-ok", FixedClock(_START)),
+            )
+            assert result.raw.route == "rest"
+            assert result.raw.offline_stub is False
+            assert result.verdicts.verdicts
+            assert result.verdicts.draft is True
+            assert all(v.source.value == "host" for v in result.verdicts.verdicts)
+            assert result.raw_envelope.kind == "harness.idea_check_raw/1"
+            assert result.verdict_envelope.kind == "verdicts.set/1"
+
+    anyio.run(body)
+
+
+def test_get_check_results_after_calculate(tmp_path: Path) -> None:
+    """AC11: get_check_results after a successful calculate_rest returns host verdicts (not a stub)."""
+    from eng_harness.adapters.idea import _calculate as calculate
+
+    control = tmp_path / "control.json"
+    config = _idea_config(tmp_path, control, route="rest")
+    model = make_ideacon(tmp_path / "joint.ideaCon")
+    store = _store(tmp_path)
+
+    async def body() -> None:
+        async with ServerManager(config, tmp_path / "run") as manager:
+            opened = await manager.call("idea", "main", "idea_open_project", {"path": str(model)}, CallEffect.WRITE)
+            assert opened.is_error is False
+            calc = await calculate.calculate_rest(
+                sessions=manager,
+                server="idea",
+                role="main",
+                connection_ids=[1],
+                design_code=_DESIGN_CODE,
+                load_map_confirmed=False,
+                approved=True,
+                store=store,
+                ids=SeededIdSource(b"idea-calc-then-get", FixedClock(_START)),
+            )
+            assert calc.raw.offline_stub is False
+            result = await calculate.get_check_results(
+                sessions=manager,
+                server="idea",
+                role="main",
+                connection_id=1,
+                design_code=_DESIGN_CODE,
+                load_map_confirmed=False,
+                store=store,
+                ids=SeededIdSource(b"idea-get-checks", FixedClock(_START)),
+            )
+            assert result.raw.route == "rest"
+            assert result.raw.offline_stub is False
+            assert result.verdicts.verdicts
+            assert result.verdicts.draft is True
+            assert result.raw_envelope.kind == "harness.idea_check_raw/1"
+            assert result.verdict_envelope.kind == "verdicts.set/1"
+
+    anyio.run(body)
