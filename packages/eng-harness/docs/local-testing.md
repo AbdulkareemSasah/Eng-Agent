@@ -69,3 +69,20 @@ Plan 0006 (CLI, progress, pages and report; listed by T17b, plan §4). Nothing h
 30. Expected times and the heartbeat on a real analysis run, with the host programs (needs spec 0007's workflow and the Sasaah servers; spec 0006 AC15).
 31. Opening the launch address through the default browser when the default is not Chromium-based (spec 0006 AC61; beside item 15).
 32. The first run with no workspace configured (amendment B-541, spec 0006 AC70): `main` (`cli/__init__.py`, T14b) calls `resolve_workspace` with `default_location_probe()`, which must classify `%LOCALAPPDATA%\eng\workspaces\default` as local on the owner's Windows machine, so that every command finds the `harness.toml` there.
+
+Plan 0008 (SAFE adapter; listed by T8, spec §12). Nothing here runs in CI. On a copy of a footing model, SAFE 22:
+33. L1. `csi_launch(product="SAFE", visible=false)`: the pid the reply names, the SAFE parent process, survival after the server job closes (silent breakaway, 0002 §12 item 1), and `csi_exit` of a launched hidden instance.
+34. L2. `csi_open_model` and `csi_save_model` on a `.FDB` (both use the same `File` object as `csi_new_model`, C2): the `saved_to` path, the hash change after a save, the files a SAFE model keeps next to it; copy hash equality; what `companion_globs` must list.
+35. L3. `csi_new_blank_model` and `csi_new_model` on SAFE (SG-1, C2).
+36. L4. The live `tools/list` fingerprint of the SAFE entry set, `csi_status` installed products, `serverInfo`.
+37. L5. `csi_db_table_fields` and `csi_db_table_read` of every table in spec 0008 §4.5, with the real columns (for `Soil Pressures`, whether a `StepType` and a `CaseType` column exist and how an envelope combination reports Max and Min), units (also when the present units are millimetres), and `truncated` behavior; the SAFE tables with `unknown` status are recorded for the owner's review.
+38. L6. Whether `Soil Pressures` needs an output selection before it has rows, the `StepType` values it reports for an envelope combination and a multi-step case (key uniqueness of AC22), its row count for a model of about 30 footings, and whether groups of one footing each read within 2000 rows (SG-6).
+39. L7. Sign convention of soil pressure; moment reference and sign of base reactions (Q6).
+40. L8. `csi_set_point_load` on SAFE: replace semantics, rejection of an all-zero row, effect on `XDim` and `YDim`, units tokens, and the read-back table (SG-7, SG-8).
+41. L9. Replies of `csi_list_points`, `csi_list_areas`, `csi_list_grids`, `csi_list_frames` on SAFE (names, unique names).
+42. L10. `csi_run_analysis` on SAFE: duration for a footing model (sizes the `long` role timeout), the save dialog the sessions met, `locked` afterwards, `csi_unlock_model`, the proof-of-end question (0002 H-G7).
+43. L11. `csi_design_run(kind="concrete")` and `csi_design_results` on SAFE: what runs, what the tables hold afterwards, and the design code the model carries (SG-5, C3).
+44. L12. `csi_add_load_pattern` with type `SuperDead` and `csi_add_load_combo` on SAFE (Q7).
+45. L13. `close_started` on a hidden SAFE instance and on a visible one.
+46. L14. Record mode on a SAFE copy (`uv run python acceptance/scripts/record_csi.py --config harness.toml --model <copy.FDB> --product SAFE --analysis --cases <names> --combos <names>`); the owner's review of the recordings before commit.
+47. L15. An ETABS server and a SAFE server in one run: epochs, host-instance locks, a timeout on one (Q1).

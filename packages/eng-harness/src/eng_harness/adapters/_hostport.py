@@ -21,6 +21,7 @@ from eng_harness.adapters.csi._checks import ReadBack, check_envelope, issues_of
 from eng_harness.adapters.csi._session_ops import CsiSession, OpenedInstance
 from eng_harness.adapters.csi._state import CsiStateReader, StateRead
 from eng_harness.adapters.csi.products._safe_state import SafeStateReader
+from eng_harness.adapters.csi.products._sap2000_state import Sap2000StateReader
 from eng_harness.ports import HostInstance, HostLease, HostModelState, SavedModel, ServerCheck, UnitsState
 from eng_harness.servers._guard import ProcessGuard, StartedInstance
 from eng_harness.servers._hostlock import HostLocks
@@ -53,8 +54,13 @@ class AdapterHostPort:
             sessions, guard, inspector, locks, ids, server=server, product=product, program=program,
             exe_name=exe_name, visible=visible,
         )  # fmt: skip
-        # Ask the profile's table map: SAFE state tables include joint_loads (spec 0008 section 4.4); else ETABS.
-        reader_type = SafeStateReader if "joint_loads" in self._profile.tables else CsiStateReader
+        # Ask the profile: declared absences → SAP2000 reader (spec 0012 AC8); joint_loads tables → SAFE; else ETABS.
+        if self._profile.declared_absences:
+            reader_type: type = Sap2000StateReader
+        elif "joint_loads" in self._profile.tables:
+            reader_type = SafeStateReader
+        else:
+            reader_type = CsiStateReader
         self._reader = reader_type(product=product, call=self._session._call)  # B-451: no public read on CsiSession
         self._load(files)
 
@@ -108,7 +114,8 @@ class AdapterHostPort:
 
     async def _record_save(self, model_key: str, path: Path, opened: OpenedInstance) -> SavedModel:
         fingerprint: str | None = None
-        if self._profile.tables:  # products without a table map yet (SAFE before T5) keep their prior fingerprint
+        # Table map or declared-absence reader (SAP2000 T4): record the state's fingerprint on save.
+        if self._profile.tables or self._profile.declared_absences:
             read = await self._reader.read(opened.pid, path)  # B-451 L3: the saved state's own
             self._reads[model_key] = read
             fingerprint = read.fingerprint

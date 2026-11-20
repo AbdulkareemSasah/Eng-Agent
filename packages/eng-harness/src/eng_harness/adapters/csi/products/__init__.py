@@ -26,6 +26,8 @@ class ProductProfile:
     companion_globs: tuple[str, ...] = ()  # files next to the model file that belong to it; empty until local test L2
     gaps: Mapping[str, str] = field(default_factory=dict)  # gap id → message; empty until the product lists gaps
     step_gaps: Mapping[str, str] = field(default_factory=dict)  # step name → gap id wired for that product
+    # Kind list keys the state reader skips (spec 0012 AC8); empty when the product has none.
+    declared_absences: tuple[str, ...] = ()
 
 
 _ETABS = ProductProfile("ETABS", _etabs.MODEL_EXTENSIONS, _etabs.TABLES, _etabs.READBACK)
@@ -47,6 +49,7 @@ _SAP2000 = ProductProfile(
     _sap2000.COMPANION_GLOBS,
     _sap2000.GAPS,
     _sap2000.STEP_GAPS,
+    _sap2000.DECLARED_ABSENCES,
 )
 _PROFILES = {item.name: item for item in (_ETABS, _SAFE, _SAP2000)}
 
