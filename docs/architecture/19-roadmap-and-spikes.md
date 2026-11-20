@@ -11,6 +11,7 @@ Status: Proposed (revised by ADR-0024 to ADR-0027)
 | 2. Foundations design | `structural-codes` (framework, ACI 318-14 and SBC 304-2018 footing checks), SAFE through `sasaah-csi-mcp`, decision-model tier (Jev) in shadow mode, language-model tier with PydanticAI, block `design_isolated_footing` and its workflow; the full UI by a new ADR | Footing workflow accepted on owner projects; checks approved |
 | 3. Revit and frames | Revit through `sasaah-revit-mcp`, SAP2000 through `sasaah-csi-mcp`, column checks, workflow: design columns in ETABS and update Revit by reference | Accepted on owner projects |
 | 4. Connections and desktop products | IDEA StatiCa through `sasaah-idea-mcp`; `synapse`, `revit-sheet-exporter`, `sasaah-studio-autocad` (may start after phase 1, at the owner's choice) | Each product's own acceptance |
+| 5. Drawing sheets | Sheets for columns, footings, tie beams and beams from office DXF templates ([20](20-drawing-sheets-from-dxf.md), ADR-0037, proposed); slab sheets later | Sheets accepted on owner projects |
 | Open source | Per package: split into its own repository after a release that meets the open-source checklist | [process/07](../../process/07-release-and-open-source.md) |
 
 In every phase, a capability that is missing during a live project goes through the project lane

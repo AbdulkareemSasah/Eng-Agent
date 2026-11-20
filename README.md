@@ -24,7 +24,7 @@ repository when it goes open source ([ADR-0001](docs/adr/0001-independent-reposi
 3. [docs/architecture/02-system-overview.md](docs/architecture/02-system-overview.md)
 4. [docs/architecture/03-repositories.md](docs/architecture/03-repositories.md)
 5. [docs/architecture/04-tool-contract.md](docs/architecture/04-tool-contract.md): the contract every tool obeys.
-6. The component documents (`05` to `19`) for the area you work on.
+6. The component documents (`05` to `20`) for the area you work on.
 7. [process/README.md](process/README.md) before writing any code anywhere.
 
 ## Status
