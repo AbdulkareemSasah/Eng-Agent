@@ -10,6 +10,10 @@ environment variable ``SASAAH_CSI_FAKE_CONTROL``::
 A fault fires once and is removed from the file. Faults: ``timeout_before_apply``, ``timeout_after_apply``,
 ``crash_during_call``, ``units_left_changed``, ``slow_analysis`` (optional ``seconds``) and ``com_worker_recycled``.
 Units are the Sasaah tokens of the S-12 report (section 4); the fake invents no engineering value.
+
+Product modes (control ``product`` or launch/attach argument): ETABS (default), SAFE (spec 0008) and SAP2000
+(spec 0012 §4.1: gap tools return ``unsupported_by_version``, frame replies omit ``label`` and ``story``, added
+frames are renamed, a blank model has no sections).
 """
 
 import asyncio
@@ -46,6 +50,17 @@ COLLECTIONS = (
     "stories", "grids", "points", "frames", "areas", "materials", "frame_sections", "area_sections",
     "load_patterns", "load_cases", "load_combos",
 )  # fmt: skip
+# Spec 0012 §4.1 gaps: the server answers unsupported_by_version (status `gap`).
+SAP2000_UNSUPPORTED = frozenset(
+    {
+        "csi_list_stories",
+        "csi_list_grids",
+        "csi_frame_details",
+        "csi_export_joint",
+        "csi_results_story_drifts",
+        "csi_new_model",
+    }
+)
 
 
 class SasaahError(Exception):
@@ -228,10 +243,17 @@ def _edit(name: str, args: dict[str, Any], units: str) -> bool:
     return True
 
 
-def _add(kind: str, args: dict[str, Any]) -> dict[str, Any]:
+def _add(kind: str, args: dict[str, Any], product: str) -> dict[str, Any]:
     items: list[dict[str, Any]] = STATE.model[kind]
-    name = args.get("name") or f"{kind[:-1]}{len(items) + 1}"
-    row = {**{k: v for k, v in args.items() if k not in ("units", "target", "dry_run")}, "name": name}
+    # Spec 0012 §4.1 serve-diff: SAP2000 AddByCoord ignores the requested name (evidence L).
+    if kind == "frames" and product == "SAP2000":
+        name = f"Frame{len(items) + 1}"
+    else:
+        name = args.get("name") or f"{kind[:-1]}{len(items) + 1}"
+    skip = {"units", "target", "dry_run"}
+    if kind == "frames" and product == "SAP2000":
+        skip = skip | {"label", "story", "name"}
+    row = {**{k: v for k, v in args.items() if k not in skip}, "name": name}
     if kind == "load_combos":  # store the list-reply shape (type, items), not the tool's arguments
         row = {"name": name, "type": args.get("combo_type", 0), "items": list(args.get("components") or [])}
     items[:] = [r for r in items if r["name"] != name]  # a combination is replaced, not duplicated (S-12 section 2)
@@ -244,10 +266,14 @@ def _add(kind: str, args: dict[str, Any]) -> dict[str, Any]:
     return {"name": name}
 
 
-def _list(kind: str, args: dict[str, Any], units: str) -> dict[str, Any]:
+def _list(kind: str, args: dict[str, Any], units: str, product: str) -> dict[str, Any]:
     items: list[dict[str, Any]] = STATE.model[kind]
     limit = int(args.get("limit") or DEFAULT_LIMIT)
-    return {"count": min(len(items), limit), "items": items[:limit], "truncated": len(items) > limit, "units": units}
+    page = items[:limit]
+    # Spec 0012 §4.1 serve-diff: SAP2000 frame replies have no label or story.
+    if kind == "frames" and product == "SAP2000":
+        page = [{k: v for k, v in item.items() if k not in ("label", "story")} for item in page]
+    return {"count": min(len(items), limit), "items": page, "truncated": len(items) > limit, "units": units}
 
 
 def _analysis(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
@@ -293,8 +319,15 @@ def _in_group(row: dict[str, Any], group: str) -> bool:
 
 def _apply(name: str, args: dict[str, Any], units: str, product: str) -> dict[str, Any]:
     model = STATE.model
+    if product == "SAP2000" and name in SAP2000_UNSUPPORTED:
+        raise SasaahError("unsupported_by_version", f"{name} is not supported by this version.")
     if name == "csi_new_model" and product == "SAFE":
         raise SasaahError("unsupported_by_version", "Creating a model is not supported by this version.")
+    if name == "csi_new_blank_model" and product == "SAP2000":
+        # Spec 0012 §4.1 / SP-1: a blank SAP2000 model ships no sections (evidence L).
+        model["frame_sections"] = []
+        model["area_sections"] = []
+        return {"ok": True}
     if name == "csi_db_table_fields":
         table = args.get("table")
         rows = model["tables"].get(table, [])
@@ -313,7 +346,7 @@ def _apply(name: str, args: dict[str, Any], units: str, product: str) -> dict[st
     if name in ("csi_run_analysis", "csi_analysis_status", "csi_design_run", "csi_design_results") or name in RESULTS:
         return _analysis(name, args, units)
     if name.startswith("csi_list_") and name[len("csi_list_") :] in COLLECTIONS:
-        return _list(name[len("csi_list_") :], args, units)
+        return _list(name[len("csi_list_") :], args, units, product)
     if name == "csi_db_table_read":
         table = args.get("table")
         rows = model["tables"].get(table, [])
@@ -330,7 +363,7 @@ def _apply(name: str, args: dict[str, Any], units: str, product: str) -> dict[st
     adds = {"csi_add_point": "points", "csi_add_frame_by_coord": "frames", "csi_add_area_by_coord": "areas"}
     adds.update(csi_add_load_pattern="load_patterns", csi_add_load_combo="load_combos")
     if name in adds:
-        return _add(adds[name], args)
+        return _add(adds[name], args, product)
     if _edit(name, args, units):
         return {"ok": True}
     if name == "csi_delete_load_combo":

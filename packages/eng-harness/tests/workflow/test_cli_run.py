@@ -414,3 +414,236 @@ def test_run_header_records_decision_runtime(tmp_path: Path, monkeypatch: pytest
         assert secret not in all_bytes
         assert secret not in stdout_bytes
         assert secret not in stderr_bytes
+
+
+def test_run_completes_and_writes_report_real_engine(tmp_path: Path) -> None:
+    """AC7 re-check with the real engine through the production port mapping (plan 0006 T17c).
+
+    A confirmed basis is required: the Q23 interim `basis_ref` cannot be reported (plan T14), so the re-check uses a
+    workflow with `basis_fields`, confirms the draft on the page, then answers the approval.
+    """
+    import contextlib
+    import re
+    import threading
+    import time
+
+    from eng_contract.cited import Cited
+    from helpers.cli_deps import client_for
+
+    from eng_harness.basis import FieldSpec
+    from eng_harness.pages._answers import bound_sha256
+    from eng_harness.pages._security import CSRF_FIELD
+
+    draft_sha = re.compile(r'<input type="hidden" name="draft_sha256" value="([0-9a-f]{64})">')
+    setup_link = re.compile(r'href="(/setup/[0-9A-HJKMNP-TV-Z]{26})"')
+    fields = (
+        FieldSpec(
+            path="materials.concrete_fc_MPa",
+            kind="quantity",
+            label="Concrete fc",
+            required=True,
+            unit="MPa",
+            min=Cited(value=20, unit="MPa", source="ACI 318-14 19.2.1"),
+            max=Cited(value=80, unit="MPa", source="ACI 318-14 19.2.1"),
+        ),
+    )
+    flow_name = "report_real_flow"
+
+    @workflow(
+        name=flow_name,
+        version=1,
+        description="Basis then one approval for the AC7 real-engine re-check.",
+        basis_fields=fields,
+    )
+    async def report_real_flow(ctx: Any, inp: FakeInput) -> FakeOutput:
+        preview = Preview(items=(PreviewItem(id="i1", label="One change", refs=()),), diff_ref=None, models=())
+        await ctx.approve("Apply the change", preview)
+        return FakeOutput()
+
+    registry = Registry([report_real_flow])
+    basis = tmp_path / "values.yaml"
+    basis.write_text(
+        "name: Engineer A\nvalues:\n  materials.concrete_fc_MPa:\n    value: 35\n    unit: MPa\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    rig = Rig(tmp_path, real_engine=True)
+
+    def interact(address: str) -> None:
+        with contextlib.suppress(Exception):
+            client = client_for(address)
+            client.open()
+            end = time.monotonic() + 15
+            setup_path = None
+            while setup_path is None and time.monotonic() < end:
+                found = setup_link.search(client.get("/").body)
+                if found is not None:
+                    setup_path = found.group(1)
+                else:
+                    time.sleep(0.02)
+            assert setup_path is not None
+            page = client.get(setup_path)
+            match = draft_sha.search(page.body)
+            assert match is not None
+            client.post(
+                setup_path,
+                {
+                    CSRF_FIELD: client.token(setup_path),
+                    "draft_sha256": match.group(1),
+                    "by": "Ada",
+                    "decision": "confirm",
+                    "confirm_materials": "on",
+                },
+            )
+            while not rig.shown and time.monotonic() < end:
+                time.sleep(0.02)
+            request = rig.shown[-1]
+            form = {
+                CSRF_FIELD: client.token(f"/request/{request.request_id}"),
+                "shown_sha256": bound_sha256(request),
+                "by": "ada",
+                "decision": "approve",
+            }
+            client.post(f"/answer/{request.request_id}", form)
+
+    def opener(address: str) -> bool:
+        rig.opened.append(address)
+        threading.Thread(target=interact, args=(address,), daemon=True).start()
+        return True
+
+    rig.open_with = opener
+    path = rig.input_file('{"note": "n"}', "utf-8-sig")
+    assert (
+        rig.main(
+            "run",
+            flow_name,
+            "--input",
+            path,
+            "--basis",
+            str(basis),
+            "--json",
+            "--progress",
+            "off",
+            workflow_registry=registry,
+            basis_fields_of=lambda w: w.basis_fields,
+        )
+        == ExitCode.OK
+    ), rig.err.getvalue()
+    result = json.loads(rig.out.getvalue())
+    [run_id] = rig.run_ids()
+    report = rig.runs / run_id / "report" / "report.html"
+    assert result == {
+        "run_id": run_id, "workflow": flow_name, "status": "COMPLETED", "exit_code": 0, "pending": [],
+        "escalation": None, "report": str(report),
+    }  # fmt: skip
+    assert report.read_text(encoding="utf-8").startswith("<!doctype html>")
+    events = _events(rig, run_id)
+    assert events[-1].type is EventType.RUN_COMPLETED
+    assert [e.payload.by for e in events if isinstance(e.payload, ev.ApprovalResolved)] == ["engineer:ada"]
+    assert "approval page opened in your browser" in rig.err.getvalue()
+    assert all(rig.opened[0] not in text for text in (rig.out.getvalue(), rig.err.getvalue()))
+
+
+def test_run_header_records_decision_runtime_real_engine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """AC63 re-check: the real engine's header through engine AC69 with a recording assembler (plan 0006 T17c)."""
+    import keyring
+    from fakes.credential_stores import MemoryKeyringBackend, backend_path
+
+    import eng_harness.providers._credentials as credentials_mod
+    from eng_harness.providers import KeyringCredentialStore, assemble_decision_runtime
+    from eng_harness.providers._credentials import SERVICE_NAME
+
+    fake_key = "-".join(("distinctive", "test", "credential", "9f4b2a"))
+    memory = MemoryKeyringBackend()
+    memory.set_password(SERVICE_NAME, "ref-secret-name", fake_key)
+    monkeypatch.setattr(keyring, "get_keyring", lambda: memory)
+    monkeypatch.setattr(
+        credentials_mod,
+        "DEFAULT_ALLOWED_BACKENDS",
+        credentials_mod.DEFAULT_ALLOWED_BACKENDS | {backend_path(memory)},
+    )
+    stored_secret = KeyringCredentialStore().get("ref-secret-name")
+    assert stored_secret is not None
+    assert stored_secret.get_secret_value() == fake_key
+
+    def write_cfg(rig: Rig, version: str) -> None:
+        rig.workspace.mkdir(parents=True, exist_ok=True)
+        (rig.workspace / "harness.toml").write_text(
+            "[providers.decision]\n"
+            'base_url = "https://endpoint-host.example.test/v1"\n'
+            'model = "m"\n'
+            f'model_version = "{version}"\n'
+            'key_ref = "ref-secret-name"\n'
+            "request_timeout_ms = 1500\n"
+            '[decisions.shadow_released.pick_action]\npoint_version = 1\nbasis = "owner"\nrecord = "owner-rec"\n',
+            encoding="utf-8",
+        )
+
+    registry = Registry([real_flow])
+    rig = Rig(tmp_path, real_engine=True)
+    write_cfg(rig, "v1")
+    assert (
+        rig.main(
+            "run",
+            REAL_FLOW,
+            "--no-wait",
+            "--no-report",
+            "--progress",
+            "off",
+            workflow_registry=registry,
+            decision_assembler=assemble_decision_runtime,
+        )
+        == ExitCode.AWAITING_ENGINEER
+    )
+    [run_id] = rig.run_ids()
+    reader = JournalReader(rig.runs / run_id)
+    try:
+        header = reader.header()
+    finally:
+        reader.close()
+    assert header.decision_runtime == {
+        "providers": [
+            {
+                "name": "openrouter", "model": "m", "version": "v1", "is_local": False, "tier": 2,
+                "status": "not_implemented",
+            }
+        ],
+        "released": {},
+        "dropped_releases": [{"point": "pick_action", "reason": "PR-G1"}],
+    }  # fmt: skip
+
+    write_cfg(rig, "v2")
+    rig.open_with = approving_opener(rig, current=lambda: rig.shown[-1] if rig.shown else None)
+    assert (
+        rig.main(
+            "resume",
+            run_id,
+            "--no-report",
+            "--progress",
+            "off",
+            workflow_registry=registry,
+            decision_assembler=assemble_decision_runtime,
+        )
+        == ExitCode.OK
+    )
+    resumes = [e.payload for e in _events(rig, run_id) if isinstance(e.payload, ev.RunResumed)]
+    assert len(resumes) == 1
+    assert resumes[0].decision_runtime == {
+        "providers": [
+            {
+                "name": "openrouter", "model": "m", "version": "v2", "is_local": False, "tier": 2,
+                "status": "not_implemented",
+            }
+        ],
+        "released": {},
+        "dropped_releases": [{"point": "pick_action", "reason": "PR-G1"}],
+    }  # fmt: skip
+
+    assert (rig.runs / run_id / "journal.sqlite").is_file()
+    all_bytes = b"".join(p.read_bytes() for p in (rig.runs / run_id).rglob("*") if p.is_file())
+    stdout_bytes = rig.out.getvalue().encode("utf-8")
+    stderr_bytes = rig.err.getvalue().encode("utf-8")
+    for secret in (b"endpoint-host", b"ref-secret-name", b"base_url", b"key_ref", fake_key.encode("utf-8")):
+        assert secret not in all_bytes
+        assert secret not in stdout_bytes
+        assert secret not in stderr_bytes
