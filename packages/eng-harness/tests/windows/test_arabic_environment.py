@@ -7,10 +7,13 @@ import sys
 from contextlib import suppress
 from pathlib import Path
 
+import pytest
+
 from eng_harness._text import format_duration_ms, format_number, format_timestamp
 from eng_harness.cli._encoding import configure_streams
 
 
+@pytest.mark.windows
 def test_arabic_workspace_and_cp1256(tmp_path: Path) -> None:
     """Dates and numbers stay Gregorian/ASCII under an Arabic path and a cp1256 stream (AC58)."""
     arabic = tmp_path / "مساحة_عمل" / "تشغيل"

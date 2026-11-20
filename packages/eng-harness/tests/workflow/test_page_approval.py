@@ -16,7 +16,7 @@ from eng_harness.block import Registry
 from eng_harness.ctx import ModelHandle, Preview, PreviewItem
 from eng_harness.engine import RunStatus
 from eng_harness.errors import ApprovalVoid, BlockRuleViolation, HarnessCode
-from eng_harness.journal import Event, EventType, JournalReader
+from eng_harness.journal import JournalReader
 from eng_harness.journal import _events as ev
 from eng_harness.pages._answers import REASON, REJECT
 
@@ -31,21 +31,6 @@ def _preview(host: Host, *items: str) -> Preview:
     handle = ModelHandle(model_key="m1", model_id=state.model_id, revision=state.revision or 0)
     shown = tuple(PreviewItem(id=item, label=f"Change {item}", refs=()) for item in items)
     return Preview(items=shown, diff_ref=None, models=(handle,))
-
-
-def _feed_void(page: RealPage, message: str) -> None:
-    """The void left no step (engine AC55); feed the page the APPROVAL_VOID failure AC34's display needs (T7b)."""
-    error = ev.HarnessError(harness_code=HarnessCode.APPROVAL_VOID, message=message)
-    page.approvals.hub.emit(
-        Event(
-            seq=99,
-            type=EventType.STEP_FAILED,
-            path=None,
-            attempt=None,
-            at="2026-01-01T00:00:00.000Z",
-            payload=ev.StepFailed(error=error, retryable=False, duration_ms=0),
-        )
-    )
 
 
 def test_answer_bound_to_hash(tmp_path: Path) -> None:
@@ -203,9 +188,10 @@ def test_per_item_reject_end_to_end(tmp_path: Path) -> None:
 
 
 def test_void_after_model_change(tmp_path: Path) -> None:
-    """AC34: model changed after the approval is shown and before the write: ApprovalVoid, nothing written, page voided.
+    """AC34: model changed after the approval is shown and before the write: ApprovalVoid, nothing written.
 
-    Engine AC55 leaves no step for a void before the first write; the page half (T7b) is fed the void's message.
+    Engine AC55 leaves no STEP_FAILED / APPROVAL_VOID for a void before the first write. The voided page display
+    is T7b (`tests/unit/pages/test_void.py`); this re-check asserts the real-engine journal half only.
     """
     box: list[RealPage] = []
     trail: list[str] = []
@@ -229,10 +215,11 @@ def test_void_after_model_change(tmp_path: Path) -> None:
         assert trail
         assert "changed since approval" in trail[0]
         assert page.host.ledger == []  # the port was not called
-        _feed_void(page, trail[0])
-        screen = page.client.get(f"/request/{request.request_id}")
+        events = list(page.events(outcome.run_id))
     assert outcome.status is RunStatus.COMPLETED
-    assert screen.status == HTTPStatus.OK
-    assert "voided" in screen.body.lower()
-    assert trail[0] in screen.body
-    assert "<form" not in screen.body
+    assert not any(
+        isinstance(e.payload, ev.StepFailed)
+        and isinstance(e.payload.error, ev.HarnessError)
+        and e.payload.error.harness_code is HarnessCode.APPROVAL_VOID
+        for e in events
+    ), "engine AC55: a void before the first write journals no APPROVAL_VOID step (page display is T7b)"
