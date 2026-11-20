@@ -25,6 +25,7 @@ from eng_harness.adapters.csi import _edits as edits
 from eng_harness.adapters.csi._state import LIST_LIMIT, StateRead
 from eng_harness.adapters.csi.products import ProductProfile
 from eng_harness.adapters.csi.products import _safe_loads as safe_loads
+from eng_harness.adapters.csi.products import _sap2000_edits as sap2000_edits
 from eng_harness.ports import ServerCheck
 
 Want = dict[str, Any]
@@ -106,6 +107,22 @@ def expect(model: Any) -> Expect:
         if m.punch_y_mm is not None:
             point_want["punch_y_mm"] = _num(m.punch_y_mm)
         return _item("point_load_table", kind.JOINT, m.joint, point_want, m.pattern)
+    if isinstance(m, sap2000_edits.AddFrameByCoordArgs):
+        # Subject id starts as the requested name; CsiToolPort.retargets it to the host reply (spec 0012 AC11).
+        subject = m.name or ""
+        want = {
+            "section": m.section,
+            "xi_mm": _num(m.xi_mm),
+            "yi_mm": _num(m.yi_mm),
+            "zi_mm": _num(m.zi_mm),
+            "xj_mm": _num(m.xj_mm),
+            "yj_mm": _num(m.yj_mm),
+            "zj_mm": _num(m.zj_mm),
+        }
+        return _item("frame_geometry", kind.FRAME, subject, want)
+    if isinstance(m, sap2000_edits.AddAreaByCoordArgs):
+        subject = m.name or ""
+        return _item("area_geometry", kind.AREA, subject, {"section": m.section, "points_mm": m.points})
     raise TypeError(f"no read-back for {type(m).__name__}")
 
 
@@ -122,6 +139,14 @@ class WrittenItems:
 
     def prepare(self, model: Any) -> None:
         self._prepared[model.model] = expect(model)
+
+    def retarget(self, key: str, host_id: str) -> None:
+        """Replace the prepared subject's id with the host-assigned name (spec 0012 AC11)."""
+        item = self._prepared.get(key)
+        if item is not None:
+            self._prepared[key] = Expect(
+                item.helper, Subject(kind=item.subject.kind, id=host_id, case=item.subject.case), item.want
+            )
 
     def commit(self, key: str) -> None:
         item = self._prepared.pop(key, None)
@@ -191,8 +216,40 @@ def _point_load(row: Want) -> Want:
     return want
 
 
+def _frame_geometry(s: Snapshot, subject: Subject) -> Want | None:
+    """Points and section of one frame from `model.frame_placements/1` (spec 0012 AC11)."""
+    frames = s.state.payloads["model.frame_placements/1"].model_dump(mode="json")["frames"]
+    row = _row(frames, {"id": subject.id})
+    if row is None:
+        return None
+    i_pt, j_pt = row["i"], row["j"]
+    return {
+        "section": row["section"],
+        "xi_mm": i_pt["x_mm"],
+        "yi_mm": i_pt["y_mm"],
+        "zi_mm": i_pt["z_mm"],
+        "xj_mm": j_pt["x_mm"],
+        "yj_mm": j_pt["y_mm"],
+        "zj_mm": j_pt["z_mm"],
+    }
+
+
+def _area_geometry(s: Snapshot, subject: Subject) -> Want | None:
+    """Section and boundary points of one area from `model.area_placements/1` (spec 0012 AC13)."""
+    areas = s.state.payloads["model.area_placements/1"].model_dump(mode="json")["areas"]
+    row = _row(areas, {"id": subject.id})
+    if row is None:
+        return None
+    points = [[p["x_mm"], p["y_mm"], p["z_mm"]] for p in row["points"]]
+    return {"section": row["section"], "points_mm": points}
+
+
 OBSERVE: dict[str, Callable[[Snapshot, Subject], Want | None]] = {  # by the allowlist's `readback` name
     "frame_section": _payload("model.frame_placements/1", "frames", "id"),
+    "frame": _frame_geometry,  # allowlist readback for csi_add_frame_by_coord
+    "frame_geometry": _frame_geometry,
+    "area": _area_geometry,  # allowlist readback for csi_add_area_by_coord
+    "area_geometry": _area_geometry,
     "area_section_table": _table("area_section", "section", lambda s, raw: raw),
     "wall_section_table": _table("wall_section", "thickness_mm", _millimetres),
     "frame_load_table": _payload("model.load_set/1", "frame_loads", "frame"),
@@ -219,8 +276,8 @@ def _differs(got: Want, want: Want, tolerance: float) -> bool:
 def compare(item: Expect, snap: Snapshot, tolerance: float | None) -> ModelIssue | None:
     """The read-back issue of one written item, or `None` when it shows the requested state."""
 
-    def issue(code: str, message: str) -> ModelIssue:
-        return ModelIssue(severity=_ERROR, code=code, subject=item.subject, message=message)
+    def issue(code: str, message: str, severity: Severity = _ERROR) -> ModelIssue:
+        return ModelIssue(severity=severity, code=code, subject=item.subject, message=message)
 
     observe, name = OBSERVE[item.helper], item.subject.id
     try:
@@ -231,6 +288,9 @@ def compare(item: Expect, snap: Snapshot, tolerance: float | None) -> ModelIssue
         return None if got is None else issue("READBACK_MISMATCH", f"{name} is still present")
     if got is None:
         return issue("READBACK_MISMATCH", f"{name} is absent")
+    # Spec 0012 AC13: without a pattern-defs table, presence by name is enough; type and self-weight are unchecked.
+    if item.helper == "load_pattern" and "pattern_defs" not in snap.profile.tables:
+        return None
     if tolerance is None and any(isinstance(wanted, float) for wanted in item.want.values()):
         return issue("READBACK_UNAVAILABLE", "no read-back tolerance (checks.readback_relative_tolerance_ratio)")
     if _differs(got, item.want, tolerance or 0.0):
@@ -238,6 +298,18 @@ def compare(item: Expect, snap: Snapshot, tolerance: float | None) -> ModelIssue
             "READBACK_MISMATCH", f"{name} reads { ({k: got.get(k) for k in item.want}) }, requested {item.want}"
         )
     return None
+
+
+def pattern_partial(item: Expect, snap: Snapshot) -> ModelIssue | None:
+    """`READBACK_PARTIAL` warning when a pattern's type and self-weight were not table-checked (spec 0012 AC13)."""
+    if item.helper != "load_pattern" or "pattern_defs" in snap.profile.tables:
+        return None
+    return ModelIssue(
+        severity=Severity.WARNING,
+        code="READBACK_PARTIAL",
+        subject=item.subject,
+        message=f"{item.subject.id}: type and self-weight unchecked until the pattern table is keyed",
+    )
 
 
 def integrity(snap: Snapshot) -> list[ModelIssue]:
@@ -325,6 +397,7 @@ def issues_of(read_back: ReadBack, model_key: str, snap: Snapshot) -> list[Model
     """The read-back issues of `model_key`'s items, then the tolerance-free ones; the caller clears the items later."""
     items = read_back.written.items(model_key)
     found = [issue for item in items if (issue := compare(item, snap, read_back.tolerance_ratio)) is not None]
+    found += [issue for item in items if (issue := pattern_partial(item, snap)) is not None]
     return [*found, *integrity(snap)]
 
 
