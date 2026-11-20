@@ -112,11 +112,18 @@ tasks:
     depends_on: [T3]
   - id: T5
     title: Add-frame edit with name from the reply, typed read-back edits, reconciliation by geometry
+    # Amendment (B-594, documents only): AC11–AC13 need the SAP2000 add-frame builders and tokens, the section
+    # check and the reply-name retarget merged into the shared registries in adapters/csi/_tools.py, and
+    # ProductProfile.add_frame_naming on products/__init__.py (wired from _sap2000; no product-name branch,
+    # spec 0008 AC2); measured by the B-249 writer (not previously in T5's files). T5 and T6 both edit
+    # adapters/csi/_tools.py (serialize T5 then T6, or either order with the integrator merging).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_sap2000_edits.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_sap2000.py"
+      - "packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py"  # T5 may only add ProductProfile.add_frame_naming wired from _sap2000 (no product-name branch) (amendment B-594)
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_tools.py"  # T5 may only merge the SAP2000 add-frame builders and tokens, the section check and the reply-name retarget into the shared registries; no product-name branch (amendment B-594)
       - "packages/eng-harness/src/eng_harness/adapters/csi/_reconcile.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_checks.py"
       - "packages/eng-harness/tests/workflow/adapters/test_sap2000_edits.py"
@@ -133,11 +140,16 @@ tasks:
     depends_on: [T4]
   - id: T6
     title: Analysis, result readers and design run and results for SAP2000
+    # Amendment (B-594, documents only): AC14–AC16 need the SAP2000 analysis, result-reader and design BUILDERS,
+    # TOKENS and READERS merged into the shared registries in adapters/csi/_tools.py (the B-588 pattern for SAFE
+    # T7); measured by the B-250 writer (not previously in T6's files). T5 and T6 both edit adapters/csi/_tools.py
+    # (serialize T5 then T6, or either order with the integrator merging).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_sap2000_results.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_sap2000.py"
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_tools.py"  # T6 may only merge the SAP2000 analysis, result-reader and design BUILDERS, TOKENS and READERS into the shared registries (the B-588 pattern) (amendment B-594)
       - "packages/eng-harness/tests/workflow/adapters/test_sap2000_analysis.py"
       - "packages/eng-harness/tests/workflow/adapters/test_sap2000_results.py"
       - "packages/eng-harness/tests/workflow/adapters/test_sap2000_design.py"
@@ -208,9 +220,15 @@ T4 may wire only `ProductProfile.declared_absences` and select the absences-awar
 
 **T5 Edits** (AC11 to AC13). Add frame with the name from the reply, assign section, area, patterns and combinations with
 typed read-back, the table-read-back edits as gap SP-4, reconcile by geometry.
+T5 may only merge the SAP2000 add-frame builders and tokens, the section check and the reply-name retarget into the
+shared registries in `csi/_tools.py`, and may only add `ProductProfile.add_frame_naming` wired from `_sap2000` on
+`products/__init__.py` (no product-name branch; spec 0008 AC2; amendment B-594).
 
 **T6 Analysis, results, design** (AC14 to AC16). Long-role analysis after save, the result kinds, steel and concrete
 design runs, steel results, concrete non-beam results as SP-3, `aluminum` and `coldformed` refused before any call.
+T6 may only merge the SAP2000 analysis, result-reader and design BUILDERS, TOKENS and READERS into the shared
+registries in `csi/_tools.py` (the B-588 pattern for SAFE T7; amendment B-594), so AC14–AC16 reach the CSI tool port.
+T5 and T6 both edit `adapters/csi/_tools.py` (serialize T5 then T6, or either order with the integrator merging).
 
 **T7 End to end** (AC18, AC19). Cycle block, crash matrix, recorded-reply contract tests (run on every applicable
 committed recording under `acceptance/recordings` and on the synthetic recording produced by record mode for that
