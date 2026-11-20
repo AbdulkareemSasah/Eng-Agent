@@ -1,6 +1,8 @@
 """Build check of a Sasaah server (plan 0002 T6b; spec 0002 section 4.3.4, AC9, AC10).
 
 A mismatch is `ServerCheck(ok=False)` with the first reason, never an exception (the engine stops the run). No units.
+Revit extensions (plan 0011 T4; spec 0011 section 4.3): code-toolset hatch names, destructive-toolset reason,
+`revit_connection_status` ping and catalog version.
 """
 
 import hashlib
@@ -19,6 +21,21 @@ from eng_harness.servers._config import BuildPin
 # Hidden by the required start options; `csi_db_tables_apply` is always listed (S12-G7), tolerated, never callable.
 # IDEA: `idea_run_script` is hidden by `--disable-script` (spec 0014 section 4.3 item 4).
 _HATCH = re.compile(r"csi_(run_script|invoke|object_\w+)|idea_run_script")
+# Spec 0011 section 4.3 item 5: code toolset on when any of these MCP names is listed.
+_REVIT_CODE_TOOLS = frozenset(
+    {
+        "revit_send_code_to_revit",
+        "revit_compile_and_run",
+        "revit_dev_hot_run",
+        "revit_dev_hot_unload",
+        "revit_dev_hot_sessions",
+        "revit_run_baked_tool",
+        "revit_list_baked_tools",
+    }
+)
+_CSI_STATUS_TOOLS = frozenset({"csi_status", "idea_status"})
+_REVIT_STATUS_TOOL = "revit_connection_status"
+_DESTRUCTIVE_REASON = "destructive toolset disabled in Revit (`bridgeToolsets`)"
 
 
 @dataclass(frozen=True)
@@ -31,6 +48,8 @@ class BuildExpectation:
     tool_names: frozenset[str]  # every allowlisted tool of `product`, whatever its route
     product: str  # the product the allowlist was loaded for
     status_tool: str = "csi_status"  # status tool the build check calls (spec 0014 AC3: idea_status)
+    # Spec 0011 section 4.3 item 4: when missing tools equal this set, the reason names bridgeToolsets.
+    destructive_tools: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -61,6 +80,30 @@ def tool_list_fingerprint(schemas: Mapping[str, Any]) -> str:
     return payload_sha256([{"name": n, "input_schema": _strip(schemas[n])} for n in sorted(schemas)])
 
 
+def _missing_reason(missing: list[str], want: BuildExpectation) -> str:
+    """Reason for missing allowlisted tools; Revit destructive-only misses name bridgeToolsets (spec 0011 §4.3)."""
+    if want.destructive_tools and frozenset(missing) == want.destructive_tools:
+        return _DESTRUCTIVE_REASON
+    return f"allowlisted tool {', '.join(missing)} is not listed"
+
+
+def _status_failures(want: BuildExpectation, status: Mapping[str, Any]) -> list[tuple[bool, str]]:
+    """Status-tool checks: CSI/IDEA flags, or Revit ping_status and catalog_version (spec 0011 §4.3 item 6)."""
+    if want.status_tool in _CSI_STATUS_TOOLS:
+        flags = [f for f in ("read_only", "script_enabled") if status.get(f) is not False]
+        return [(bool(flags), f"{want.status_tool} {' and '.join(flags)} is not false")]
+    if want.status_tool == _REVIT_STATUS_TOOL:
+        catalog = status.get("catalog_version")
+        return [
+            (status.get("ping_status") != "ok", f"{want.status_tool} ping_status is not ok"),
+            (
+                not (isinstance(catalog, str) and catalog != ""),
+                f"{want.status_tool} catalog_version is missing",
+            ),
+        ]
+    return []
+
+
 def check_build(
     server: str, pin: BuildPin, want: BuildExpectation, seen: Observed, minimum: str = "", *, product: str
 ) -> ServerCheck:
@@ -73,9 +116,8 @@ def check_build(
     fingerprint = tool_list_fingerprint({n: s for n, s in seen.tools.items() if n in want.tool_names})
     version = seen.server_info.version if seen.server_info else None
     missing = sorted(want.tool_names - seen.tools.keys())
-    hatch = sorted(n for n in seen.tools if _HATCH.fullmatch(n))
+    hatch = sorted(n for n in seen.tools if _HATCH.fullmatch(n) or n in _REVIT_CODE_TOOLS)
     tested = (want.sasaah_commit, *want.also_tested_commits)
-    flags = [f for f in ("read_only", "script_enabled") if seen.status.get(f) is not False]
     try:
         addin_hashes = tuple(hashlib.sha256(Path(path).read_bytes()).hexdigest() for path in pin.addin_paths)
     except OSError:
@@ -87,10 +129,10 @@ def check_build(
         (pin.server_info_version not in (None, version), "serverInfo version is not the pinned one"),
         (pin.sasaah_commit != want.sasaah_commit, "the pinned Sasaah commit is not the allowlist's commit"),
         (bool(minimum) and minimum not in tested, "the workflow's minimum build was not tested with the allowlist"),
-        (bool(missing), f"allowlisted tool {', '.join(missing)} is not listed"),
+        (bool(missing), _missing_reason(missing, want)),
         (bool(hatch), f"{', '.join(hatch)} is listed: the start options failed"),
         (fingerprint != want.tool_fingerprint, "tool-list fingerprint differs from the allowlist's"),
-        (bool(flags), f"{want.status_tool} {' and '.join(flags)} is not false"),
+        *_status_failures(want, seen.status),
     ]
     reason = next((why for failed, why in failures if failed), None)
     build = f"{pin.sasaah_commit[:12]}+{seen.exe_sha256[:12]}"

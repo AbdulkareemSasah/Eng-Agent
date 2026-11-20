@@ -41,6 +41,8 @@ logger = logging.getLogger(__name__)
 
 _MAX_LIST_PAGES = 100  # pages of `tools/list` read before the listing counts as endless; a software setting
 _ATTACH_TOOL = "csi_attach"  # S-12: attaches the session to a running instance by process id
+_REVIT_ADAPTER = "sasaah-revit-mcp"  # spec 0011 section 4.2
+_REVIT_TARGET_TOOL = "revit_get_current_target"  # AC4: must return the configured pipe_name
 
 
 class CallEffect(StrEnum):
@@ -191,19 +193,25 @@ class ServerManager:
 
         return await self._request(self._roles[server, role], CallEffect.READ, "tools/list", read)
 
+    def _expectation(self, role: _Role) -> BuildExpectation | None:
+        """Lookup keyed by `server/role` (Revit read/write) or by server alone (CSI, IDEA)."""
+        return self._check.get(f"{role.server}/{role.name}") or self._check.get(role.server)
+
     async def preflight(self, min_builds: Mapping[str, str]) -> list[ServerCheck]:
-        """Check each server's build on its first role (spec 4.3.4); `min_builds` maps a server to its minimum."""
+        """Check each server's build (spec 4.3.4); Revit checks every role (spec 0011 section 4.3)."""
         self._min_builds = dict(min_builds)
         checks: list[ServerCheck] = []
         for name, server in self._config.servers.items():
-            role = self._roles[name, next(iter(server.roles))]
-            if (expected := self._check.get(name)) is None:
-                checks.append(self._unchecked(role, "no build check is configured for this server"))
-                continue
-            try:
-                checks.append(await self._verify(role, await self._ensure(role), expected))
-            except ToolFailed as error:
-                checks.append(self._unchecked(role, error.detail.message))
+            role_names = list(server.roles) if server.adapter == _REVIT_ADAPTER else [next(iter(server.roles))]
+            for role_name in role_names:
+                role = self._roles[name, role_name]
+                if (expected := self._expectation(role)) is None:
+                    checks.append(self._unchecked(role, "no build check is configured for this server"))
+                    continue
+                try:
+                    checks.append(await self._verify(role, await self._ensure(role), expected))
+                except ToolFailed as error:
+                    checks.append(self._unchecked(role, error.detail.message))
         return checks
 
     def _unchecked(self, role: _Role, reason: str) -> ServerCheck:
@@ -234,18 +242,42 @@ class ServerManager:
                         break
                 status_tool = expected.status_tool
                 reply = await client.call_tool(status_tool, {}, read_timeout_seconds=backstop_s)
-            block = reply.content[0] if reply.content else None
-            status = json.loads(block.text) if isinstance(block, types.TextContent) and not reply.is_error else None
-            if not isinstance(status, dict):
-                raise ValueError(f"{status_tool} gave no JSON object")
+                block = reply.content[0] if reply.content else None
+                status = json.loads(block.text) if isinstance(block, types.TextContent) and not reply.is_error else None
+                if not isinstance(status, dict):
+                    raise ValueError(f"{status_tool} gave no JSON object")
+                pipe_error = await self._revit_pipe_mismatch(role, client, backstop_s)
         except (TimeoutError, MCPError, OSError, ValueError) as error:
             return self._unchecked(role, f"the build cannot be read: {error}")
+        if pipe_error is not None:
+            return self._unchecked(role, pipe_error)
         seen = Observed(exe, client.server_info, {t.name: t.input_schema for t in tools}, status)
+        catalog = status.get("catalog_version", "")
         logger.info(
-            "%s/%s %s, tool list %s", role.server, role.name, seen.server_info, tool_list_fingerprint(seen.tools)
+            "%s/%s %s, tool list %s, catalog_version %s",
+            role.server,
+            role.name,
+            seen.server_info,
+            tool_list_fingerprint(seen.tools),
+            catalog,
         )
         minimum = self._min_builds.get(role.server, "")
-        return check_build(role.server, role.config.build, expected, seen, minimum, product=role.config.product)
+        # Revit allowlist products are the role names `read`/`write` (plan 0011 T3), not ServerConfig.product.
+        product = expected.product if role.config.adapter == _REVIT_ADAPTER else role.config.product
+        return check_build(role.server, role.config.build, expected, seen, minimum, product=product)
+
+    async def _revit_pipe_mismatch(self, role: _Role, client: Client, backstop_s: float) -> str | None:
+        """AC4: `revit_get_current_target` must return the configured `pipe_name` (spec 0011 section 4.2)."""
+        if role.config.adapter != _REVIT_ADAPTER or role.config.pipe_name is None:
+            return None
+        reply = await client.call_tool(_REVIT_TARGET_TOOL, {}, read_timeout_seconds=backstop_s)
+        block = reply.content[0] if reply.content else None
+        body = json.loads(block.text) if isinstance(block, types.TextContent) and not reply.is_error else None
+        if not isinstance(body, dict):
+            return f"{_REVIT_TARGET_TOOL} gave no JSON object"
+        if body.get("pipe_name") != role.config.pipe_name:
+            return f"{_REVIT_TARGET_TOOL} pipe_name differs from the configured pipe"
+        return None
 
     async def call(
         self, server: str, role: str, tool: str, arguments: Mapping[str, Any], effect: CallEffect
@@ -299,7 +331,7 @@ class ServerManager:
             live = await self._start(role)
             role.live = live
             try:
-                expected = self._check.get(role.server) if role.starts > 1 else None  # a restart repeats the check
+                expected = self._expectation(role) if role.starts > 1 else None  # a restart repeats the check
                 if expected and not (result := await self._verify(role, live, expected)).ok:
                     raise _fail(ErrorCode.HOST_NOT_CONNECTED, f"{role.server}: build check failed: {result.reason}")
                 await self._attach(role, live)
@@ -314,9 +346,30 @@ class ServerManager:
         """The launch of spec section 4.3.2: `launch_argv` adds the timeout and, when set, the audit log."""
         servers = self._run_dir / "servers"
         argv = launch_argv(role.config, role.server, role.name, role.role, self._run_dir)
+        if role.config.adapter == _REVIT_ADAPTER:
+            argv = self._revit_argv(argv, role)
         env = {**get_default_environment(), **role.config.env}
         stderr = servers / f"{role.server}-{role.name}.stderr.log"
         return LaunchSpec(argv=argv, env=env, cwd=self._run_dir, stderr_path=stderr, job=JobPolicy.SERVER)
+
+    @staticmethod
+    def _revit_argv(argv: list[str], role: _Role) -> list[str]:
+        """Required Revit start options (spec 0011 section 4.2 rule 2); `--read-only` on the read role only."""
+        pipe_name = role.config.pipe_name
+        if pipe_name is None:
+            raise ValueError("pipe_name is required for Revit")  # validated when the section loads
+        extra = [
+            "--pipe-name",
+            pipe_name,
+            "--bridge-timeout-ms",
+            str(role.role.call_timeout_s * 1000),
+            "--disable-send-code",
+            "--disable-adaptive-bake",
+            "--no-cache-send-code-bodies",
+        ]
+        if role.name == "read":
+            extra.append("--read-only")
+        return [*argv, *extra]
 
     async def _start(self, role: _Role) -> _Live:
         started: _Live | Exception
