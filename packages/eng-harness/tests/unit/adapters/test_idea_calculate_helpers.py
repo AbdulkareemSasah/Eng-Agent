@@ -12,6 +12,7 @@ from typing import Any, cast
 
 import anyio
 import pytest
+from eng_contract.envelope import HostInfo, LiteralInput
 from eng_contract.errors import ContractError, ErrorCode, Precondition
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import LocationClass, ResultStore, Workspace
@@ -21,6 +22,7 @@ from pydantic import JsonValue
 
 from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.adapters.idea import _calculate as m
+from eng_harness.adapters.idea._calculate import CalculateProvenance
 from eng_harness.adapters.idea._replies import TEXT_LIMIT
 from eng_harness.adapters.idea._verdicts import HOST_ASSUMPTION
 from eng_harness.kinds.idea import IDEA_KINDS
@@ -72,6 +74,34 @@ def _store(tmp_path: Any) -> ResultStore:
     ids = SeededIdSource(b"idea-calc-helpers", clock)
     workspace = Workspace(root=tmp_path / "ws", classification=LocationClass.LOCAL)
     return ResultStore(workspace, HARNESS_KINDS.extend(IDEA_KINDS), ids, clock)
+
+
+def _provenance(*, revision: int = 1, tick: int = 1) -> CalculateProvenance:
+    """Caller-supplied clock/host/build for store provenance (spec 0002 section 4.5.3)."""
+    return CalculateProvenance(
+        clock=FixedClock(_START, tick),
+        host=HostInfo(
+            program="idea",
+            version="",
+            model_id="mdl_01HF7YAT00361949KDC0CXNRAC",
+            model_revision=revision,
+        ),
+        tool_version="test-build+deadbeefdead",
+    )
+
+
+def _store_kwargs(store: ResultStore | None = None, **extra: Any) -> dict[str, Any]:
+    """Common kwargs for _store_pair / _process_success after the fix-round provenance change."""
+    clock = FixedClock(_START, 1)
+    base: dict[str, Any] = {
+        "provenance": _provenance(),
+        "inputs": {"path": LiteralInput(literal="joint.ideaCon")},
+        "files": (),
+        "started_at": clock.now(),
+        "duration_ms": 3,
+    }
+    base.update(extra)
+    return base
 
 
 def test_assumptions_native_and_rest() -> None:
@@ -132,7 +162,7 @@ def test_error_verdict_fields() -> None:
         errors=["", ""],
     )
     # Empty/falsy error items → join empty → fallback message in assumptions extras.
-    assert any("host reported errors" in a for a in empty.assumptions)
+    assert any("host text was empty" in a for a in empty.assumptions)
     assert empty.ratio is None
     assert empty.governing is False
     assert empty.status is VerdictStatus.ERROR
@@ -345,6 +375,7 @@ def test_store_pair(tmp_path: Any) -> None:
         tool="idea_native_calculate",
         raw_payload=raw_payload,
         verdicts=verdicts,
+        **_store_kwargs(),
     )
     assert raw_env.kind == "harness.idea_check_raw/1"
     assert verd_env.kind == "verdicts.set/1"
@@ -366,6 +397,7 @@ def test_store_pair(tmp_path: Any) -> None:
         tool="idea_calculate",
         raw_payload=raw_empty,
         verdicts=verdicts,
+        **_store_kwargs(),
     )
     assert raw2.summary["connections"] == 0
 
@@ -442,7 +474,6 @@ def test_require_service_reachable_branches() -> None:
 def test_process_success_rejects_unexpected_shape(tmp_path: Any) -> None:
     """AC12: bare unexpected shape is UNEXPECTED_REPLY, not OFFLINE_STUB."""
     store = _store(tmp_path)
-    ids = SeededIdSource(b"proc", FixedClock(_START))
     bad = CallToolResult(
         content=[TextContent(type="text", text='{"unexpected":true,"payload":"malformed"}')],
         is_error=False,
@@ -457,7 +488,7 @@ def test_process_success_rejects_unexpected_shape(tmp_path: Any) -> None:
                 route="native",
                 load_map_confirmed=False,
                 store=store,
-                ids=ids,
+                **_store_kwargs(),
             )
         assert raised.value.detail.code is ErrorCode.HOST_ERROR
         assert raised.value.detail.host_code == "UNEXPECTED_REPLY"
@@ -535,7 +566,7 @@ def test_raise_host_missing_body_no_code_fallback() -> None:
 
 
 def test_store_pair_kinds_summary_parents_and_provenance(tmp_path: Any) -> None:
-    """AC14: exact kind strings, summary keys, parent link, and harness/{tool} provenance."""
+    """AC14 / 0002 §4.5.3: exact kinds, summary, parents, and <adapter>/<tool> provenance."""
     from eng_contract.kinds.verdicts import VerdictSet
     from eng_contract.verdicts import Subject, Verdict
 
@@ -588,6 +619,7 @@ def test_store_pair_kinds_summary_parents_and_provenance(tmp_path: Any) -> None:
         tool="idea_get_check_results",
         raw_payload=raw_payload,
         verdicts=verdicts,
+        **_store_kwargs(),
     )
     assert raw_env.kind == "harness.idea_check_raw/1"
     assert verd_env.kind == "verdicts.set/1"
@@ -599,9 +631,13 @@ def test_store_pair_kinds_summary_parents_and_provenance(tmp_path: Any) -> None:
     counts_summary = verd_env.summary["counts"]
     assert isinstance(counts_summary, dict)
     assert counts_summary["PASS"] == 1
-    assert raw_env.provenance.tool == "harness/idea_get_check_results"
-    assert verd_env.provenance.tool == "harness/idea_get_check_results"
-    assert verd_env.provenance.tool_version == "1"
+    assert raw_env.provenance.tool == "sasaah-idea-mcp/idea_get_check_results"
+    assert verd_env.provenance.tool == "sasaah-idea-mcp/idea_get_check_results"
+    assert verd_env.provenance.tool_version == "test-build+deadbeefdead"
+    assert verd_env.provenance.host is not None
+    assert verd_env.provenance.host.program == "idea"
+    assert verd_env.provenance.host.model_revision == 1
+    assert verd_env.provenance.duration_ms == 3
     stored = store.get(verd_env.result_id)
     assert stored.parents == [raw_env.result_id]
 
@@ -658,13 +694,17 @@ def test_store_pair_records_put_args_via_fake_store() -> None:
         tool="idea_calculate",
         raw_payload=cast(dict[str, JsonValue], {"route": "rest", "connections": "not-a-list"}),
         verdicts=verdicts,
+        **_store_kwargs(),
     )
     assert len(puts) == 2
     assert puts[0][0] == "harness.idea_check_raw/1"
     assert puts[1][0] == "verdicts.set/1"
     assert puts[1][3] == [raw_env.result_id]
-    assert puts[0][2].tool == "harness/idea_calculate"
-    assert puts[1][2].tool == "harness/idea_calculate"
+    assert puts[0][2].tool == "sasaah-idea-mcp/idea_calculate"
+    assert puts[1][2].tool == "sasaah-idea-mcp/idea_calculate"
+    assert puts[0][2].tool_version == "test-build+deadbeefdead"
+    assert puts[0][2].host is not None
+    assert puts[0][2].host.model_revision == 1
     assert raw_env.summary["connections"] == 0
     assert raw_env.summary["route"] == "rest"
     assert verd_env.summary["draft"] is True
@@ -673,7 +713,6 @@ def test_store_pair_records_put_args_via_fake_store() -> None:
 def test_process_success_offline_stub_refused(tmp_path: Any) -> None:
     """AC11/AC12: check-shaped offline stub → OFFLINE_STUB (not UNEXPECTED_REPLY)."""
     store = _store(tmp_path)
-    ids = SeededIdSource(b"proc-stub", FixedClock(_START))
     stub = CallToolResult(
         content=[
             TextContent(
@@ -693,7 +732,7 @@ def test_process_success_offline_stub_refused(tmp_path: Any) -> None:
                 route="rest",
                 load_map_confirmed=False,
                 store=store,
-                ids=ids,
+                **_store_kwargs(),
             )
         assert raised.value.detail.code is ErrorCode.HOST_ERROR
         assert raised.value.detail.host_code == "OFFLINE_STUB"
@@ -708,7 +747,6 @@ def test_process_success_parses_minimal_native_connections(tmp_path: Any) -> Non
     import json
 
     store = _store(tmp_path)
-    ids = SeededIdSource(b"proc-ok", FixedClock(_START))
     body_obj = {
         "offline_stub": False,
         "backend": None,
@@ -746,7 +784,7 @@ def test_process_success_parses_minimal_native_connections(tmp_path: Any) -> Non
             route="native",
             load_map_confirmed=True,
             store=store,
-            ids=ids,
+            **_store_kwargs(),
         )
         assert result.raw.route == "native"
         assert result.raw.offline_stub is False
@@ -764,7 +802,6 @@ def test_process_success_parses_minimal_native_connections(tmp_path: Any) -> Non
 def test_process_success_unexpected_shape_exact_literals(tmp_path: Any) -> None:
     """AC12: unexpected shape uses exact message, host_method=tool, retryable=False."""
     store = _store(tmp_path)
-    ids = SeededIdSource(b"proc-unexp", FixedClock(_START))
     bad = CallToolResult(
         content=[TextContent(type="text", text='{"unexpected":true}')],
         is_error=False,
@@ -779,7 +816,7 @@ def test_process_success_unexpected_shape_exact_literals(tmp_path: Any) -> None:
                 route="rest",
                 load_map_confirmed=False,
                 store=store,
-                ids=ids,
+                **_store_kwargs(),
             )
         detail = raised.value.detail
         assert detail.code is ErrorCode.HOST_ERROR
@@ -882,6 +919,7 @@ def test_calculate_native_success_tool_args_effect_and_route(monkeypatch: pytest
             load_map_confirmed=True,
             store=_store(tmp_path),
             ids=SeededIdSource(b"nat-ok", FixedClock(_START)),
+            provenance=_provenance(),
         )
         assert out is sentinel
 
@@ -934,6 +972,7 @@ def test_calculate_native_error_raises_host(monkeypatch: pytest.MonkeyPatch, tmp
                 load_map_confirmed=False,
                 store=_store(tmp_path),
                 ids=SeededIdSource(b"nat-err", FixedClock(_START)),
+                provenance=_provenance(),
             )
         assert raised.value.detail.host_method == "idea_native_calculate"
 
@@ -978,6 +1017,7 @@ def test_calculate_rest_success_tool_args_effect_and_route(monkeypatch: pytest.M
             approved=True,
             store=_store(tmp_path),
             ids=SeededIdSource(b"rest-ok", FixedClock(_START)),
+            provenance=_provenance(),
         )
         assert out is sentinel
 
@@ -1027,6 +1067,7 @@ def test_calculate_rest_error_raises_host_write(monkeypatch: pytest.MonkeyPatch,
                 approved=False,
                 store=_store(tmp_path),
                 ids=SeededIdSource(b"rest-err", FixedClock(_START)),
+                provenance=_provenance(),
             )
 
     anyio.run(body)
@@ -1071,6 +1112,7 @@ def test_get_check_results_success_with_and_without_connection_id(
             load_map_confirmed=True,
             store=store,
             ids=ids,
+            provenance=_provenance(),
         )
         assert out is sentinel
         out2: Any = await m.get_check_results(
@@ -1082,6 +1124,7 @@ def test_get_check_results_success_with_and_without_connection_id(
             load_map_confirmed=False,
             store=store,
             ids=ids,
+            provenance=_provenance(),
         )
         assert out2 is sentinel
 
@@ -1130,6 +1173,7 @@ def test_get_check_results_error_raises_host_read(monkeypatch: pytest.MonkeyPatc
                 load_map_confirmed=True,
                 store=_store(tmp_path),
                 ids=SeededIdSource(b"get-err", FixedClock(_START)),
+                provenance=_provenance(),
             )
 
     anyio.run(body)
@@ -1168,6 +1212,7 @@ def test_calculate_rest_without_approval_omits_confirm(monkeypatch: pytest.Monke
             approved=False,
             store=_store(tmp_path),
             ids=SeededIdSource(b"rest-no-confirm", FixedClock(_START)),
+            provenance=_provenance(),
         )
         assert result.route == "rest"
         assert result.tool == "idea_calculate"
@@ -1177,3 +1222,106 @@ def test_calculate_rest_without_approval_omits_confirm(monkeypatch: pytest.Monke
     assert calls[0]["effect"] is CallEffect.WRITE
     assert calls[0]["args"] == {"connection_ids": [5]}
     assert "confirm" not in calls[0]["args"]
+
+
+def test_process_success_route_mismatch_unexpected(tmp_path: Any) -> None:
+    """AC11: host route native on a rest call is UNEXPECTED_REPLY; failure evidence stored."""
+    store = _store(tmp_path)
+    body = {
+        "route": "native",
+        "backend": "file",
+        "offline_stub": False,
+        "connections": [_connection()],
+    }
+    reply = CallToolResult(content=[TextContent(type="text", text=__import__("json").dumps(body))], is_error=False)
+
+    async def run() -> None:
+        with pytest.raises(ContractError) as raised:
+            await m._process_success(
+                reply,
+                tool="idea_calculate",
+                design_code=_DESIGN_CODE,
+                route="rest",
+                load_map_confirmed=False,
+                store=store,
+                **_store_kwargs(),
+            )
+        assert raised.value.detail.host_code == "UNEXPECTED_REPLY"
+
+    anyio.run(run)
+
+
+def test_verdicts_from_connections_errors_keep_fail_checks() -> None:
+    """AC12 additive: connection with errors and a FAIL check keeps FAIL and adds ERROR."""
+    rows = [
+        _connection(
+            name="CON1",
+            passed=False,
+            checks=[_check("Plates", 150.0, status=False)],
+            errors=["kernel failed"],
+        )
+    ]
+    payload = m._verdicts_from_connections(
+        rows,
+        design_code=_DESIGN_CODE,
+        route="native",
+        load_map_confirmed=True,
+    )
+    assert any(v.status is VerdictStatus.FAIL for v in payload.verdicts)
+    assert any(v.check_id == "idea:connection" and v.status is VerdictStatus.ERROR for v in payload.verdicts)
+
+
+def test_verdicts_from_connections_mixed_error_uncalculated() -> None:
+    """AC12: calculated+errors with sibling uncalculated keeps ERROR (not PRECONDITION_FAILED)."""
+    rows = [
+        _connection(name="BAD", calculated=True, checks=[], errors=["kernel failed"]),
+        _connection(name="PENDING", calculated=False, checks=[], errors=[]),
+    ]
+    payload = m._verdicts_from_connections(
+        rows,
+        design_code=_DESIGN_CODE,
+        route="native",
+        load_map_confirmed=True,
+    )
+    assert any(v.status is VerdictStatus.ERROR for v in payload.verdicts)
+
+
+def test_calculate_rest_passes_op_id_on_timeout(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+    """AC18: calculate_rest forwards op_id to _raise_host for TIMEOUT_UNKNOWN_OUTCOME."""
+    from types import SimpleNamespace
+
+    raise_kwargs: list[dict[str, Any]] = []
+
+    class _Sessions:
+        async def call(self, *_a: Any, **_k: Any) -> Any:
+            return SimpleNamespace(is_error=True)
+
+    async def _fake_preflight(**_kwargs: Any) -> None:
+        return None
+
+    def _fake_raise(result: Any, **kwargs: Any) -> None:
+        raise_kwargs.append(dict(kwargs))
+        raise ContractError(ErrorCode.TIMEOUT_UNKNOWN_OUTCOME, "timeout", op_id=kwargs.get("op_id", ""))
+
+    monkeypatch.setattr(m, "_require_service_reachable", _fake_preflight)
+    monkeypatch.setattr(m, "_raise_host", _fake_raise)
+
+    async def body() -> None:
+        with pytest.raises(ContractError) as raised:
+            await m.calculate_rest(
+                sessions=_Sessions(),
+                server="idea",
+                role="main",
+                connection_ids=[1],
+                design_code=_DESIGN_CODE,
+                load_map_confirmed=True,
+                approved=True,
+                store=_store(tmp_path),
+                ids=SeededIdSource(b"rest-op", FixedClock(_START)),
+                provenance=_provenance(),
+                op_id="op_from_caller",
+            )
+        assert raised.value.detail.op_id == "op_from_caller"
+
+    anyio.run(body)
+    assert raise_kwargs[0]["op_id"] == "op_from_caller"

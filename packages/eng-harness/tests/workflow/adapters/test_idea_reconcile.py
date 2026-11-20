@@ -114,7 +114,7 @@ def test_set_loads_outcomes(tmp_path: Path) -> None:
     run_dir.mkdir()
     src = make_ideacon(run_dir / "src.ideaCon")
     loads = _sample_loads()
-    reconciler = IdeaReconciler(tolerance_ratio=1e-9)
+    reconciler = IdeaReconciler(tolerance_ratio=1e-9)  # test-only synthetic value; not a cited engineering number
 
     async def body() -> None:
         async with ServerManager(config, run_dir) as manager:
@@ -222,7 +222,7 @@ def test_calculate_unknown_no_rerun(tmp_path: Path) -> None:
         }
     )
     model = make_ideacon(tmp_path / "joint.ideaCon")
-    reconciler = IdeaReconciler(tolerance_ratio=1e-9)
+    reconciler = IdeaReconciler(tolerance_ratio=1e-9)  # test-only synthetic value; not a cited engineering number
     call_log: list[str] = []
 
     async def body() -> None:
