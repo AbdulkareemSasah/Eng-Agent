@@ -124,6 +124,64 @@ SAFE_SEED: dict[str, Any] = {
         ],
     },
 }  # fmt: skip
+# SAP2000 synthetic seed: state of plan 0012 T4 plus force/reaction results of T6 (spec 0012 §4.3, AC15).
+# Values match test_sap2000_state._seed and test_sap2000_results._SEED (no invented numbers or table keys).
+SAP2000_SEED: dict[str, Any] = {
+    "points": [{"name": "P1", "x": 1000.0, "y": 500.0, "z": 0.0}],
+    "frames": [
+        {"name": "F1", "point1": [0.0, 0.0, 0.0], "point2": [0.0, 0.0, 3000.0], "section": "C300"},
+    ],
+    "areas": [
+        {
+            "name": "A1",
+            "points": [[0.0, 0.0, 0.0], [4000.0, 0.0, 0.0], [4000.0, 4000.0, 0.0], [0.0, 4000.0, 0.0]],
+            "section": "SLAB1",
+        }
+    ],
+    "frame_sections": [{"name": "C300"}, {"name": "C400"}],
+    "area_sections": [{"name": "SLAB1", "type": "slab"}],
+    "materials": [{"name": "C30"}],
+    "load_patterns": [{"name": "DEAD", "type": "Dead", "self_weight": 1.0}],
+    "load_cases": [{"name": "DEAD"}, {"name": "LIVE"}],
+    "load_combos": [{"name": "C1", "type": 0, "items": [{"name": "DEAD", "factor": 1.4, "kind": "case"}]}],
+    "tables": {},
+    "results": {
+        "csi_results_joint_reactions": [
+            {"joint": "J1", "case": "DEAD", "F1": 1.5, "F2": -2.0, "F3": 120.25, "M1": 0.5, "M2": -0.25, "M3": 0.0},
+        ],
+        "csi_results_frame_forces": [
+            {
+                "frame": "B1",
+                "case": "1.4D",
+                "kind": "combo",
+                "station": 1.25,
+                "step": "Max",
+                "P": -10.0,
+                "V2": 4.5,
+                "V3": 0.0,
+                "T": 0.0,
+                "M2": 0.0,
+                "M3": -7.75,
+            },
+            {
+                "frame": "B1",
+                "case": "1.4D",
+                "kind": "combo",
+                "station": 1.25,
+                "step": "Min",
+                "P": -8.0,
+                "V2": 3.0,
+                "V3": 0.0,
+                "T": 0.0,
+                "M2": 0.0,
+                "M3": -5.0,
+            },
+        ],
+        "csi_results_base_reactions": [
+            {"case": "DEAD", "F1": 1.0, "F2": -2.0, "F3": 50.0, "M1": 0.5, "M2": -0.25, "M3": 0.0},
+        ],
+    },
+}  # fmt: skip
 
 
 @asynccontextmanager
@@ -183,12 +241,32 @@ async def scripted_session(client: Client, home: str, *, product: str = "ETABS")
         await _body(client, "csi_analysis_status", target)
         return
 
+    if product == "SAP2000":
+        from eng_harness.adapters.csi.products._sap2000_state import Sap2000StateReader
+
+        # No Project Information read: SAP2000 table names beyond Analysis Messages are OQ-Q102 (keep unknown).
+        await Sap2000StateReader(product=product, call=call).read(pid, Path(model))
+        await _body(client, "csi_results_joint_reactions", {"cases": ["DEAD"], "units": "kN_m_C", **target})
+        await _body(client, "csi_results_frame_forces", {"cases": ["1.4D"], "units": "kN_m_C", **target})
+        await _body(client, "csi_run_analysis", target)  # no `confirm`: the host refuses
+        await _body(client, "csi_analysis_status", target)
+        return
+
     await CsiStateReader(product=product, call=call).read(pid, Path(model))
     await _body(client, "csi_db_table_read", {"table": "Project Information", **target})  # dropped by record mode
     await _body(client, "csi_results_joint_reactions", {"cases": ["DEAD"], "units": "kN_m_C", **target})
     await _body(client, "csi_run_analysis", target)  # no `confirm`: the host refuses
     await _body(client, "csi_design_results", {"kind": "steel", **target})  # no design run: a `csi_error` reply
     await _body(client, "csi_analysis_status", target)
+
+
+def _seed_for(product: str) -> Mapping[str, Any]:
+    """Synthetic seed for the product's scripted session (ETABS / SAFE / SAP2000)."""
+    if product == "SAFE":
+        return SAFE_SEED
+    if product == "SAP2000":
+        return SAP2000_SEED
+    return SEED
 
 
 def record_synthetic(
@@ -199,7 +277,7 @@ def record_synthetic(
     recording = Recording(
         directory, run_dir, adapter="sasaah-csi-mcp", build="synthetic", tool_names=tool_names, user=USER, home=home
     )
-    seed: Mapping[str, Any] = SAFE_SEED if product == "SAFE" else SEED
+    seed: Mapping[str, Any] = _seed_for(product)
 
     async def session() -> None:
         async with fake_client(run_dir, seed, recording=recording, product=product) as client:
@@ -218,7 +296,7 @@ def replay_on_fake(
 ) -> list[tuple[Any, dict[str, Any]]]:
     """Send every recorded `tools/call` of `host` to a fresh synthetic fake, in recorded order; pairs with the reply."""
     answers: list[tuple[Any, dict[str, Any]]] = []
-    used = SAFE_SEED if product == "SAFE" and seed is None else (SEED if seed is None else seed)
+    used = _seed_for(product) if seed is None else seed
 
     async def session() -> None:
         async with fake_client(run_dir, used, product=product) as client:

@@ -86,3 +86,14 @@ Plan 0008 (SAFE adapter; listed by T8, spec §12). Nothing here runs in CI. On a
 45. L13. `close_started` on a hidden SAFE instance and on a visible one.
 46. L14. Record mode on a SAFE copy (`uv run python acceptance/scripts/record_csi.py --config harness.toml --model <copy.FDB> --product SAFE --analysis --cases <names> --combos <names>`); the owner's review of the recordings before commit.
 47. L15. An ETABS server and a SAFE server in one run: epochs, host-instance locks, a timeout on one (Q1).
+
+Plan 0012 (SAP2000 adapter; listed by T7, spec §12). Nothing here runs in CI. On a copy of a frame model, SAP2000 26:
+48. L1. `csi_launch(product="SAP2000", visible=false)`, the pid, survival after the server job closes, `csi_exit`, the live `tools/list` fingerprint and `csi_status` (AC3, AC5).
+49. L2. `csi_open_model` and `csi_save_model` on `.SDB`: hash change, companion files, copy equality (AC5).
+50. L3. The replies of every `serve` list tool: names, `truncated`, frame fields, and that `csi_list_stories`/`csi_list_grids` answer `unsupported_by_version` on COM (AC7, AC8).
+51. L4. `csi_db_table_fields` and `csi_db_table_read` of each table the readers need (frame, joint and area loads, restraints, pattern and combination definitions, `Analysis Messages`): the owner records them for review (AC10, SP-4). Table names beyond Analysis Messages remain open (OQ-Q102).
+52. L5. `csi_run_analysis`: duration (sizes the `long` timeout), whether the model is locked afterwards, which cases run, the proof-of-end question (AC14, SP-6).
+53. L6. Sign, axes and station semantics of `csi_results_frame_forces`, reactions, and base reactions (AC15).
+54. L7. `csi_design_run` for steel and concrete and the shape of `csi_design_results` for steel and concrete columns (AC16, SP-3).
+55. L8. `csi_frame_details` and `csi_export_joint` on the COM path (the evidence is for bridge targets), `csi_add_frame_by_coord` naming, section requirement and units, `csi_set_point_load` semantics (AC11, SP-5).
+56. L9. Record mode on a SAP2000 copy: record-mode scenario, owner review and commit of recordings, and subsequent contract-test verification against the real server (AC19; amendment B-573).
