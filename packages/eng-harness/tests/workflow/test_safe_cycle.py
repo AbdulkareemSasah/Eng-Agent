@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import anyio
+import pytest
 
 from eng_harness.engine import RunStatus
 from eng_harness.journal import EventType
@@ -52,7 +53,9 @@ def test_cycle_steps(tmp_path: Path) -> None:
             assert r.calls("csi_run_analysis")[0]["role"] == "long"
             assert r.calls("csi_results_base_reactions")
             # Soil pressures are a table read (spec 0008 §4.6), not a ToolPort step; verify after the run.
+            # Seed supplies _SOIL_ROW Pressure 12.5 (same oracle as test_safe_results.py / T7).
             pressures = await r.read_soil_pressures(ports, model="m@copy")
-            assert pressures.summary.count >= 0
+            assert pressures.summary.count == 1
+            assert pressures.rows[0].pressure_kpa == pytest.approx(12.5)
 
     anyio.run(body)

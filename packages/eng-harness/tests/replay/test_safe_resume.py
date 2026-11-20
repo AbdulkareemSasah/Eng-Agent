@@ -58,6 +58,8 @@ def test_crash_matrix(tmp_path: Path, cut: str) -> None:
             result = await r.engine(ports, inputs=inputs).resume(r.run_id)
             assert result.status is RunStatus.COMPLETED, result
             assert len(logical_calls()) == before == 1
+            # AC27: no repeated load write on every cut (spec names the load write, not only the cut tool).
+            assert len(r.calls("csi_set_point_load")) == 1
             journal = r.events()
             (reconciled,) = [e for e in journal if isinstance(e.payload, ev.StepReconciled)]
             assert isinstance(reconciled.payload, ev.StepReconciled)
