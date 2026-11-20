@@ -1,14 +1,17 @@
-"""The code-pack route of the CalcPort (plan 0010 T2; spec 0010 AC3, AC4, 4.3; spec 0003 4.12 item 4)."""
+"""The code-pack route of the CalcPort (plan 0010 T2; plan 0013 T6 / AC13).
+
+Covers spec 0010 AC3, AC4, 4.3; spec 0003 4.12 item 4; and column companion coverage of AC13.
+"""
 
 import importlib
 import sys
 from collections.abc import Iterator
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, cast
 
 import pytest
-from eng_contract.envelope import FailureEnvelope, Provenance, RefInput, SuccessEnvelope
+from eng_contract.envelope import FailureEnvelope, LiteralInput, Provenance, RefInput, SuccessEnvelope
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import LocationClass, ResultStore, Workspace
@@ -337,3 +340,310 @@ def test_port_consults_the_route(pack_module: ModuleType, tmp_path: Path) -> Non
     with pytest.raises(ContractError) as unrouted:
         bare.describe(pack_module.SIZED_ID)
     assert unrouted.value.detail.code is ErrorCode.NOT_FOUND
+
+
+# --- Plan 0013 T6 / AC13: companion coverage for the three column checks (amendment B-578) ---
+
+_COLUMN_SRC = "engineer:trial@2026-11-01T00:00:00.000Z"
+# Item literals and basis paths: packages/eng-harness/tests/data/kinds/column_design/column_check_items.json
+# (harness.column_check_items/1) and the design-basis fields of spec 0013 §4.7 A / owner answer 2026-11-19
+# (limits.ratio_limit_ratio); same cited values as the merged harness.column_demands tests (B-282).
+_COLUMN_BASIS_FIELDS = (
+    ("materials.concrete_fc_MPa", 30.0, "MPa"),
+    ("materials.rebar_fy_MPa", 420.0, "MPa"),
+    ("columns.effective_length_factor_ratio", 1.0, "1"),
+    ("limits.ratio_limit_ratio", 1.0, "1"),
+)
+_STRENGTH_REF_NAMES = frozenset({"fc_MPa", "fy_MPa", "k_factor", "ratio_limit"})
+_LIMITS_REF_NAMES = frozenset({"ratio_limit"})
+
+
+class _ColumnStore(ResultStore):
+    """Result store that counts `put` calls and can serve an injected raw payload (permissive list fixture)."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.puts = 0
+        self._raw: dict[str, tuple[Any, dict[str, JsonValue]]] = {}
+
+    def put(self, *args: Any, **kwargs: Any) -> Any:
+        self.puts += 1
+        return super().put(*args, **kwargs)
+
+    def inject_raw(self, result_id: str, record: Any, payload: dict[str, JsonValue]) -> None:
+        self._raw[result_id] = (record, payload)
+
+    def get(self, result_id: str) -> Any:
+        if result_id in self._raw:
+            return self._raw[result_id][0]
+        return super().get(result_id)
+
+    def payload(self, result_id: str) -> dict[str, JsonValue]:
+        if result_id in self._raw:
+            return self._raw[result_id][1]
+        return super().payload(result_id)
+
+
+class ColumnRig:
+    """HarnessCalcPort over the real aci318_14 registry and a counting store (spec 0013 AC13)."""
+
+    def __init__(self, tmp_path: Path, run_class: RunClass = RunClass.TRIAL) -> None:
+        clock = FixedClock(_START_MS, 1)
+        self.ids = SeededIdSource(b"harness", clock)
+        self.store = _ColumnStore(
+            Workspace(root=tmp_path / "ws", classification=LocationClass.LOCAL), HARNESS_KINDS, self.ids, clock
+        )
+        self.clock = clock
+        self.producer = Provenance(tool="harness", tool_version="t", inputs={}, started_at=clock.now(), duration_ms=0)
+        self.route = CodePackRoute(
+            Registry.discover(),
+            self.store,
+            max_items=10,
+            run_class=run_class,
+            clock=clock,
+            ids=self.ids,
+        )
+        approvals = ApprovalsFile.model_validate({"schema": 1, "approvals": [], "withdrawn": []})
+        self.port = HarnessCalcPort(
+            CalcRegistry(HARNESS_KINDS, [], hasher=lambda _: _DIGEST),
+            approvals,
+            self.store,
+            CalcSettings(max_items=10),
+            run_class,
+            clock,
+            self.ids,
+            code_packs=self.route,
+        )
+        self.basis_id = self._put_basis()
+        self.store.puts = 0
+
+    def _put_basis(self) -> str:
+        fields: dict[str, Any] = {
+            path: {"value": value, "unit": unit, "source": _COLUMN_SRC, "confirmed": True, "citation": None}
+            for path, value, unit in _COLUMN_BASIS_FIELDS
+        }
+        result_id = self.store.put(
+            "basis.design_basis/1", cast(dict[str, JsonValue], {"template": None, "fields": fields}), self.producer
+        ).result_id
+        assert isinstance(result_id, str)
+        return result_id
+
+    def basis_ref(self, path: str) -> dict[str, JsonValue]:
+        return {"$ref": f"{self.basis_id}#/fields/{path}/value"}
+
+    def check_items_payload(self) -> dict[str, JsonValue]:
+        """A conforming harness.column_check_items/1 payload (fixture column_check_items.json values)."""
+        fc = self.basis_ref("materials.concrete_fc_MPa")
+        fy = self.basis_ref("materials.rebar_fy_MPa")
+        k_factor = self.basis_ref("columns.effective_length_factor_ratio")
+        ratio = self.basis_ref("limits.ratio_limit_ratio")
+        max_axial = COLUMN_CHECK_IDS[0]
+        axial_flexure = COLUMN_CHECK_IDS[1]
+        reinf_limits = COLUMN_CHECK_IDS[2]
+        payload: dict[str, Any] = {
+            "calc": {"id": "harness.column_demands", "version": 1, "content_sha256": _DIGEST, "status": "draft"},
+            "draft": True,
+            "trace": {
+                "calc_id": "harness.column_demands",
+                "calc_version": "1",
+                "content_sha256": _DIGEST,
+                "inputs": [],
+                "constants": [],
+                "steps": [],
+                "outputs": [],
+            },
+            "items": {
+                max_axial: [
+                    {
+                        "subject": {"kind": "frame", "id": "C1", "station_mm": 0.0, "case": "COMB1"},
+                        "inputs": {
+                            "Pu_kN": 1200.0,
+                            "b_mm": 500.0,
+                            "h_mm": 500.0,
+                            "Ast_mm2": 4000.0,
+                            "fc_MPa": fc,
+                            "fy_MPa": fy,
+                            "transverse_kind": "tied",
+                            "k_factor": k_factor,
+                            "lu_mm": 3000.0,
+                            "ratio_limit": ratio,
+                        },
+                    }
+                ],
+                axial_flexure: [
+                    {
+                        "subject": {"kind": "frame", "id": "C1", "station_mm": 0.0, "case": "COMB1"},
+                        "inputs": {
+                            "Pu_kN": 1200.0,
+                            "Mu_kNm": 80.0,
+                            "Mu_other_kNm": 0.0,
+                            "b_mm": 500.0,
+                            "h_mm": 500.0,
+                            "d_prime_mm": 60.0,
+                            "n_bars_b": 3,
+                            "n_bars_h": 3,
+                            "A_bar_mm2": 500.0,
+                            "fc_MPa": fc,
+                            "fy_MPa": fy,
+                            "transverse_kind": "tied",
+                            "k_factor": k_factor,
+                            "lu_mm": 3000.0,
+                            "ratio_limit": ratio,
+                        },
+                    }
+                ],
+                reinf_limits: [
+                    {
+                        "subject": {"kind": "frame", "id": "C1", "station_mm": None, "case": None},
+                        "inputs": {"Ag_mm2": 250000.0, "Ast_mm2": 4000.0, "ratio_limit": ratio},
+                    }
+                ],
+            },
+            "not_checked": [{"frame_id": "C2", "code": "LAYOUT_MISSING", "gap": None}],
+        }
+        return cast(dict[str, JsonValue], payload)
+
+    def put_check_items(self) -> str:
+        result_id = self.store.put("harness.column_check_items/1", self.check_items_payload(), self.producer).result_id
+        assert isinstance(result_id, str)
+        self.store.puts = 0
+        return result_id
+
+    def inject_item_list(self, items: list[dict[str, Any]]) -> str:
+        """Permissive stored list: a raw payload that accepts item inputs the kind would refuse."""
+        template = self.store.put("basis.design_basis/1", self.store.payload(self.basis_id), self.producer)
+        listed_id = "res_01KCD0000000000000000000AA"
+        record = template.model_copy(
+            update={"result_id": listed_id, "kind": "harness.column_check_items/1", "payload": None, "parents": []}
+        )
+        payload = cast(dict[str, JsonValue], {"items": items})
+        self.store.inject_raw(listed_id, record, payload)
+        self.store.puts = 0
+        return listed_id
+
+
+def test_batch_through_calcport(tmp_path: Path) -> None:
+    """AC13: real aci318_14 checks through HarnessCalcPort.run in trial; parents, draft, Ref/Literal split."""
+    rig = ColumnRig(tmp_path)
+    items_id = rig.put_check_items()
+    stored_items = rig.store.payload(items_id)["items"]
+    assert isinstance(stored_items, dict)
+
+    for check_id in COLUMN_CHECK_IDS:
+        group = stored_items[check_id]
+        assert isinstance(group, list)
+        assert group
+        result = rig.port.run(check_id, {"batch": {"$ref": f"{items_id}#/items/{check_id}"}})
+        assert isinstance(result, SuccessEnvelope)
+        assert result.summary["draft"] is True
+        assert result.summary["items"] == len(group)
+        record = rig.store.get(result.result_id)
+        assert record.parents == [items_id, rig.basis_id]
+        assert (record.producer.tool, record.producer.host) == (CODE_PACK_TOOL, None)
+        payload = rig.store.payload(result.result_id)
+        assert payload["draft"] is True
+        traces: Any = payload["traces"]
+        assert len(traces) == len(group)
+        assert record.producer.inputs["batch"] == RefInput(ref=f"{items_id}#/items/{check_id}")
+
+        ref_names = _LIMITS_REF_NAMES if check_id == COLUMN_CHECK_IDS[2] else _STRENGTH_REF_NAMES
+        for index, row in enumerate(group):
+            assert isinstance(row, dict)
+            inputs = row["inputs"]
+            assert isinstance(inputs, dict)
+            for name, stored in inputs.items():
+                key = f"items[{index}].{name}"
+                provenance = record.producer.inputs[key]
+                if name in ref_names:
+                    assert isinstance(stored, dict)
+                    assert "$ref" in stored
+                    ref_value = stored["$ref"]
+                    assert isinstance(ref_value, str)
+                    assert provenance == RefInput(ref=ref_value)
+                else:
+                    assert isinstance(provenance, LiteralInput)
+                    assert provenance.literal == stored
+
+
+def test_ref_strings_refused(tmp_path: Path) -> None:
+    """AC13: a bare RefString item input through batch is INVALID_ARGUMENT; no verdict is stored."""
+    rig = ColumnRig(tmp_path)
+    ratio = rig.basis_ref("limits.ratio_limit_ratio")
+    bare = f"{rig.basis_id}#/fields/materials.concrete_fc_MPa/value"
+    items = [
+        {
+            "subject": {"kind": "frame", "id": "C1", "station_mm": 0.0, "case": "COMB1"},
+            "inputs": {
+                "Pu_kN": 1200.0,
+                "b_mm": 500.0,
+                "h_mm": 500.0,
+                "Ast_mm2": 4000.0,
+                "fc_MPa": bare,
+                "fy_MPa": rig.basis_ref("materials.rebar_fy_MPa"),
+                "transverse_kind": "tied",
+                "k_factor": rig.basis_ref("columns.effective_length_factor_ratio"),
+                "lu_mm": 3000.0,
+                "ratio_limit": ratio,
+            },
+        }
+    ]
+    listed_id = rig.inject_item_list(items)
+    failure = _failure(rig.port.run(COLUMN_CHECK_IDS[0], {"batch": {"$ref": f"{listed_id}#/items"}}))
+    assert failure.error.code is ErrorCode.INVALID_ARGUMENT
+    assert failure.error.field == "items[0].fc_MPa"
+    assert rig.store.puts == 0
+
+
+def test_literal_fc_refused(tmp_path: Path) -> None:
+    """AC13: a literal fc_MPa under require_refs is INVALID_ARGUMENT; no verdict is stored."""
+    rig = ColumnRig(tmp_path)
+    ratio = rig.basis_ref("limits.ratio_limit_ratio")
+    items = [
+        {
+            "subject": {"kind": "frame", "id": "C1", "station_mm": 0.0, "case": "COMB1"},
+            "inputs": {
+                "Pu_kN": 1200.0,
+                "b_mm": 500.0,
+                "h_mm": 500.0,
+                "Ast_mm2": 4000.0,
+                "fc_MPa": 30.0,
+                "fy_MPa": rig.basis_ref("materials.rebar_fy_MPa"),
+                "transverse_kind": "tied",
+                "k_factor": rig.basis_ref("columns.effective_length_factor_ratio"),
+                "lu_mm": 3000.0,
+                "ratio_limit": ratio,
+            },
+        }
+    ]
+    listed_id = rig.inject_item_list(items)
+    failure = _failure(rig.port.run(COLUMN_CHECK_IDS[0], {"batch": {"$ref": f"{listed_id}#/items"}}))
+    assert failure.error.code is ErrorCode.INVALID_ARGUMENT
+    assert failure.error.field == "items[0].fc_MPa"
+    assert "engineering quantity" in failure.error.message
+    assert rig.store.puts == 0
+
+
+def test_production_refused(tmp_path: Path) -> None:
+    """AC13: in production, each draft column check is refused before any write (CK-AC5)."""
+    production = ColumnRig(tmp_path, RunClass.PRODUCTION)
+    items_id = production.put_check_items()
+    for check_id in COLUMN_CHECK_IDS:
+        with pytest.raises(CalcRefused) as refused:
+            production.port.run(check_id, {"batch": {"$ref": f"{items_id}#/items/{check_id}"}})
+        assert refused.value.code is HarnessCode.CALC_NOT_APPROVED
+        assert production.route.refusal(check_id) == (CalcStatus.DRAFT, HarnessCode.CALC_NOT_APPROVED)
+    assert production.store.puts == 0
+
+
+def test_only_listed_checks(tmp_path: Path) -> None:
+    """AC13: a check id outside the allowlist is ContractError NOT_FOUND before any evaluation."""
+    rig = ColumnRig(tmp_path)
+    for check_id in COLUMN_CHECK_IDS:
+        assert rig.port.describe(check_id).id == check_id
+    outside = "aci318_14.99_9_9.not_on_allowlist"
+    with pytest.raises(ContractError) as described:
+        rig.port.describe(outside)
+    assert described.value.detail.code is ErrorCode.NOT_FOUND
+    failure = _failure(rig.port.run(outside, {"items": []}))
+    assert failure.error.code is ErrorCode.NOT_FOUND
+    assert rig.store.puts == 0
