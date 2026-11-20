@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 
+from eng_contract.refs import parse_ref
 from pydantic import BaseModel, ConfigDict, Field
 
 from eng_harness.calc import InputMeta, RefMeta
@@ -50,7 +51,8 @@ def input_meta(refs: Mapping[str, str], kinds: Mapping[str, str]) -> InputMeta:
     return InputMeta(
         refs={
             name: RefMeta(
-                result_id=result_id,
+                result_id=parse_ref(result_id)[0],
+                ref=result_id,
                 kind=kinds[name],
                 complete=True,
                 model_id=None,

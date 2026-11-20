@@ -24,6 +24,7 @@ from eng_contract.verdicts import Subject, SubjectKind
 from eng_harness.adapters.csi import _edits as edits
 from eng_harness.adapters.csi._state import LIST_LIMIT, StateRead
 from eng_harness.adapters.csi.products import ProductProfile
+from eng_harness.adapters.csi.products import _safe_loads as safe_loads
 from eng_harness.ports import ServerCheck
 
 Want = dict[str, Any]
@@ -91,6 +92,20 @@ def expect(model: Any) -> Expect:
         return _item("load_combo", kind.LOAD_COMBINATION, m.name, None)
     if isinstance(m, edits.SetPointRestraintArgs):
         return _item("restraint_table", kind.JOINT, m.joint, {n: getattr(m, n) for n in _FLAGS})
+    if isinstance(m, safe_loads.SetPointLoadArgs):
+        point_want: Want = {
+            "FX_kN": _num(m.FX_kN),
+            "FY_kN": _num(m.FY_kN),
+            "FZ_kN": _num(m.FZ_kN),
+            "MX_kNm": _num(m.MX_kNm),
+            "MY_kNm": _num(m.MY_kNm),
+            "MZ_kNm": _num(m.MZ_kNm),
+        }
+        if m.punch_x_mm is not None:
+            point_want["punch_x_mm"] = _num(m.punch_x_mm)
+        if m.punch_y_mm is not None:
+            point_want["punch_y_mm"] = _num(m.punch_y_mm)
+        return _item("point_load_table", kind.JOINT, m.joint, point_want, m.pattern)
     raise TypeError(f"no read-back for {type(m).__name__}")
 
 
@@ -166,6 +181,16 @@ def _millimetres(s: Snapshot, raw: Any) -> float:  # a table has no units token:
     return convert(float(raw), csi_unit_system(s.state.status.units).length, "mm")
 
 
+def _point_load(row: Want) -> Want:
+    """Canonical force/moment fields; punch dims when the table carried them (spec 0008 AC18)."""
+    want = {name: row[name] for name in ("FX_kN", "FY_kN", "FZ_kN", "MX_kNm", "MY_kNm", "MZ_kNm")}
+    if row.get("punch_x_mm") is not None:
+        want["punch_x_mm"] = row["punch_x_mm"]
+    if row.get("punch_y_mm") is not None:
+        want["punch_y_mm"] = row["punch_y_mm"]
+    return want
+
+
 OBSERVE: dict[str, Callable[[Snapshot, Subject], Want | None]] = {  # by the allowlist's `readback` name
     "frame_section": _payload("model.frame_placements/1", "frames", "id"),
     "area_section_table": _table("area_section", "section", lambda s, raw: raw),
@@ -175,6 +200,7 @@ OBSERVE: dict[str, Callable[[Snapshot, Subject], Want | None]] = {  # by the all
     "load_pattern": _payload("model.load_set/1", "patterns", "name"),
     "load_combo": _payload("model.load_set/1", "combinations", "name", _combo),
     "restraint_table": _payload("model.joint_restraints/1", "joints", "joint"),
+    "point_load_table": _payload("harness.joint_loads/1", "loads", "joint", _point_load),
 }
 
 
@@ -215,7 +241,7 @@ def compare(item: Expect, snap: Snapshot, tolerance: float | None) -> ModelIssue
 
 
 def integrity(snap: Snapshot) -> list[ModelIssue]:
-    """The checks that need no tolerance (spec 4.5.8): undefined sections, missing combination parts, a locked model."""
+    """The checks that need no tolerance (spec 4.5.8 / 0008 §4.7): sections, combos, lock, SAFE joint/soil issues."""
 
     def issue(code: str, kind: SubjectKind, name: str, message: str, severity: Severity = _ERROR) -> ModelIssue:
         return ModelIssue(severity=severity, code=code, subject=Subject(kind=kind, id=name), message=message)
@@ -245,6 +271,33 @@ def integrity(snap: Snapshot) -> list[ModelIssue]:
     ]
     if snap.state.status.locked:
         found.append(issue("MODEL_LOCKED", SubjectKind.MODEL, "model", "the model is locked", Severity.INFO))
+    # SAFE integrity (spec 0008 section 4.7): present when the state carried joint loads / soil supports.
+    if "harness.joint_loads/1" in payloads and "harness.model_points/1" in payloads:
+        point_names = {str(row["name"]) for row in payloads["harness.model_points/1"].model_dump(mode="json")["points"]}
+        for row in payloads["harness.joint_loads/1"].model_dump(mode="json")["loads"]:
+            if row["joint"] not in point_names:
+                found.append(
+                    issue(
+                        "JOINT_LOAD_ON_MISSING_JOINT",
+                        SubjectKind.JOINT,
+                        str(row["joint"]),
+                        f"joint load on missing joint {row['joint']}",
+                    )
+                )
+    if "harness.safe_soil_supports/1" in payloads:
+        soil = payloads["harness.safe_soil_supports/1"].model_dump(mode="json")
+        supported = {str(row["area"]) for row in soil.get("assignments", []) if row.get("property") is not None}
+        for row in areas:
+            if row["id"] not in supported:
+                found.append(
+                    issue(
+                        "AREA_WITHOUT_SOIL_SUPPORT",
+                        SubjectKind.AREA,
+                        str(row["id"]),
+                        f"area {row['id']} has no soil support",
+                        Severity.WARNING,
+                    )
+                )
     return found
 
 

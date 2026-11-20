@@ -33,6 +33,7 @@
       "refs": {
         "required": {
           "result_id": "res_00000000000000000000000001",
+          "ref": "res_00000000000000000000000001",
           "kind": "basis.engineer_input/1",
           "complete": true,
           "model_id": null,
@@ -42,6 +43,7 @@
         },
         "basis": {
           "result_id": "res_00000000000000000000000009",
+          "ref": "res_00000000000000000000000009",
           "kind": "basis.design_basis/1",
           "complete": true,
           "model_id": null,

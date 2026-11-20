@@ -4,3 +4,17 @@ MODEL_EXTENSIONS = (".SDB",)
 COMPANION_GLOBS: tuple[str, ...] = ()  # empty until local test L2 (spec 0012 section 4.3)
 TABLES: dict[str, str] = {}
 READBACK: dict[str, tuple[str, str, str]] = {}
+# Gap registry (spec 0012 section 4.5); only SP-1 is wired to a step in T3 (plan 0012 T3).
+GAPS = {
+    "SP-1": "creating a new model is not implemented: provide a prepared model",
+    "SP-2": "defining sections, materials or load cases is not implemented",
+    "SP-3": "concrete design results for frames that are not beams are not implemented",
+    "SP-4": "table-based reads and the edits that need them are not implemented",
+    "SP-5": "design orientation, frame labels and local axes are not implemented",
+    "SP-6": "choosing which load cases an analysis runs is not implemented",
+    "SP-7": "levels and grids are not implemented",
+    "SP-8": "cable, link and general-shell workflows are not implemented",
+}
+STEP_GAPS = {
+    "new_model": "SP-1",
+}

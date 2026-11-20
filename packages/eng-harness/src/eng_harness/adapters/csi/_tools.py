@@ -36,16 +36,19 @@ from eng_harness.adapters._envelope import make_envelope
 from eng_harness.adapters._toolport import AdapterToolPort, Binding, Builder, ModelBinder, Reader
 from eng_harness.adapters.csi import _replies, csi_allowlist
 from eng_harness.adapters.csi._checks import WrittenItems
-from eng_harness.adapters.csi._edits import EDIT_BUILDERS, EDIT_MODELS
+from eng_harness.adapters.csi._edits import EDIT_BUILDERS as _BASE_EDIT_BUILDERS
+from eng_harness.adapters.csi._edits import EDIT_MODELS as _BASE_EDIT_MODELS
 from eng_harness.adapters.csi._read_state_tool import READ_TOOLS, ModelArgs
 from eng_harness.adapters.csi._revisions import CsiToolInfo, OpenRevisionArgs, Revisions, SavedFile, SaveModelArgs
+from eng_harness.adapters.csi.products import _safe_loads as _safe_loads
+from eng_harness.adapters.csi.products import _safe_results as _safe_results
 from eng_harness.errors import ToolFailed
 from eng_harness.ports import ToolInfo
 from eng_harness.servers import CallEffect
 
-__all__ = ["READERS", "TOKENS", "CsiToolPort", "tool_allowlist"]
+__all__ = ["EDIT_BUILDERS", "READERS", "TOKENS", "CsiToolPort", "edit_builders", "tool_allowlist"]
 
-TOKENS = {  # spec 4.6.2 and 4.6.3
+_BASE_TOKENS = {  # spec 4.6.2 and 4.6.3
     "csi_define_wall_section": "kN_mm_C",
     "csi_set_frame_load_distributed": "kN_m_C",
     "csi_set_area_load_uniform": "kN_m_C",
@@ -53,6 +56,22 @@ TOKENS = {  # spec 4.6.2 and 4.6.3
     "csi_results_frame_forces": "kN_m_C",
     "csi_results_story_drifts": "kN_m_C",
 }
+# SAFE point-load token (spec 0008 AC14) and SAFE base-reaction token (spec 0008 section 4.6, AC23).
+TOKENS = {**_BASE_TOKENS, **_safe_loads.TOKENS, **_safe_results.TOKENS}
+
+
+def edit_builders() -> dict[str, Builder]:
+    """Edit builders: base CSI map plus SAFE point-load and SAFE pattern SuperDead override (plan 0008 T6)."""
+    return {**_BASE_EDIT_BUILDERS, **_safe_loads.EDIT_BUILDERS}
+
+
+def edit_models() -> dict[str, type[ParamModel]]:
+    """Argument models for the edit builders, including `SetPointLoadArgs`."""
+    return {**_BASE_EDIT_MODELS, **_safe_loads.EDIT_MODELS}
+
+
+EDIT_BUILDERS = edit_builders()  # module-level for tool_allowlist and call-site commits
+EDIT_MODELS = edit_models()
 
 
 DesignKind = Literal["steel", "concrete", "aluminum", "coldformed"]  # the host rejects the last two (S-12 1)
@@ -116,7 +135,7 @@ LOCAL_TOOLS = (  # adapter-local (spec 0007 4.10): not in the server's tool list
 SESSION_TOOLS = frozenset({"csi_save_model", "csi_open_model"})  # allowlisted; their canonical arguments are below
 _UNRECONCILED = SESSION_TOOLS | {"csi_open_revision"}
 
-ANALYSIS_MODELS: dict[str, type[ParamModel]] = {  # by the allowlist's `args_model`
+_BASE_ANALYSIS_MODELS: dict[str, type[ParamModel]] = {  # by the allowlist's `args_model`
     "RunAnalysisArgs": _ModelArgs,
     "AnalysisStatusArgs": _ModelArgs,
     "DesignRunArgs": DesignRunArgs,
@@ -129,6 +148,8 @@ ANALYSIS_MODELS: dict[str, type[ParamModel]] = {  # by the allowlist's `args_mod
     "SaveModelArgs": SaveModelArgs,
     "OpenModelArgs": OpenModelArgs,
 }
+# SAFE base-reaction args (plan 0008 T7; spec 0008 AC23).
+ANALYSIS_MODELS: dict[str, type[ParamModel]] = {**_BASE_ANALYSIS_MODELS, **_safe_results.ANALYSIS_MODELS}
 
 
 def _reader(mapper: Callable[[Mapping[str, Any], Binding], BaseModel]) -> Reader:
@@ -138,7 +159,7 @@ def _reader(mapper: Callable[[Mapping[str, Any], Binding], BaseModel]) -> Reader
     return read
 
 
-READERS: dict[str, Reader] = {  # the host tool to its stored kind (spec 4.6.1); the units token is the binding's
+_BASE_READERS: dict[str, Reader] = {  # the host tool to its stored kind (spec 4.6.1); the units token is the binding's
     "csi_run_analysis": _reader(lambda r, b: _replies.analysis_run(r)),
     "csi_analysis_status": _reader(lambda r, b: _replies.analysis_status(r)),
     "csi_design_run": _reader(lambda r, b: _replies.design_run(r)),
@@ -146,6 +167,11 @@ READERS: dict[str, Reader] = {  # the host tool to its stored kind (spec 4.6.1);
     "csi_results_joint_reactions": _reader(lambda r, b: _replies.joint_reactions(r, b.units_system or "")),
     "csi_results_frame_forces": _reader(lambda r, b: _replies.member_forces(r, b.units_system or "")),
     "csi_results_story_drifts": _reader(lambda r, b: _replies.story_drifts(r, b.units_system or "")),
+}
+# SAFE base-reaction reader (plan 0008 T7); analysis keys from `_safe_results.READERS` are already in `_BASE_READERS`.
+READERS: dict[str, Reader] = {
+    **_BASE_READERS,
+    **{name: reader for name, reader in _safe_results.READERS.items() if name not in _BASE_READERS},
 }
 
 
@@ -206,12 +232,12 @@ class CsiToolPort(AdapterToolPort):
     ) -> None:  # fmt: skip
         self._written, self._wrote, self._revisions = written or WrittenItems(), wrote or (lambda key: None), revisions
         self._reopened, self._saved, self._opener = reopened or (lambda key, path: None), saved or _no_save, opener
-        builders: dict[str, Builder] = {tool: _noting(build, self._written) for tool, build in EDIT_BUILDERS.items()}
+        builders: dict[str, Builder] = {tool: _noting(build, self._written) for tool, build in edit_builders().items()}
         builders["csi_save_model"] = (
             lambda model, descriptor, binding: {}
         )  # the open file in place; no `as_new_revision`
         super().__init__(
-            allowlist=tool_allowlist(), arg_models=EDIT_MODELS | ANALYSIS_MODELS, builders=builders, readers=READERS,
+            allowlist=tool_allowlist(), arg_models=edit_models() | ANALYSIS_MODELS, builders=builders, readers=READERS,
             binder=_TokenBinder(binder), **wiring,
         )  # fmt: skip
 
