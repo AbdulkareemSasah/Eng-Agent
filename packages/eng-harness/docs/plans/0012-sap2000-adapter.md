@@ -93,7 +93,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_sap2000_tables.toml"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_sap2000_state.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_sap2000.py"
-      - "packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py"  # T4 may only add ProductProfile.declared_absences (wired from _sap2000.DECLARED_ABSENCES) and select the state reader from the profile (no product-name branch) (amendment B-590)
+      - "packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py"  # T4 may only add ProductProfile.declared_absences (wired from _sap2000.DECLARED_ABSENCES); no other change (no product-name branch) (amendment B-590)
       - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"  # T4 may only select the absences-aware state reader from profile.declared_absences and record the fingerprint on save when absences or tables are set (no product-name branch) (amendment B-590)
       - "packages/eng-harness/src/eng_harness/adapters/csi/_reconcile.py"  # T4 may only select the absences-aware state reader from profile.declared_absences (no product-name branch) (amendment B-590)
       - "packages/eng-harness/tests/unit/adapters/test_sap2000_tables.py"

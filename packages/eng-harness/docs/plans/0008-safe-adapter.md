@@ -375,7 +375,7 @@ local test shows that no allowlisted tool can run the SAFE designer, this task i
   `declared_absences` (wired from `_sap2000.DECLARED_ABSENCES`), and
   `packages/eng-harness/src/eng_harness/adapters/csi/_reconcile.py` so it selects the absences-aware state reader from
   the profile (no product-name branch; spec 0008 AC2); T4 may only make those profile-field and reader-selection
-  changes. Recorded in this plan's `products/__init__.py` and `_reconcile.py` serialization above. Plan 0002 records
+  changes. Recorded in this plan's `products/__init__.py`, `_hostport.py` and `_reconcile.py` serialization above. Plan 0002 records
   the matching external amendment for `_hostport.py`, `products/__init__.py` and `csi/_reconcile.py`.
 
 ## 4. Verification
