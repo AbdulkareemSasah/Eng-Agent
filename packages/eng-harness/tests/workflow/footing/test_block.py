@@ -415,7 +415,7 @@ def test_width_too_small_closes(tmp_stand_root: Path) -> None:
 
 
 def test_plan_closed_sibling_open_reaches_status(tmp_stand_root: Path) -> None:
-    """Spec 0010 §4.6 steps 1–2.3 / P6: one footing closed at plan; sibling still reaches status.
+    """Spec 0010 §4.6 steps 1-2.3 / P6: one footing closed at plan; sibling still reaches status.
 
     F1: service FZ <= 0 → plan UPLIFT → closed before rounds.
     F2: FZ=576 kN, MY=50 → plan 2000 mm, bearing FAIL under full contact (enlarge-until-pass loads);
@@ -441,13 +441,11 @@ def test_plan_closed_sibling_open_reaches_status(tmp_stand_root: Path) -> None:
     closed = _closures(outcome)
     assert any(c["id"] == "F1" and c["status"] == "NEEDS_ENGINEER" and c["reason"] == "UPLIFT" for c in closed)
     assert any(s.kind == "calc" and s.name == "harness.footing_status" for s in stand.steps())
-    assert any(c["id"] == "F2" for c in closed) or any(
-        r["id"] == "F2" for r in _status_rows(stand)[0]["footings"]
-    )
+    assert any(c["id"] == "F2" for c in closed) or any(r["id"] == "F2" for r in _status_rows(stand)[0]["footings"])
 
 
 def test_width_closed_sibling_open_reaches_status(tmp_stand_root: Path) -> None:
-    """Spec 0010 §4.6.2.1–2.3 / B-568: WIDTH_TOO_SMALL sibling closed; open footing still reaches status.
+    """Spec 0010 §4.6.2.1-2.3 / B-568: WIDTH_TOO_SMALL sibling closed; open footing still reaches status.
 
     F1: same WIDTH_TOO_SMALL derivation as test_width_too_small_closes (cover 100, min plan 200).
     F2: enlarge-until-pass bearing-fail loads with dense bars so status runs for F2 only.
@@ -476,13 +474,11 @@ def test_width_closed_sibling_open_reaches_status(tmp_stand_root: Path) -> None:
     closed = _closures(outcome)
     assert any(c["id"] == "F1" and c["reason"] == "WIDTH_TOO_SMALL" for c in closed)
     assert any(s.kind == "calc" and s.name == "harness.footing_status" for s in stand.steps())
-    assert any(c["id"] == "F2" for c in closed) or any(
-        r["id"] == "F2" for r in _status_rows(stand)[0]["footings"]
-    )
+    assert any(c["id"] == "F2" for c in closed) or any(r["id"] == "F2" for r in _status_rows(stand)[0]["footings"])
 
 
 def test_status_closed_sibling_still_resizes(tmp_stand_root: Path) -> None:
-    """Spec 0010 §4.6.2.3–2.7: one footing closed at status NEEDS_ENGINEER; sibling still resizes.
+    """Spec 0010 §4.6.2.3-2.7: one footing closed at status NEEDS_ENGINEER; sibling still resizes.
 
     F1: eccentric service MY so bearing NEEDS_ENGINEER (FULL_CONTACT / G-1); closed at status, no decide.
     F2: bearing FAIL under full contact → rule enlarge_plan. Resize must still list an action for F1 (closed in dims).
@@ -507,14 +503,13 @@ def test_status_closed_sibling_still_resizes(tmp_stand_root: Path) -> None:
     assert outcome.output is not None
     closed = _closures(outcome)
     assert any(
-        c["id"] == "F1" and c["status"] == "NEEDS_ENGINEER" and c["reason"] in {"FULL_CONTACT", "G-1", None}
-        for c in closed
+        c["id"] == "F1" and c["status"] == "NEEDS_ENGINEER" and c["reason"] in {"FULL_CONTACT", "G-1"} for c in closed
     )
     assert any("F2:enlarge_plan:" in d for d in cast(Any, outcome.output).decisions)
 
 
 def test_combine_one_resize_sibling(tmp_stand_root: Path) -> None:
-    """Spec 0010 §4.6.2.6–2.7: combine closes one footing; sibling still resizes (actions for every dims id).
+    """Spec 0010 §4.6.2.6-2.7: combine closes one footing; sibling still resizes (actions for every dims id).
 
     Mixed family failures so no draft rule matches (engineer decides). One decide_many screen: F1 combine, F2 enlarge.
     """

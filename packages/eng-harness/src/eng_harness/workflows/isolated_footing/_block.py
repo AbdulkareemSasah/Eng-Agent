@@ -407,18 +407,68 @@ async def _resize(
     plan: Ref,
     depth: Ref,
     spacing: Ref,
+    *,
+    keep: list[str] | None = None,
 ) -> Any:
-    return await ctx.calc(
-        "harness.footing_resize",
-        {
-            "dims": dims.ref,
-            "actions": actions,
-            "engineer_plan": plan,
-            "engineer_depth": depth,
-            "engineer_spacing": spacing,
-            "basis": ctx.basis.record_ref(),
-        },
-    )
+    """Resize with an action for every footing still in `dims` (spec 0010 §4.4.4); closed ids get `none`.
+
+    When `keep` is set, only those footing ids are retained in the next dims (closed rows dropped for
+    open-only layout/status rounds, spec 0010 §4.6 steps 1-2.3).
+    """
+    covered = dict(actions)
+    for row in await _data(ctx, dims.ref, "/footings"):
+        if keep is not None and row["id"] not in keep:
+            continue
+        if row["id"] not in covered:
+            covered[row["id"]] = "none"
+    args: dict[str, Any] = {
+        "dims": dims.ref,
+        "actions": covered,
+        "engineer_plan": plan,
+        "engineer_depth": depth,
+        "engineer_spacing": spacing,
+        "basis": ctx.basis.record_ref(),
+    }
+    if keep is not None:
+        args["keep"] = list(keep)
+    return await ctx.calc("harness.footing_resize", args)
+
+
+async def _keep_open_dims(ctx: Any, dims: Any, open_ids: list[str], plan: Ref, depth: Ref, spacing: Ref) -> Any:
+    """Drop closed footings from trial dims so the next layout/status see only open ids."""
+    present = [row["id"] for row in await _data(ctx, dims.ref, "/footings")]
+    if len(present) == len(open_ids) and all(item in open_ids for item in present):
+        return dims
+    return await _resize(ctx, dims, {}, plan, depth, spacing, keep=list(open_ids))
+
+
+async def _gap_reason(ctx: Any, bearing: Ref, footing_id: str) -> str | None:
+    """Copy the NEEDS_ENGINEER gap/precondition id from the bearing verdict set (AC19 / Q18; BP FULL_CONTACT, G-1)."""
+    payload = await _data(ctx, bearing, "")
+    verdicts = list(payload.get("verdicts") or [])
+    traces = list(payload.get("traces") or [])
+    for verdict in verdicts:
+        subject = verdict.get("subject") or {}
+        if subject.get("id") != footing_id:
+            continue
+        if verdict.get("status") != _NEEDS:
+            continue
+        messages: list[str] = []
+        ref = verdict.get("trace_ref")
+        if isinstance(ref, str) and ref.startswith("#/traces/"):
+            index = int(ref.rsplit("/", 1)[1])
+            if index < len(traces):
+                messages = list(traces[index].get("messages") or [])
+        for message in messages:
+            if message.startswith("FULL_CONTACT"):
+                return "FULL_CONTACT"
+            if message.startswith("G-1"):
+                return "G-1"
+            if "G-1" in message:
+                return "G-1"
+            if "FULL_CONTACT" in message:
+                return "FULL_CONTACT"
+    return None
 
 
 async def _apply_limit_closures(ctx: Any, dims: Any, open_ids: list[str], closures: list[Closure]) -> list[str]:
@@ -474,6 +524,19 @@ async def design_isolated_footing(ctx: Any, inp: DesignIsolatedFootingInput) -> 
         if not open_ids:
             break
 
+        # Spec 0010 §4.6 steps 1-2.3: layout/status see only open footings; closed sizes stay in closures.
+        unused = (
+            _ref(f"{_rid(inp.unused_engineer_dims)}#/fields/L/value"),
+            _ref(f"{_rid(inp.unused_engineer_dims)}#/fields/h/value"),
+            _ref(f"{_rid(inp.unused_engineer_dims)}#/fields/s/value"),
+        )
+        dims = await _keep_open_dims(ctx, dims, open_ids, *unused)
+        design = await ctx.calc(
+            "harness.footing_layout",
+            {"dims": dims.ref, "subjects": inp.subjects, "basis": ctx.basis.record_ref()},
+        )
+        last_design = design.ref
+
         service = await _cases(ctx, inp.service_cases)
         factored = await _cases(ctx, inp.factored_cases)
         families = await _batch_checks(
@@ -513,7 +576,8 @@ async def design_isolated_footing(ctx: Any, inp: DesignIsolatedFootingInput) -> 
             if row["closure"] == "passed":
                 closures.append(Closure(id=row["id"], status="PASSED", reason=None))
             elif row["closure"] == "needs_engineer":
-                closures.append(Closure(id=row["id"], status=_NEEDS, reason=None))
+                reason = await _gap_reason(ctx, families["bearing"], row["id"])
+                closures.append(Closure(id=row["id"], status=_NEEDS, reason=reason))
             else:
                 failing.append(row)
                 still.append(row["id"])
@@ -556,14 +620,7 @@ async def design_isolated_footing(ctx: Any, inp: DesignIsolatedFootingInput) -> 
             if footing_id not in auto_actions and footing_id not in ask_ids:
                 auto_actions[footing_id] = "none"
 
-        # Resize always needs three Quantity refs (4.4.4); unused carrier from the input, ask fields for engineer_set.
-        unused = (
-            _ref(f"{_rid(inp.unused_engineer_dims)}#/fields/L/value"),
-            _ref(f"{_rid(inp.unused_engineer_dims)}#/fields/h/value"),
-            _ref(f"{_rid(inp.unused_engineer_dims)}#/fields/s/value"),
-        )
         if auto_actions:
-            # After layout the trial dims are still the plan-size / prior resize dims kind.
             dims = await _resize(ctx, dims, auto_actions, *unused)
             open_ids = await _apply_limit_closures(ctx, dims, open_ids, closures)
 
@@ -574,9 +631,6 @@ async def design_isolated_footing(ctx: Any, inp: DesignIsolatedFootingInput) -> 
                 FootingDimensions, title=f"Dimensions for footing {footing_id}"
             )
             actions = {footing_id: "engineer_set"}
-            for other in open_ids:
-                if other != footing_id:
-                    actions[other] = "none"
             dims = await _resize(
                 ctx,
                 dims,
@@ -586,6 +640,8 @@ async def design_isolated_footing(ctx: Any, inp: DesignIsolatedFootingInput) -> 
                 asked.field_ref("s"),
             )
             open_ids = await _apply_limit_closures(ctx, dims, open_ids, closures)
+
+        dims = await _keep_open_dims(ctx, dims, open_ids, *unused)
 
     return DesignIsolatedFootingOutput(
         design=last_design,
