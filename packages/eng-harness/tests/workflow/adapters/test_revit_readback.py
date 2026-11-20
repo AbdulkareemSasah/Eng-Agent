@@ -6,6 +6,7 @@ basis field `checks.readback_relative_tolerance_ratio` handed to `ReadBack` (nev
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,13 @@ def _issues(envelope: Any) -> list[tuple[str, str, str, str]]:
     assert isinstance(envelope, SuccessEnvelope)
     data: Any = envelope.data
     return [(i["severity"], i["code"], i["subject"]["kind"], i["subject"]["id"]) for i in data["issues"]]
+
+
+def _control_calls(control: Path) -> list[dict[str, Any]]:
+    data = json.loads(control.read_text(encoding="utf-8"))
+    calls = data.get("calls", [])
+    assert isinstance(calls, list)
+    return [c for c in calls if isinstance(c, dict)]
 
 
 def _prior() -> dict[str, Any]:
@@ -293,5 +301,137 @@ def test_check_model_issues(tmp_path: Path, store: ResultStore) -> None:
         assert any(i[0] == "info" and i[1] == "MODEL_UNSAVED" for i in found)
         assert any(i[0] == "warning" and i[1] == "REVIT_WARNINGS_INCREASED" for i in found)
         assert any(i[0] == "error" and i[1] == "ELEMENT_MISSING" for i in found)
+
+    helpers.run_scenario(tmp_path, config, body)
+
+
+def test_duplicate_family_type_both_readbacks(tmp_path: Path, store: ResultStore) -> None:
+    """Spec 0011 §4.4 / L-B232-1: duplicate_family_type runs both read-backs under check_model."""
+    control = tmp_path / "control.json"
+    config = helpers.revit_config(tmp_path, control)
+
+    async def body(manager: ServerManager, launcher: helpers.RecordingLauncher) -> None:
+        ledger = WriteLedger(tmp_path / "run")
+        written = WrittenItems()
+        read_back = ReadBack(written=written, store=store, check=CHECK, tolerance_ratio=TOLERANCE)
+        target = await helpers.warm_bound_target(manager, launcher)
+        key = "m1"
+
+        async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            return await helpers.call_dump(
+                manager, tool, arguments, effect, role="write" if effect is CallEffect.WRITE else "read"
+            )
+
+        dup_args = build_edit_args(
+            "duplicate_family_type",
+            source_type_id=2001,
+            new_type_name="C450x450",
+            prior=_prior(),
+        )
+        written.prepare(key, expect_write("revit_duplicate_family_type", dup_args))
+        await send_attended_write(
+            call,
+            ledger,
+            tool="revit_duplicate_family_type",
+            host_args=dup_args,
+            op_id="op-dup-readback",
+            bound_path=helpers.BOUND,
+            references={},
+            element_ids=None,
+            target=target,
+            call_timeout_s=90,
+        )
+        written.commit(key)
+
+        before = len(_control_calls(control))
+        envelope = await check_model(call, read_back, key, host=HOST, pre_image_warnings=[])
+        subject_codes = {i[1] for i in _issues(envelope) if i[2] == "section" and i[3] == "C450x450"}
+        assert "READBACK_MISMATCH" not in subject_codes, _issues(envelope)
+        assert "READBACK_UNAVAILABLE" not in subject_codes, _issues(envelope)
+
+        after = _control_calls(control)[before:]
+        get_type_params = [c for c in after if c.get("tool") == "revit_get_type_parameters"]
+        assert get_type_params, after
+        args_seen = get_type_params[0].get("args", {})
+        assert isinstance(args_seen, dict), get_type_params[0]
+        type_ids = args_seen.get("typeIds")
+        assert isinstance(type_ids, list), get_type_params[0]
+        assert type_ids, get_type_params[0]
+        first_id = type_ids[0]
+        assert isinstance(first_id, int), first_id
+        new_type_id = first_id
+        # Discover the new type id independently (first §4.4 read-back tool) and match.
+        listed = await helpers.call_dump(
+            manager,
+            "revit_list_family_types_in_family",
+            {},
+            CallEffect.READ,
+            role="read",
+        )
+        from eng_harness.adapters.revit._replies import parse_revit_reply
+
+        listed_body = parse_revit_reply(listed).body
+        types = listed_body.get("items") or listed_body.get("types") or []
+        assert isinstance(types, list)
+        new_type = next(t for t in types if isinstance(t, dict) and t.get("name") == "C450x450")
+        type_id_raw = new_type.get("type_id")
+        assert isinstance(type_id_raw, int)
+        assert type_id_raw == new_type_id
+
+    helpers.run_scenario(tmp_path, config, body)
+
+
+def test_readback_unavailable_without_tolerance(tmp_path: Path, store: ResultStore) -> None:
+    """AC19: a length write with no frozen tolerance → READBACK_UNAVAILABLE."""
+    control = tmp_path / "control.json"
+    config = helpers.revit_config(tmp_path, control)
+
+    async def body(manager: ServerManager, launcher: helpers.RecordingLauncher) -> None:
+        ledger = WriteLedger(tmp_path / "run")
+        written = WrittenItems()
+        # No frozen basis field → tolerance_ratio is None (spec 0011 AC19 / compare).
+        read_back = ReadBack(written=written, store=store, check=CHECK, tolerance_ratio=None)
+        target = await helpers.warm_bound_target(manager, launcher)
+        key = "m1"
+
+        async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            return await helpers.call_dump(
+                manager, tool, arguments, effect, role="write" if effect is CallEffect.WRITE else "read"
+            )
+
+        args = build_edit_args(
+            "set_element_parameter_values",
+            element_ids=[3001],
+            parameter_name="b",
+            value_mm=450.0,
+            prior=_prior(),
+        )
+        written.prepare(key, expect_write("revit_set_element_parameter_values", args, unique_id="col-3001"))
+        await send_attended_write(
+            call,
+            ledger,
+            tool="revit_set_element_parameter_values",
+            host_args=args,
+            op_id="op-no-tolerance",
+            bound_path=helpers.BOUND,
+            references={3001: "col-3001"},
+            element_ids=[3001],
+            target=target,
+            call_timeout_s=90,
+        )
+        written.commit(key)
+
+        envelope = await check_model(call, read_back, key, host=HOST, pre_image_warnings=[])
+        unavailable = [i for i in _issues(envelope) if i[1] == "READBACK_UNAVAILABLE"]
+        assert unavailable, _issues(envelope)
+        assert unavailable[0][0] == "error"
+        assert unavailable[0][2] == "frame"
+        assert unavailable[0][3] == "col-3001"
+        assert isinstance(envelope, SuccessEnvelope)
+        data: Any = envelope.data
+        messages = [
+            i["message"] for i in data["issues"] if isinstance(i, dict) and i.get("code") == "READBACK_UNAVAILABLE"
+        ]
+        assert "no read-back tolerance (checks.readback_relative_tolerance_ratio)" in messages, messages
 
     helpers.run_scenario(tmp_path, config, body)
