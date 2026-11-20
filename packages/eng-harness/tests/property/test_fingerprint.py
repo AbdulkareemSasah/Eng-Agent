@@ -222,3 +222,59 @@ def test_order_independent_and_edit_sensitive(
     else:
         changed[kind] = {"rows": []}
     assert fingerprint(changed, more) != base
+
+
+SAFE_HOST_KINDS = (
+    "model.grid_system/1",
+    "harness.model_points/1",
+    "model.frame_placements/1",
+    "model.area_placements/1",
+    "model.sections/1",
+    "model.materials/1",
+    "model.load_set/1",
+    "harness.joint_loads/1",
+    "harness.safe_soil_supports/1",
+)
+SAFE_EDITS = ("value", "name", "coordinate", "add_row", "drop_row", "count", "empty")
+
+
+@st.composite
+def safe_host_reads(draw: st.DrawFn) -> tuple[dict[str, Any], dict[str, int]]:
+    """SAFE host sections (spec 0008 section 4.4) and object counts for one synthetic read."""
+    rows = st.lists(_host_row(), min_size=1, max_size=4, unique_by=lambda row: row["name"])
+    sections = {kind: {"rows": draw(rows)} for kind in SAFE_HOST_KINDS}
+    return sections, draw(st.dictionaries(_label, st.integers(0, 2000), min_size=1, max_size=4))
+
+
+@settings(derandomize=True, max_examples=100, deadline=None)
+@given(safe_host_reads(), st.sampled_from(SAFE_EDITS), st.data())
+def test_safe_order_independent_and_edit_sensitive(
+    read: tuple[dict[str, Any], dict[str, int]], edit: str, data: st.DataObject
+) -> None:
+    """AC9: the SAFE fingerprint ignores row and key order and changes with each section 4.4 edit kind."""
+    from eng_harness.adapters.csi.products._safe_state import fingerprint
+
+    sections, counts = read
+    base = fingerprint(sections, counts)
+    assert len(base) == 64
+    assert fingerprint(_mixed(data, sections), _mixed(data, counts)) == base
+
+    changed, more = copy.deepcopy(sections), dict(counts)
+    kind = data.draw(st.sampled_from(SAFE_HOST_KINDS))
+    rows = changed[kind]["rows"]
+    row = rows[data.draw(st.integers(0, len(rows) - 1))]
+    if edit == "value":
+        row["value"] = data.draw(_coord.filter(lambda v: v != row["value"]))
+    elif edit == "name":
+        row["name"] += "x"
+    elif edit == "coordinate":
+        row["point"][data.draw(st.integers(0, 2))] += 1.0
+    elif edit == "add_row":
+        rows.append({"name": "new", "value": 0.0, "point": [0.0, 0.0, 0.0], "items": []})
+    elif edit == "drop_row":
+        rows.remove(row)
+    elif edit == "count":
+        more[data.draw(st.sampled_from(sorted(more)))] += 1
+    else:
+        changed[kind] = {"rows": []}
+    assert fingerprint(changed, more) != base
