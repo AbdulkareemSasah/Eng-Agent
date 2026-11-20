@@ -14,15 +14,17 @@ from __future__ import annotations
 import json
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from pathlib import Path, PureWindowsPath
-from typing import Any, Literal
+from typing import Any, Literal, NoReturn
 
 from eng_contract.canonical import payload_sha256
-from eng_contract.errors import ContractError, ErrorCode, Precondition
-from eng_contract.ids import SystemClock
+from eng_contract.errors import ContractError, ErrorCode, ErrorDetail, Precondition
+from eng_contract.ids import FixedClock, SeededIdSource, SystemClock
 from pydantic import JsonValue
 
 from eng_harness.adapters._args import HostTarget
+from eng_harness.adapters._errors import parse_error_reply
 from eng_harness.adapters._ledger import LedgerEntry, WriteLedger
+from eng_harness.adapters.revit._errors import RevitErrorMapper
 from eng_harness.adapters.revit._replies import parse_revit_reply
 from eng_harness.adapters.revit._tools import (
     build_change_element_type_args,
@@ -32,10 +34,11 @@ from eng_harness.adapters.revit._tools import (
     build_set_type_parameter_values_args,
 )
 from eng_harness.adapters.revit._units import load_specs
-from eng_harness.errors import NotImplementedGap
+from eng_harness.errors import NotImplementedGap, ToolFailed
 from eng_harness.servers import CallEffect
 
 __all__ = [
+    "ADDIN_QUEUE_DEADLINE_S",
     "DIALOG_SUMMARY_LIMIT",
     "batch_ids_fitting_dialog",
     "build_edit_args",
@@ -44,12 +47,15 @@ __all__ = [
     "encode_write_value",
     "prepare_and_send_write",
     "resolve_parameter_name",
+    "send_attended_write",
     "verify_unique_ids",
 ]
 
 # Spec 0011 section 1 / AC14: dialog shows the first 500 characters of the arguments
 # (`RevitDestructiveConfirmationPrompt.cs:19-28`, `PrepareDestructiveHandler.cs:43-45`).
 DIALOG_SUMMARY_LIMIT = 500
+# Spec 0011 section 4.2 rule 1 / E/Runtime/MainThreadRequestQueue.cs:25 (same constant as doctor).
+ADDIN_QUEUE_DEADLINE_S = 60
 
 HostCall = Callable[[str, dict[str, Any], CallEffect], Awaitable[Mapping[str, Any]]]
 EditKind = Literal[
@@ -391,3 +397,93 @@ async def prepare_and_send_write(
     ledger.append(entry)
     result = await call(tool, args, CallEffect.WRITE)
     return parse_revit_reply(dict(result)).body
+
+
+def _raise_detail(detail: ErrorDetail) -> NoReturn:
+    """Raise `ContractError` carrying every field of `detail` (AC18 never retries declined)."""
+    extra: dict[str, Any] = {}
+    if detail.host_code is not None:
+        extra["host_code"] = detail.host_code
+    if detail.op_id is not None:
+        extra["op_id"] = detail.op_id
+    if detail.incident_id is not None:
+        extra["incident_id"] = detail.incident_id
+    if detail.hint is not None:
+        extra["hint"] = detail.hint
+    if detail.field is not None:
+        extra["field"] = detail.field
+    raise ContractError(detail.code, detail.message, retryable=detail.retryable, **extra)
+
+
+async def send_attended_write(
+    call: HostCall,
+    ledger: WriteLedger,
+    *,
+    tool: str,
+    host_args: Mapping[str, Any],
+    op_id: str,
+    bound_path: Path,
+    references: Mapping[int, str],
+    element_ids: Sequence[int] | None,
+    target: HostTarget,
+    call_timeout_s: int,
+) -> Mapping[str, Any]:
+    """Attended write on the `write` role: map dialog outcomes, never retry a decline (AC18).
+
+    `call_timeout_s` is the write role's configured timeout (spec 0011 §4.2 rule 1). A client-side
+    timeout (`ToolFailed` / code-less unexpected error) with a timeout at or below the add-in
+    deadline stays `TIMEOUT_UNKNOWN_OUTCOME`; the busy/`MODAL_DIALOG` path is the host reply that
+    names `prepare_destructive` (fake fault `dialog_unanswered` with `reply: busy`).
+    """
+    _ = call_timeout_s  # documented against ADDIN_QUEUE_DEADLINE_S; the session enforces the role timeout
+    meta = await call("revit_get_model_metadata", {}, CallEffect.READ)
+    meta_body = parse_revit_reply(dict(meta)).body
+    path = meta_body.get("path")
+    check_active_document(str(path) if isinstance(path, str) else None, bound_path)
+
+    if element_ids:
+        missing = sum(1 for eid in element_ids if int(eid) not in references)
+        if missing:
+            raise ContractError(
+                ErrorCode.INVALID_ARGUMENT,
+                f"{missing} element id(s) lack a unique_id reference",
+                field="references",
+            )
+        details = await call(
+            "revit_get_element_details",
+            {"elementIds": [int(x) for x in element_ids]},
+            CallEffect.READ,
+        )
+        body = parse_revit_reply(dict(details)).body
+        items = body.get("items")
+        if not isinstance(items, list):
+            raise ContractError(ErrorCode.HOST_ERROR, "element details reply has no items")
+        needed = {int(eid): references[int(eid)] for eid in element_ids}
+        verify_unique_ids([row for row in items if isinstance(row, Mapping)], needed)
+
+    args = dict(host_args)
+    entry = LedgerEntry(
+        op_id=op_id,
+        tool=tool,
+        args_sha256=payload_sha256(args),
+        target=target,
+        pre_image_ref=None,
+        sent_at=SystemClock().now(),
+    )
+    ledger.append(entry)
+
+    mapper = RevitErrorMapper(SeededIdSource(b"revit-attended", FixedClock(1_700_000_000_000, 1)))
+    try:
+        result = await call(tool, args, CallEffect.WRITE)
+    except ToolFailed as error:
+        # Session backstop / lost pipe on a write (spec 0011 §4.7 code-less unexpected / client timeout).
+        _raise_detail(error.detail)
+    except ContractError:
+        raise
+
+    dumped = dict(result)
+    failure = parse_error_reply(dumped)
+    if failure is not None:
+        detail = mapper.map(failure, effect=CallEffect.WRITE, tool=tool, op_id=op_id)
+        _raise_detail(detail)
+    return parse_revit_reply(dumped).body
