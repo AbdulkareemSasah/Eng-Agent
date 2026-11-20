@@ -139,7 +139,7 @@ class Stand:
         return build_ports(
             config(self.control), self.workspace, self.store, self.run_dir, self.clock, self.ids,
             inspector=Inspector(self.control), launcher=PosixLauncher(), lock_dir=self.root / "locks",
-            files={MODEL_KEY: self.original},
+            files={MODEL_KEY: self.original, self.original.name: self.original},
         )  # fmt: skip
 
     @property
@@ -250,10 +250,12 @@ class Stand:
         )  # fmt: skip
         return Engine(self.workspace, Registry([flow]), bound, self.store, EngineSettings(), self.clock, self.ids)
 
-    def request(self, mode: PermissionMode = PermissionMode.WORK_ON_COPY) -> RunRequest:
-        """The run request of the test workflow."""
+    def request(
+        self, mode: PermissionMode = PermissionMode.WORK_ON_COPY, *, workflow: str = "edit_cycle_test"
+    ) -> RunRequest:
+        """The run request of the test workflow or of the shipped `model_edit_cycle`."""
         return RunRequest(
-            workflow="edit_cycle_test",
+            workflow=workflow,
             input={"model": str(self.original), "visible_host": False},
             basis_ref=self.basis_ref,
             run_class=RunClass.TRIAL,
@@ -268,15 +270,27 @@ class Stand:
         *,
         cycles_hook: Any = None,
         mode: PermissionMode = PermissionMode.WORK_ON_COPY,
+        workflow: str | None = None,
     ) -> RunOutcome:
         """Start the run and answer every pause with `responder(stand, request)` until it ends or stops."""
 
         async def body() -> RunOutcome:
             async with self.ports() as ports:
+                # host_state during resume presents and answers in one call (no pause); accept as the play loop would
+                present = self.inputs.present
+
+                async def accept_host_state(request: InputRequest) -> None:
+                    await present(request)
+                    if request.kind == "engine.host_state":
+                        self.inputs.script(request.request_id, self.choose(request, "accept"))
+
+                attr = "present"
+                setattr(self.inputs, attr, accept_host_state)
                 engine = self.engine(ports, flow)
                 if cycles_hook is not None:
                     cycles_hook(ports)
-                outcome = await engine.start(self.request(mode=mode))
+                name = workflow if workflow is not None else flow.name
+                outcome = await engine.start(self.request(mode=mode, workflow=name))
                 for _ in range(40):  # a bound, never reached by a run that behaves
                     if outcome.status is not RunStatus.PAUSED:
                         return outcome
@@ -437,3 +451,101 @@ def build_stand(root: Path, *, values: Mapping[str, tuple[Any, str | None]] | No
 def stand(tmp_path: Path) -> Stand:
     """A stand over a fake model with one frame, one area, a frame load and the synthetic basis of `VALUES`."""
     return build_stand(tmp_path)
+
+
+# --- T9b helpers (plan 0007 T9b): the shipped workflow and shared responders --------------------
+
+CLEAN_DRIFT = 0.004  # below the stand's limits.drift_ratio 0.01 (synthetic)
+CLEAN_STEEL = [{"frame": "F1", "ratio": 0.5, "ratio_type": "PMM", "location": 0.0, "combo": "C1"}]
+
+
+def seed_clean(stand: Stand) -> None:
+    """No analysis messages; drifts under the limit; one steel design row (normal path of spec 4.9)."""
+    seed_results(
+        stand,
+        drifts=[
+            {
+                "story": "S1",
+                "case": "C1",
+                "direction": "X",
+                "drift": CLEAN_DRIFT,
+                "label": "J1",
+                "x": 0.0,
+                "y": 0.0,
+                "z": 3.0,
+            }
+        ],
+        design={"steel": CLEAN_STEEL},
+        messages=[],
+    )
+
+
+def unlock(stand: Stand) -> None:
+    """Clear the fake's post-analysis lock (spec 4.5: the engineer unlocks in ETABS)."""
+    data = json.loads(stand.control.read_text())
+    data.setdefault("host", {})["locked"] = False
+    stand.control.write_text(json.dumps(data))
+
+
+def turn_options(shown: InputRequest) -> set[str]:
+    props: dict[str, Any] = cast(dict[str, Any], shown.fields_schema.get("properties", {}))
+    found: set[str] = set()
+    for prop in props.values():
+        found.update(cast(list[str], prop.get("enum") or ()))
+    return found
+
+
+def is_turn(shown: InputRequest) -> bool:
+    return {"accept", "more_edits", "hand_edit"} <= turn_options(shown)
+
+
+def is_d3(shown: InputRequest) -> bool:
+    options = turn_options(shown)
+    return "stop_cycle" in options and "accept" not in options
+
+
+def shipped_cycle() -> Any:
+    """The real `model_edit_cycle` workflow (imported late so a missing finish fails the test, not collection)."""
+    from eng_harness.rules import edit_cycle as edit_rules
+    from eng_harness.workflows import model_edit_cycle as package
+    from eng_harness.workflows.model_edit_cycle import model_edit_cycle
+
+    _warm_coverage_multiline_maps(Path(package.__file__).resolve().parent, Path(edit_rules.__file__).resolve())
+    return model_edit_cycle
+
+
+def cycle_responder(
+    *,
+    change_set: Mapping[str, JsonValue] | None = None,
+    turn: str = "accept",
+    d3: str = "continue",
+    on_change_set: Callable[[Stand], None] | None = None,
+    on_approval: Callable[[Stand, ApprovalRequest], Any] | None = None,
+    on_turn: Callable[[Stand, InputRequest, int], Any] | None = None,
+) -> Callable[[Stand, Any], Any]:
+    """Approve every request; answer the change set, D-3 and the engineer turn. Hooks for hand edits."""
+    given: Mapping[str, JsonValue] = {"change_set": {"items": [ITEM_SECTION]}} if change_set is None else change_set
+    turns = {"n": 0}
+
+    def respond(stand: Stand, shown: Any) -> Any:
+        if isinstance(shown, ApprovalRequest):
+            if on_approval is not None:
+                return on_approval(stand, shown)
+            return stand.approve(shown)
+        assert isinstance(shown, InputRequest)
+        if shown.kind == "block":
+            if on_change_set is not None:
+                on_change_set(stand)
+            return stand.give(shown, given)
+        if is_turn(shown):
+            turns["n"] += 1
+            if on_turn is not None:
+                return on_turn(stand, shown, turns["n"])
+            return stand.choose(shown, turn)
+        if is_d3(shown):
+            return stand.choose(shown, d3)
+        if shown.kind == "engine.host_state":
+            return stand.choose(shown, "accept")
+        return stand.choose(shown, "continue")
+
+    return respond

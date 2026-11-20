@@ -68,3 +68,22 @@ def test_workflow_definition() -> None:
         (f.path, f.kind, f.unit, f.label) for f in BASIS_FIELDS
     ]
     assert [tuple(a.choices) if a.choices else None for a in asks] == [f.choices for f in BASIS_FIELDS]
+
+
+def test_workflow_registered() -> None:
+    """AC1 (lock part): `block.discover()` holds the model_edit_cycle workflow and its child blocks."""
+    from eng_harness.block import discover
+
+    names = {b.name for b in discover().blocks}
+    assert "model_edit_cycle" in names
+    for child in (
+        "read_state",
+        "obtain_change_set",
+        "apply_change_set",
+        "edit_cycle_once",
+        "run_and_summarize",
+        "promote_revision",
+        "sign_off_run",
+        "engineer_turn_only",
+    ):
+        assert child in names, child
