@@ -11,6 +11,9 @@ dependencies = ["structural-codes-core", "structural-codes-aci318-14", "eng-cont
 [dependency-groups]
 dev = ["pytest>=9.2.0", "hypothesis>=6.170.14", "pyyaml>=6,<7", "types-pyyaml>=6"]
 
+[project.entry-points."structural_codes.packs"]
+sbc304_2018 = "sbc304_2018:PACK"
+
 [tool.uv.sources]
 eng-contract = { workspace = true }
 structural-codes-core = { workspace = true }
