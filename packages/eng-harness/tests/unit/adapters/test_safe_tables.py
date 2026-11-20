@@ -109,9 +109,10 @@ def test_soil_supports() -> None:
     prop = supports.properties[0]
     assert prop.name == "SOIL"
     assert prop.stiffness_option == "Simple"
-    assert prop.u1_kN_m3 == pytest.approx(0.0)
-    assert prop.u2_kN_m3 == pytest.approx(0.0)
-    assert prop.u3_kN_m3 == pytest.approx(12_000.0)  # unit-weight dimension under kN_m_C (spec Q3)
+    wire = prop.model_dump(by_alias=True)
+    assert wire["u1_kN_m3"] == pytest.approx(0.0)
+    assert wire["u2_kN_m3"] == pytest.approx(0.0)
+    assert wire["u3_kN_m3"] == pytest.approx(12_000.0)  # unit-weight dimension under kN_m_C (spec Q3)
     assert prop.nonlinear_u3 == "CompressionOnly"
     by_area = {row.area: row.property for row in supports.assignments}
     assert by_area == {"A1": "SOIL", "A2": None}
@@ -127,7 +128,8 @@ def test_missing_column() -> None:
     assert detail.incident_id is not None
     assert "Slab Property Definitions" in detail.incident_id
     assert "thickness" in detail.incident_id.lower() or "Thickness" in detail.message
-    assert detail.received is not None  # columns seen as failure evidence (AC13)
+    assert isinstance(detail.received, dict)
+    assert detail.received["columns_seen"] == ["Name", "PropType", "Material"]
 
 
 def test_ambiguous_column() -> None:
@@ -147,7 +149,13 @@ def test_ambiguous_column() -> None:
     assert detail.code is ErrorCode.INTERNAL
     assert detail.incident_id is not None
     assert "case" in detail.incident_id.lower() or "case" in detail.message.lower()
-    assert detail.received is not None
+    assert isinstance(detail.received, dict)
+    seen = detail.received["columns_seen"]
+    assert isinstance(seen, list)
+    assert "OutputCase" in seen
+    assert "LoadCase" in seen
+    assert "OutputCase" in detail.message
+    assert "LoadCase" in detail.message
 
 
 def test_unknown_table_is_gap() -> None:

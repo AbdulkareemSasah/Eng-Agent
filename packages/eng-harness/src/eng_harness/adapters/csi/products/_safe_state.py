@@ -113,7 +113,7 @@ def materials_from_rows(
                 name=name,
                 type=MaterialType.CONCRETE if is_concrete else MaterialType.OTHER,
                 E_MPa=_stress_mpa(body["e1"], units),
-                nu_ratio=float(body["u12"]),
+                nu_ratio=_as_float(body["u12"]),
                 gamma_kN_m3=_unit_weight(body["unit_weight"], units),
                 fc_MPa=_stress_mpa(conc[name]["fc"], units) if is_concrete else None,
             )
@@ -131,9 +131,9 @@ def soil_supports_from_rows(
         SafeSoilProperty(
             name=str(row["name"]),
             stiffness_option=str(row["stiff_opt"]),
-            u1_kN_m3=_unit_weight(row["stiff_u1"], units),
-            u2_kN_m3=_unit_weight(row["stiff_u2"], units),
-            u3_kN_m3=_unit_weight(row["stiff_u3"], units),
+            u1_kn_m3=_unit_weight(row["stiff_u1"], units),
+            u2_kn_m3=_unit_weight(row["stiff_u2"], units),
+            u3_kn_m3=_unit_weight(row["stiff_u3"], units),
             nonlinear_u3=str(row["nonlin_opt3"]),
         )
         for row in _mapped("Spring Property Definitions - Area Springs", properties)
