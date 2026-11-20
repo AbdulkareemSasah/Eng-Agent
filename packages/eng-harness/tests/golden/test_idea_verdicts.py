@@ -31,6 +31,16 @@ _CASES: list[tuple[dict[str, Any], VerdictStatus, float | None]] = [
         VerdictStatus.NOT_APPLICABLE,
         0.5,
     ),
+    (
+        {"name": "Negative", "check_value": -5.0, "check_status": True, "skipped": False},
+        VerdictStatus.NEEDS_ENGINEER,
+        None,
+    ),
+    (
+        {"name": "NonFinite", "check_value": float("nan"), "check_status": True, "skipped": False},
+        VerdictStatus.ERROR,
+        None,
+    ),
 ]
 
 

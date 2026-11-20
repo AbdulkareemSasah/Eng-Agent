@@ -152,23 +152,39 @@ def test_empty_is_precondition() -> None:
 
 
 def test_passed_disagreement() -> None:
-    """AC14: connection passed that disagrees with its checks adds one idea:connection NEEDS_ENGINEER."""
-    connections = [
-        _connection(
-            passed=True,
-            checks=[_check("Welds", 112.0, status=False)],
-        )
-    ]
-    payload = idea_verdicts.build_verdict_set(
-        connections,
+    """AC14: when passed is true, disagree on a non-skipped check_status false or mapped FAIL/ERROR.
+
+    Host-pass / high-ratio (103/true) is NEEDS_ENGINEER on the check alone and does not add idea:connection.
+    Host-fail / low-ratio (80/false) with passed=true is the real passed-vs-checks disagreement.
+    """
+    disagree = idea_verdicts.build_verdict_set(
+        [_connection(passed=True, checks=[_check("Welds", 80.0, status=False)])],
         design_code="AISC",
         route="native",
         load_map_confirmed=True,
     )
-    extra = [v for v in payload.verdicts if v.check_id == "idea:connection"]
-    assert len(extra) == 1
-    assert extra[0].status is VerdictStatus.NEEDS_ENGINEER
-    assert extra[0].subject.id == "CON1"
+    extra_disagree = [v for v in disagree.verdicts if v.check_id == "idea:connection"]
+    assert len(extra_disagree) == 1
+    assert extra_disagree[0].status is VerdictStatus.NEEDS_ENGINEER
+    assert extra_disagree[0].subject.id == "CON1"
+
+    host_fail = idea_verdicts.build_verdict_set(
+        [_connection(passed=True, checks=[_check("Welds", 112.0, status=False)])],
+        design_code="AISC",
+        route="native",
+        load_map_confirmed=True,
+    )
+    assert len([v for v in host_fail.verdicts if v.check_id == "idea:connection"]) == 1
+
+    agree_high = idea_verdicts.build_verdict_set(
+        [_connection(passed=True, checks=[_check("Bolts", 103.0, status=True)])],
+        design_code="AISC",
+        route="native",
+        load_map_confirmed=True,
+    )
+    assert [v for v in agree_high.verdicts if v.check_id == "idea:connection"] == []
+    assert agree_high.verdicts[0].status is VerdictStatus.NEEDS_ENGINEER
+    assert agree_high.verdicts[0].ratio == 1.03
 
 
 def test_code_label_and_assumptions() -> None:
