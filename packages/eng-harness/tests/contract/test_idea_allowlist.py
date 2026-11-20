@@ -78,3 +78,61 @@ def test_fake_process_schemas_match_inventory(tmp_path: Path) -> None:
         assert actual == {name: by_name[name] for name in expected_names}
     finally:
         enabled.close()
+
+
+def test_against_inventory() -> None:
+    """AC2: the four classes partition the 58 inventory names; served entries match the allowlist."""
+    from helpers.idea_classification import EXCLUDED, GAP, NOT_SERVED, SERVED
+
+    from eng_harness.adapters.idea import idea_allowlist
+
+    inventory = load_repo_json(
+        INVENTORY,
+        reason="the S-12 inventory is outside the package copy that the mutation step runs (B-369); expires 2026-12-31",
+    )
+    names = {t["name"] for t in inventory["tools"]}
+    assert len(names) == 58
+    assert names == SERVED | GAP | NOT_SERVED | EXCLUDED
+    assert len(SERVED) + len(GAP) + len(NOT_SERVED) + len(EXCLUDED) == 58
+
+    allowlist = idea_allowlist()
+    assert allowlist.sasaah_commit == inventory["sasaah_commit"]
+    assert allowlist.fingerprint_source == "s12-inventory"
+    assert set(allowlist.tool_names) == SERVED
+    by_name = {t["name"]: t for t in inventory["tools"]}
+    for tool in allowlist.tools:
+        item = by_name[tool.name]
+        assert not item["excluded_from_allowlist"], tool.name
+        assert item["classification"] != "escape-hatch", tool.name
+        assert "IDEA" in tool.products
+        assert tool.units == "none"
+
+
+def test_fingerprint_from_inventory() -> None:
+    """AC3: the fingerprint of the 9 served tools computed from S-12 equals the pinned IDEA fingerprint."""
+    from eng_harness.adapters.idea import idea_allowlist
+    from eng_harness.servers._buildcheck import tool_list_fingerprint
+
+    allowlist = idea_allowlist()
+    assert allowlist.fingerprint_source == "s12-inventory"
+    assert allowlist.product == "IDEA"
+    inventory = load_repo_json(
+        INVENTORY,
+        reason="the S-12 inventory is outside the package copy that the mutation step runs (B-369); expires 2026-12-31",
+    )
+    schemas = {t["name"]: t["input_schema"] for t in inventory["tools"] if t["name"] in allowlist.tool_names}
+    assert set(schemas) == set(allowlist.tool_names) == SERVED_TOOLS
+    assert tool_list_fingerprint(schemas) == allowlist.fingerprint["IDEA"] == allowlist.tool_fingerprint
+
+
+def test_unit_header() -> None:
+    """AC16: the allowlist header declares native load units as declared and idea_set_loads as missing."""
+    from eng_harness.adapters.idea import idea_allowlist
+
+    allowlist = idea_allowlist()
+    rows = {(e.tool, e.field, e.unit, e.unit_status) for e in allowlist.units}
+    assert ("idea_native_get_loads", "force", "N", "declared") in rows
+    assert ("idea_native_get_loads", "moment", "N.m", "declared") in rows
+    assert ("idea_native_set_loads", "force", "N", "declared") in rows
+    assert ("idea_native_set_loads", "moment", "N.m", "declared") in rows
+    assert ("idea_set_loads", "forces", None, "missing") in rows

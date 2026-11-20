@@ -232,11 +232,12 @@ class ServerManager:
                     tools += page.tools
                     if (cursor := page.next_cursor) is None:
                         break
-                reply = await client.call_tool("csi_status", {}, read_timeout_seconds=backstop_s)
+                status_tool = expected.status_tool
+                reply = await client.call_tool(status_tool, {}, read_timeout_seconds=backstop_s)
             block = reply.content[0] if reply.content else None
             status = json.loads(block.text) if isinstance(block, types.TextContent) and not reply.is_error else None
             if not isinstance(status, dict):
-                raise ValueError("csi_status gave no JSON object")
+                raise ValueError(f"{status_tool} gave no JSON object")
         except (TimeoutError, MCPError, OSError, ValueError) as error:
             return self._unchecked(role, f"the build cannot be read: {error}")
         seen = Observed(exe, client.server_info, {t.name: t.input_schema for t in tools}, status)
