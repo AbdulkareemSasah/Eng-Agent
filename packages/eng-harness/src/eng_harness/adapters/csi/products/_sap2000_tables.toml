@@ -1,0 +1,8 @@
+# SAP2000 field-map data (spec 0012 section 4.4). Every entry is unknown until a recording (L4) sets its keys.
+# No key is taken from the ETABS or SAFE references (spec 0012 section 4.4). Host table names come only from
+# spec 0012 section 12 L4 (or a later recording / sap2000-all-tables.json, Q3).
+# status: reference | candidate | unknown.
+
+[tables."Analysis Messages"]
+status = "unknown"
+source = "spec 0012 section 12 L4; host field keys unconfirmed until recording"
