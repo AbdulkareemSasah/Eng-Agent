@@ -801,5 +801,75 @@ def test_basis_step_refusals_and_json_bom_values(tmp_path: Path) -> None:
 
 
 def test_basis_confirmation_flow_real_engine(tmp_path: Path) -> None:
-    """AC47 re-check with the real engine (plan 0006 T17c)."""
-    raise AssertionError("T17c: real-engine re-check of AC47 not yet written")
+    """AC47 re-check with the real engine through the production port mapping (plan 0006 T17c)."""
+    basis_path = _basis_file(tmp_path)
+    rig = Rig(tmp_path, real_engine=True)
+    seen_pages: dict[str, str] = {}
+    post_statuses: list[int] = []
+
+    def interact(client: Any) -> None:
+        setup_path = _setup_path(client)
+        page = client.get(setup_path)
+        seen_pages["setup"] = page.body
+        draft_match = _DRAFT_SHA.search(page.body)
+        assert draft_match is not None
+        form = {
+            CSRF_FIELD: client.token(setup_path),
+            "draft_sha256": draft_match.group(1),
+            "by": "Ada",
+            "decision": "confirm",
+            "confirm_materials": "on",
+            "confirm_limits": "on",
+            "confirm_modeling": "on",
+        }
+        post_statuses.append(client.post(setup_path, form).status)
+
+    rig.open_with = _threaded(interact)
+    code = rig.main(
+        "run",
+        BASIS_FLOW,
+        "--template",
+        "blank@0.1.0",
+        "--basis",
+        str(basis_path),
+        "--progress",
+        "off",
+        "--no-report",
+        workflow_registry=BASIS_REGISTRY,
+        basis_fields_of=lambda w: w.basis_fields,
+    )
+    assert code == ExitCode.OK
+    assert post_statuses == [HTTPStatus.OK]
+    html = seen_pages["setup"]
+    assert "draft_template" in html
+    assert "blank@0.1.0" in html
+    assert "Concrete fc" in html
+    assert "35" in html
+    assert "MPa" in html
+    assert "provided" in html
+    assert "min 20 MPa (ACI 318-14 19.2.1)" in html
+    assert "max 80 MPa (ACI 318-14 19.2.1)" in html
+    assert "<b>x</b>" not in html
+    assert "&lt;b&gt;x&lt;/b&gt;" in html
+    assert '<bdi dir="auto">' in html
+    assert 'name="confirm_materials"' in html
+    assert 'name="confirm_limits"' in html
+    assert 'name="confirm_modeling"' in html
+    assert 'name="by"' in html
+    assert 'name="by" value=' not in html
+
+    setup_logs = list((rig.workspace / "setups").glob("*.json"))
+    assert len(setup_logs) == 1
+    raw_log = setup_logs[0].read_bytes()
+    assert not raw_log.startswith(b"\xef\xbb\xbf")
+    assert b"\r" not in raw_log
+    records = json.loads(raw_log.decode("utf-8"))
+    assert len(records) == 1
+    record = records[0]
+    assert record["by"] == "Ada"
+    assert set(record["confirmed_sections"]) == {"materials", "limits", "modeling"}
+    assert len(record["draft_sha256"]) == 64
+    assert set(record) == {"setup_id", "draft_sha256", "confirmed_sections", "by", "at", "rejected"}
+    assert "values" not in record
+    assert "ملاحظة" not in raw_log.decode("utf-8")
+    assert rig.run_ids()  # the real engine started after the freeze

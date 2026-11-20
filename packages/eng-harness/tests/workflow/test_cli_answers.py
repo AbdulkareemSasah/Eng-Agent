@@ -129,10 +129,116 @@ def test_run_answers_first_data_request(tmp_path: Path) -> None:
 
 
 def test_form_request_answers_file_real_engine(tmp_path: Path) -> None:
-    """AC46 re-check with the real engine (plan 0006 T17c)."""
-    raise AssertionError("T17c: real-engine re-check of AC46 not yet written")
+    """AC46 re-check with the real engine through the production port mapping (plan 0006 T17c)."""
+    from helpers.cli_deps import FakeInput, FakeOutput
+    from pydantic import BaseModel, ConfigDict
+
+    from eng_harness.block import Registry, workflow
+
+    class Section(BaseModel):
+        model_config = ConfigDict(frozen=True, extra="forbid")
+
+        label: str
+        count: int
+
+    flow_name = "ask_real_flow"
+
+    @workflow(name=flow_name, version=1, description="One data request for the real-engine answers-file re-check.")
+    async def ask_real_flow(ctx: Any, inp: FakeInput) -> FakeOutput:
+        answered = await ctx.ask(Section, title="Give the values")
+        assert answered.value == Section(label="x", count=2)
+        return FakeOutput()
+
+    registry = Registry([ask_real_flow])
+    for name, encoding, keyed in [("bare", "utf-8", False), ("keyed", "utf-8-sig", True)]:
+        rig = Rig(tmp_path / name, real_engine=True)
+        rig.workspace.mkdir(parents=True)
+        (rig.workspace / "harness.toml").write_text('[engine]\nengineer = "ada"\n', encoding="utf-8")
+        assert rig.main("run", flow_name, *QUIET, workflow_registry=registry) == ExitCode.AWAITING_ENGINEER, name
+        [run_id] = rig.run_ids()
+        assert _provided(rig, run_id) == [], name
+        request_id = next(
+            e.payload.request_id for e in _events(rig, run_id) if isinstance(e.payload, ev.InputRequested)
+        )
+        payload: Any = {request_id: VALUES} if keyed else VALUES
+        answers = _file(rig, payload, encoding)
+        assert (
+            rig.main(
+                "resume",
+                run_id,
+                "--answers",
+                answers,
+                "--no-report",
+                "--progress",
+                "off",
+                workflow_registry=registry,
+            )
+            == ExitCode.OK
+        ), name
+        [given] = _provided(rig, run_id)
+        assert (given.request_id, given.by) == (request_id, "engineer:ada"), name
+        assert rig.opened == [], name
 
 
 def test_run_answers_first_data_request_real_engine(tmp_path: Path) -> None:
-    """AC64 re-check with the real engine (plan 0006 T17c)."""
-    raise AssertionError("T17c: real-engine re-check of AC64 not yet written")
+    """AC64 re-check with the real engine through the production port mapping (plan 0006 T17c)."""
+    from helpers.cli_deps import FakeInput, FakeOutput
+    from pydantic import BaseModel, ConfigDict
+
+    from eng_harness.block import Registry, workflow
+    from eng_harness.ctx import Preview, PreviewItem
+
+    class Section(BaseModel):
+        model_config = ConfigDict(frozen=True, extra="forbid")
+
+        label: str
+        count: int
+
+    flow_name = "ask_two_real_flow"
+    seen: list[str] = []
+
+    @workflow(name=flow_name, version=1, description="Two data requests; only the first is pre-answered.")
+    async def ask_two_real_flow(ctx: Any, inp: FakeInput) -> FakeOutput:
+        first = await ctx.ask(Section, title="First values")
+        seen.append(first.value.label)
+        await ctx.ask(Section, title="Second values")
+        return FakeOutput()
+
+    registry = Registry([ask_two_real_flow])
+    rig = Rig(tmp_path / "first", real_engine=True)
+    rig.workspace.mkdir(parents=True)
+    (rig.workspace / "harness.toml").write_text('[engine]\nengineer = "ada"\n', encoding="utf-8")
+    answers = _file(rig, VALUES, "utf-8-sig")
+    assert (
+        rig.main("run", flow_name, "--answers", answers, *QUIET, workflow_registry=registry)
+        == ExitCode.AWAITING_ENGINEER
+    )
+    [run_id] = rig.run_ids()
+    [given] = _provided(rig, run_id)
+    assert given.by == "engineer:ada"
+    requested = [e.payload for e in _events(rig, run_id) if isinstance(e.payload, ev.InputRequested)]
+    assert len(requested) == 2
+    assert given.request_id == requested[0].request_id
+    assert rig.opened == []
+    assert "not used" not in rig.err.getvalue()
+    assert seen == ["x"]
+
+    approve_name = "approve_only_real"
+
+    @workflow(name=approve_name, version=1, description="An approval only: --answers is unused.")
+    async def approve_only(ctx: Any, inp: FakeInput) -> FakeOutput:
+        preview = Preview(items=(PreviewItem(id="i1", label="One change", refs=()),), diff_ref=None, models=())
+        await ctx.approve("Apply the change", preview)
+        return FakeOutput()
+
+    registry2 = Registry([approve_only])
+    unused = Rig(tmp_path / "none", real_engine=True)
+    unused.workspace.mkdir(parents=True)
+    (unused.workspace / "harness.toml").write_text('[engine]\nengineer = "ada"\n', encoding="utf-8")
+    assert (
+        unused.main("run", approve_name, "--answers", _file(unused, VALUES), *QUIET, workflow_registry=registry2)
+        == ExitCode.AWAITING_ENGINEER
+    )
+    [unused_id] = unused.run_ids()
+    assert _provided(unused, unused_id) == []
+    assert unused.err.getvalue().count("the --answers file was not used") == 1

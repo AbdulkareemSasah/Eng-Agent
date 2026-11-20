@@ -203,4 +203,185 @@ def test_signoff_reads_host_design_verdicts(tmp_path: Path) -> None:
 
 def test_signoff_rules_real_engine(tmp_path: Path) -> None:
     """AC42 re-check with the real engine through the production page wiring (plan 0006 T17c)."""
-    raise AssertionError("T17c: real-engine re-check of AC42 not yet written")
+    import contextlib
+    import threading
+    import time
+    from typing import Any, cast
+
+    from eng_contract.envelope import SuccessEnvelope
+    from eng_contract.ids import SeededIdSource
+    from helpers.cli_deps import FakeInput, FakeOutput, FakePorts, Rig, client_for
+    from workflows.rig import Host
+
+    from eng_harness.block import Registry, workflow
+    from eng_harness.cli import ExitCode
+    from eng_harness.ctx import ApprovalKind, Preview, PreviewItem
+    from eng_harness.journal import _events as ev
+    from eng_harness.pages._answers import bound_sha256
+    from eng_harness.pages._security import CSRF_FIELD
+    from eng_harness.ports import ApprovalRequest
+
+    statuses = STATUSES
+    counts = {s: statuses.count(s) for s in ("PASS", "FAIL", "NOT_APPLICABLE", "NEEDS_ENGINEER", "ERROR")}
+    sha = SHA
+    calc_id = "harness.host_design_verdicts"
+    trace: dict[str, JsonValue] = {
+        "inputs": [], "constants": [], "steps": [], "outputs": [],
+        "calc_id": calc_id, "calc_version": "1", "content_sha256": sha,
+    }  # fmt: skip
+    calc: dict[str, JsonValue] = {"id": calc_id, "version": 1, "content_sha256": sha, "status": "draft"}
+    body: dict[str, JsonValue] = {
+        "verdicts": [_verdict(f"C{n}", status) for n, status in enumerate(statuses, 1)],
+        "traces": [],
+        "counts": cast(dict[str, JsonValue], counts),
+        "draft": True,
+        "calc": calc,
+        "trace": trace,
+    }
+    flow_name = "signoff_real_flow"
+    held: dict[str, Any] = {}
+
+    @workflow(name=flow_name, version=1, description="Tool then sign-off for the real-engine AC42 re-check.")
+    async def signoff_real_flow(ctx: Any, inp: FakeInput) -> FakeOutput:
+        result = await ctx.tool("read_a", {"n": 0})
+        items = [
+            PreviewItem(id="out_1", label="Design verdicts", refs=(result.ref,)),
+            PreviewItem(id="exc_1", label="Exception", refs=()),
+            PreviewItem(id="exc_2", label="Exception", refs=()),
+        ]
+        await ctx.approve(
+            "Sign the design", Preview(items=tuple(items), diff_ref=None, models=()), kind=ApprovalKind.SIGN_OFF
+        )
+        return FakeOutput()
+
+    registry = Registry([signoff_real_flow])
+    rig = Rig(tmp_path, real_engine=True)
+    rig.workspace.mkdir(parents=True)
+    (rig.workspace / "harness.toml").write_text(
+        '[project_lane."csi/new-tool"]\nrecord = "rec-7"\n',
+        encoding="utf-8",
+    )
+
+    def port_builder(
+        config: Any,
+        workspace: Any,
+        store: Any,
+        run_folder: Any,
+        clock: Any,
+        ids: Any,
+        *,
+        files: Any = None,
+        visible: bool = False,
+    ) -> FakePorts:
+        host = Host(cast(SeededIdSource, ids), clock, workspace.root / "runs")
+        producer = _producer("csi/new-tool")
+        stored = store.put("harness.host_design_verdicts/1", body, producer)
+        held["result_id"] = stored.result_id
+        envelope = SuccessEnvelope(
+            contract="eng-contract/1",
+            ok=True,
+            result_id=stored.result_id,
+            kind="harness.host_design_verdicts/1",
+            summary={"tool": "read_a"},
+            complete=True,
+            provenance=producer,
+        )
+        host.script("read_a", envelope)
+        ports = FakePorts(rig.log, host)
+        held["ports"] = ports
+        return ports
+
+    seen: dict[str, str] = {}
+    posts: list[int] = []
+
+    def interact(address: str) -> None:
+        with contextlib.suppress(Exception):
+            client = client_for(address)
+            client.open()
+            end = time.monotonic() + 15
+            while not rig.shown or client.get(f"/request/{rig.shown[-1].request_id}").status != 200:
+                assert time.monotonic() < end
+                time.sleep(0.02)
+            request = rig.shown[-1]
+            assert isinstance(request, ApprovalRequest)
+            page = client.get(f"/request/{request.request_id}")
+            seen["body"] = page.body
+            assert page.status == HTTPStatus.OK
+            form_base = {
+                CSRF_FIELD: client.token(f"/request/{request.request_id}"),
+                "shown_sha256": bound_sha256(request),
+                "by": "ada",
+                "decision": "approve",
+            }
+            posts.append(
+                client.post(f"/answer/{request.request_id}", form_base | {"acknowledged_unreleased": "on"}).status
+            )
+            posts.append(
+                client.post(
+                    f"/answer/{request.request_id}",
+                    form_base | {"reason_exc_1": REASON, "acknowledged_unreleased": "on"},
+                ).status
+            )
+            posts.append(
+                client.post(
+                    f"/answer/{request.request_id}",
+                    form_base | {"reason_exc_1": REASON, "reason_exc_2": "second"},
+                ).status
+            )
+            posts.append(
+                client.post(
+                    f"/answer/{request.request_id}",
+                    form_base | {"reason_exc_1": REASON, "reason_exc_2": "  ", "acknowledged_unreleased": "on"},
+                ).status
+            )
+            posts.append(
+                client.post(
+                    f"/answer/{request.request_id}",
+                    form_base | {"reason_exc_1": REASON, "reason_exc_2": "second", "acknowledged_unreleased": "on"},
+                ).status
+            )
+
+    def opener(address: str) -> bool:
+        rig.opened.append(address)
+        threading.Thread(target=interact, args=(address,), daemon=True).start()
+        return True
+
+    rig.open_with = opener
+    code = rig.main(
+        "run",
+        flow_name,
+        "--progress",
+        "off",
+        "--json",
+        workflow_registry=registry,
+        port_builder=port_builder,
+    )
+    assert code == ExitCode.OK, (code, rig.err.getvalue(), rig.out.getvalue())
+    html = seen["body"]
+    assert 'href="/report"' in html
+    assert "DRAFT" in html
+    assert UNRELEASED in html
+    assert 'name="acknowledged_unreleased"' in html
+    assert 'name="reason_exc_1"' in html
+    assert 'name="reason_exc_2"' in html
+    assert 'name="reason_exc_3"' not in html
+    assert 'name="by"' in html
+    assert posts == [
+        HTTPStatus.BAD_REQUEST,
+        HTTPStatus.BAD_REQUEST,
+        HTTPStatus.BAD_REQUEST,
+        HTTPStatus.BAD_REQUEST,
+        HTTPStatus.OK,
+    ]
+    [run_id] = rig.run_ids()
+    reader = JournalReader(rig.runs / run_id)
+    try:
+        events = reader.events()
+    finally:
+        reader.close()
+    resolved = [e.payload for e in events if isinstance(e.payload, ev.ApprovalResolved)]
+    assert len(resolved) == 1
+    assert resolved[0].decision == "approve"
+    assert dict(resolved[0].item_reasons) == {"exc_1": REASON, "exc_2": "second"}
+    assert resolved[0].acknowledged_unreleased is True
+    assert events[-1].type is EventType.RUN_COMPLETED

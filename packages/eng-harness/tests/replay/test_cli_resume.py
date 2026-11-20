@@ -86,5 +86,54 @@ def test_stop_file_removed_on_return_and_before_resume(tmp_path: Path) -> None:
 
 
 def test_no_wait_then_resume_real_engine(tmp_path: Path) -> None:
-    """AC8 re-check with the real engine (plan 0006 T17c)."""
-    raise AssertionError("T17c: real-engine re-check of AC8 not yet written")
+    """AC8 re-check with the real engine through the production port mapping (plan 0006 T17c)."""
+    from typing import Any
+
+    from helpers.cli_deps import FakeInput, FakeOutput
+    from helpers.cli_deps import approving_opener as page_opener
+
+    from eng_harness.block import Registry, workflow
+    from eng_harness.ctx import Preview, PreviewItem
+
+    flow_name = "resume_real_flow"
+
+    @workflow(name=flow_name, version=1, description="One approval for the real-engine resume re-check.")
+    async def resume_real_flow(ctx: Any, inp: FakeInput) -> FakeOutput:
+        preview = Preview(items=(PreviewItem(id="i1", label="One change", refs=()),), diff_ref=None, models=())
+        await ctx.approve("Apply the change", preview)
+        return FakeOutput()
+
+    registry = Registry([resume_real_flow])
+    rig = Rig(tmp_path, real_engine=True)
+    assert (
+        rig.main("run", flow_name, "--no-wait", "--json", "--progress", "off", workflow_registry=registry)
+        == ExitCode.AWAITING_ENGINEER
+    )
+    [run_id] = rig.run_ids()
+    first = json.loads(rig.out.getvalue())
+    assert first["status"] == "PAUSED"
+    assert len(first["pending"]) == 1
+    pending_id = first["pending"][0]["request_id"]
+    assert first["pending"] == [{"request_id": pending_id, "title": "Apply the change"}]
+    # no report: the Q23 interim basis_ref cannot be reported (plan T14; AC8 itself does not require the file)
+    assert _last(rig, run_id).payload == ev.RunPaused(reason="awaiting_approval", request_ids=[pending_id])
+    assert rig.opened == []
+
+    other = Rig(tmp_path / "text", real_engine=True)
+    assert (
+        other.main("run", flow_name, "--no-wait", "--progress", "off", workflow_registry=registry)
+        == ExitCode.AWAITING_ENGINEER
+    )
+    [other_id] = other.run_ids()
+    text = other.out.getvalue()
+    assert "Apply the change" in text
+    assert f"resume with: eng-harness resume {other_id}" in text
+    assert "http" not in text + other.err.getvalue()
+
+    rig.open_with = page_opener(rig, current=lambda: rig.shown[-1] if rig.shown else None)
+    rig.out.truncate(0)
+    rig.out.seek(0)
+    assert rig.main("resume", run_id, "--json", "--progress", "off", workflow_registry=registry) == ExitCode.OK
+    assert json.loads(rig.out.getvalue())["status"] == "COMPLETED"
+    assert _last(rig, run_id).type is EventType.RUN_COMPLETED
+    assert len(rig.opened) == 1
