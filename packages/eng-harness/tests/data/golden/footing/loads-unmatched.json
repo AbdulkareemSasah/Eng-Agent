@@ -1,8 +1,8 @@
 {
   "source": "eng-harness spec 0010 section 4.9, synthetic fixture",
-  "method_ref": "\u00a74.9 M2",
+  "method_ref": "§4.9 M2",
   "synthetic": true,
-  "derivation": "compare.length_mm = 10 mm. Subject J1 at (0, 0); SAFE point P1 at (10.1, 0, 0). Plan distance squared = 10.1^2 = 102.01; tolerance squared = 100; 102.01 > 100 so no SAFE point matches. Spec 0010 4.9 M2: none gives NEEDS_ENGINEER (UNMATCHED). Expected error_code INVALID_ARGUMENT, field points, hint UNMATCHED.",
+  "derivation": "compare.length_mm = 10 mm. Subject J1 at (0, 0); SAFE point P1 at (10.1, 0, 0). Plan distance squared = 10.1^2 = 102.01; tolerance squared = 100; 102.01 > 100 so no SAFE point matches. Spec 0010 4.9 M2: none gives NEEDS_ENGINEER (UNMATCHED). Spec 0003 4.2: engineering outcomes are payload statuses, never exceptions. Expected payload status NEEDS_ENGINEER, reason UNMATCHED; loads and combinations_to_add empty (no transfer proceeds).",
   "input": {
     "reactions": {
       "axes": "global",
@@ -135,8 +135,10 @@
     "basis": "res_00000000000000000000000007"
   },
   "expected": {
-    "error_code": "INVALID_ARGUMENT",
-    "field": "points",
-    "hint": "UNMATCHED"
+    "axes": "global",
+    "loads": [],
+    "combinations_to_add": [],
+    "status": "NEEDS_ENGINEER",
+    "reason": "UNMATCHED"
   }
 }

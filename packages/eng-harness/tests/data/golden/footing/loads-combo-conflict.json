@@ -1,8 +1,8 @@
 {
   "source": "eng-harness spec 0010 section 4.9, synthetic fixture",
-  "method_ref": "\u00a74.9 M1",
+  "method_ref": "§4.9 M1",
   "synthetic": true,
-  "derivation": "Subject matches. Patterns DEAD present on both. Chosen S1: ETABS items [(DEAD, 1.2)]; SAFE already has S1 with items [(DEAD, 1.0)]. Same name, other items: NEEDS_ENGINEER, never replaced (spec 0010 4.9 step 2). Hint COMBO_CONFLICT.",
+  "derivation": "Subject matches. Patterns DEAD present on both. Chosen S1: ETABS items [(DEAD, load_pattern, 1.2)]; SAFE already has S1 with items [(DEAD, load_pattern, 1.0)]. Same name, other items (scale 1.2 vs 1.0): NEEDS_ENGINEER, never replaced (spec 0010 4.9 step 2). Spec names no parenthetical reason code; reason COMBO_CONFLICT records the conflict. Spec 0003 4.2: engineering outcomes are payload statuses, never exceptions. Expected payload status NEEDS_ENGINEER, reason COMBO_CONFLICT; loads and combinations_to_add empty.",
   "input": {
     "reactions": {
       "axes": "global",
@@ -150,8 +150,10 @@
     "basis": "res_00000000000000000000000007"
   },
   "expected": {
-    "error_code": "INVALID_ARGUMENT",
-    "field": "safe_load_set",
-    "hint": "COMBO_CONFLICT"
+    "axes": "global",
+    "loads": [],
+    "combinations_to_add": [],
+    "status": "NEEDS_ENGINEER",
+    "reason": "COMBO_CONFLICT"
   }
 }

@@ -1,8 +1,8 @@
 {
   "source": "eng-harness spec 0010 section 4.9, synthetic fixture",
-  "method_ref": "\u00a74.9 M4",
+  "method_ref": "§4.9 M4",
   "synthetic": true,
-  "derivation": "Subject J1 matches P1 exactly. Chosen S1 = 1.0*LIVE. ETABS has LIVE; SAFE load set has only DEAD, no LIVE. Spec 0010 4.9 M4: a case without a SAFE pattern of the same name is NEEDS_ENGINEER (PATTERN_MISSING).",
+  "derivation": "Subject J1 matches P1 exactly. Chosen S1 = 1.0*LIVE. ETABS has LIVE; SAFE load set has only DEAD, no LIVE. Spec 0010 4.9 M4: a case without a SAFE pattern of the same name is NEEDS_ENGINEER (PATTERN_MISSING). Spec 0003 4.2: engineering outcomes are payload statuses, never exceptions. Expected payload status NEEDS_ENGINEER, reason PATTERN_MISSING; loads and combinations_to_add empty.",
   "input": {
     "reactions": {
       "axes": "global",
@@ -135,8 +135,10 @@
     "basis": "res_00000000000000000000000007"
   },
   "expected": {
-    "error_code": "INVALID_ARGUMENT",
-    "field": "safe_load_set",
-    "hint": "PATTERN_MISSING"
+    "axes": "global",
+    "loads": [],
+    "combinations_to_add": [],
+    "status": "NEEDS_ENGINEER",
+    "reason": "PATTERN_MISSING"
   }
 }
