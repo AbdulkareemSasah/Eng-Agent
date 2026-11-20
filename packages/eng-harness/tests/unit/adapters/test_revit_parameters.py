@@ -22,7 +22,7 @@ def _family(
 
 
 def test_role_map_rules() -> None:
-    """AC33: missing/empty name or status, unknown status/role, empty guid, or duplicate GUID → ConfigError; valid map loads."""
+    """AC33: role map load rules; valid map loads; bad name/status/role/guid raise ConfigError."""
     from eng_harness.adapters.revit._parameters import ROLE_NAMES, load_role_map
 
     assert ROLE_NAMES == (
