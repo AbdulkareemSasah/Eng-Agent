@@ -77,6 +77,10 @@ spec 0001 §4.1.2), or `PurePath | None`, not `pathlib.Path`, because block modu
 gate's FB004 refuses it (engine §11 Q47): the command line finds these fields by the identity of the annotation and
 turns each value into a `Path` for its own checks at `run`; `resume` is unchanged (§4.2.2 step 2, §4.7, §5, AC67).
 
+**Amendment B-598.** By the owner answer of 2026-11-20 (OQ-Q99), AC48's 10 MB adversarial string applies to result
+payloads and previews; journal text fields carry the other adversarial strings within the engine inline event cap
+(engine §4.4.1, `INLINE_EVENT_BYTES` = 16384).
+
 ## 1. Problem
 
 In the sessions behind ADR-0024, more than 20 hours went into interface work while host work stalled, the engineer
@@ -420,11 +424,14 @@ page tests use a real server on the loopback interface and `http.client`; no bro
 ### 3.6 Untrusted text
 
 - AC48. Given adversarial strings (markup, quotes, `javascript:` text, `</style>`, bidirectional overrides, escape
-  sequences, NUL, a 10 MB string, Arabic text mixed with digits) in every text field of the journal, of result
-  payloads and of previews, then on every screen and in the report the text appears only escaped, inside a labeled
-  field, wrapped in `<bdi dir="auto">`, with bidirectional controls shown as `<U+XXXX>`, truncated at
-  `display_max_chars` with the original length stated; parsing the output finds only allowlisted tags and attributes
-  and text nodes equal to the escaped input. Test: `tests/property/test_untrusted_text.py::test_every_screen_and_report_escape`.
+  sequences, NUL, Arabic text mixed with digits) in every text field of the journal, of result payloads and of
+  previews, and a 10 MB string in result payloads and previews (amendment B-598, OQ-Q99), then on every screen and
+  in the report the text appears only escaped, inside a labeled field, wrapped in `<bdi dir="auto">`, with
+  bidirectional controls shown as `<U+XXXX>`, truncated at `display_max_chars` with the original length stated;
+  parsing the output finds only allowlisted tags and attributes and text nodes equal to the escaped input. Journal
+  text fields carry those adversarial strings within the engine inline event cap (engine §4.4.1,
+  `INLINE_EVENT_BYTES` = 16384); the oversized example goes through result payloads and previews only. Test:
+  `tests/property/test_untrusted_text.py::test_every_screen_and_report_escape`.
 - AC49. Given the HTML builder, then an attribute accepts only a `SafeToken` (`[A-Za-z0-9_.-]{1,64}`) or an enumerated
   value, a data string is never placed in an attribute, a URL, a class name, an id or a style, and passing one raises.
   Test: `tests/unit/test_html.py::test_attributes_accept_only_tokens`.
