@@ -431,3 +431,13 @@ def test_revit_sanitized(tmp_path: Path) -> None:
     assert meta["path"] == "<path>/<model-1>.rvt"
     assert meta["message"] == "Document <title-1> opened by <user>"
     assert verify_manifest(out) == []
+
+
+def test_revit_title_matches_model_stem() -> None:
+    """When the title equals a model stem already seen, the model placeholder is reused (AC31)."""
+    sanitizer = _sanitizer()
+    assert sanitizer.text("/models/Tower-A.rvt") == "<path>/<model-1>.rvt"
+    assert sanitizer.value({"title": "Tower-A", "path": "/models/Tower-A.rvt"}) == {
+        "title": "<model-1>",
+        "path": "<path>/<model-1>.rvt",
+    }

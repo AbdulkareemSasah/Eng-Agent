@@ -56,3 +56,49 @@ def test_adapter_on_recordings(recording: Path, tmp_path: Path) -> None:
     from fakes.recorded._checks import revit_adapter_problems
 
     assert revit_adapter_problems(RecordedHost(recording), tmp_path / "workspace") == []
+
+
+def test_synthetic_matches_recordings(recording: Path, tmp_path: Path) -> None:
+    """AC31: the synthetic Revit fake gives the recorded reply shape and error codes for every recorded operation."""
+    from fakes.recorded._checks import revit_fidelity_problems
+
+    run_dir = tmp_path / "fake"
+    run_dir.mkdir()
+    assert revit_fidelity_problems(RecordedHost(recording), run_dir) == []
+
+
+def test_the_synthetic_recording(generated: Path) -> None:
+    """The scripted Revit session as recorded: sanitized, with a manifest that verifies and the pinned build."""
+    from eng_harness.adapters.revit import revit_allowlist
+    from eng_harness.servers import verify_manifest
+    from fakes.recorded._session import USER
+
+    assert verify_manifest(generated) == []
+    host = RecordedHost(generated)
+    tools = [e.tool for e in host.calls]
+    assert tools[0] == "revit_open_model"
+    assert "revit_connection_status" in tools
+    assert tools.count("revit_get_model_metadata") >= 1
+    assert host.manifest["tool_fingerprint"] == revit_allowlist(role="write").tool_fingerprint
+    assert host.manifest["adapter"] == "sasaah-revit-mcp"
+    text = "".join(p.read_text(encoding="utf-8") for p in sorted(generated.glob("[0-9]*.json")))
+    assert USER not in text
+    assert "Acme" not in text
+    assert "Tower" not in text
+    opened = next(e for e in host.calls if e.tool == "revit_open_model")
+    assert opened.arguments["path"] == "<path>/<model-1>.rvt"
+
+
+def test_committed_revit_recordings_are_fingerprint_filtered(tmp_path: Path) -> None:
+    from eng_harness.adapters.revit import revit_allowlist
+    from fakes.recorded._checks import applicable_revit_recordings
+
+    write_fp = revit_allowlist(role="write").tool_fingerprint
+    for name, fingerprint in (("revit-a", write_fp), ("revit-b", "other"), ("notes", None)):
+        folder = tmp_path / name
+        folder.mkdir()
+        if fingerprint is not None:
+            (folder / "manifest.json").write_text(
+                '{"tool_fingerprint": "%s", "files": {}}' % fingerprint, encoding="utf-8"
+            )
+    assert applicable_revit_recordings(tmp_path) == [tmp_path / "revit-a"]
