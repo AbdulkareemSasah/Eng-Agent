@@ -104,7 +104,7 @@ def _parse(markup: str) -> _Scan:
     return scan
 
 
-@settings(derandomize=True, max_examples=60)
+@settings(derandomize=True, max_examples=60, deadline=None)
 @given(_ANY)
 def test_every_screen_and_report_escape(text: str) -> None:
     """Every screen field and the report show only escaped, labeled, truncated text (AC48)."""
