@@ -22,6 +22,7 @@ from eng_harness.adapters._toolport import Decision, HostRead, LostWrite
 from eng_harness.adapters.csi import products
 from eng_harness.adapters.csi._checks import OBSERVE, Expect, Snapshot, Want, compare, expect, snapshot
 from eng_harness.adapters.csi._state import CsiStateReader
+from eng_harness.adapters.csi.products._safe_state import SafeStateReader
 from eng_harness.servers import CallEffect
 
 __all__ = ["CsiReconciler"]
@@ -122,7 +123,9 @@ class CsiReconciler:
 
     async def _snapshot(self, lost: LostWrite, read: HostRead) -> Snapshot:
         """The model state and the read-back tables, read as `check_model` reads them."""
-        reader = CsiStateReader(product=self._product, call=read)
+        # Ask the profile's table map: SAFE state tables include joint_loads (spec 0008 section 4.4); else ETABS.
+        reader_type = SafeStateReader if "joint_loads" in self._profile.tables else CsiStateReader
+        reader = reader_type(product=self._product, call=read)
         state = await reader.read(lost.binding.target.pid, None)
         target: dict[str, Any] = {"target": lost.binding.target.model_dump()}
         return await snapshot(reader._rows, target, state, self._profile)  # B-451: the reader's validated read
