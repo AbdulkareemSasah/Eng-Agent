@@ -748,7 +748,7 @@ any public module to `[tool.eng-gate] public_modules`. Workflow tests start the 
 own launcher (POSIX in Linux CI); `tests/windows/` runs in the Windows CI job. Each adapter task extends the synthetic
 CSI fake (`tests/fakes/sasaah_csi/`, test code) with the behaviour of the tools it adds (spec §4.8.3); the tasks that
 share it (T6b, T10, T11, T11b, T12, T12b, T13, T14, T19a) are serialized by `depends_on` (B-413). Tasks that share a source file are
-serialized by `depends_on`: `_session.py` (T5, T6b, T7, T20), `doctor.py` and `test_doctor.py` (T18, T22; B-541), `_toolport.py` (T8b, T9, T12, T14, T16, T19a; T16 and
+serialized by `depends_on`: `_session.py` (T5, T6b, T7, T20; plan 0014 T3 after them, B-584), `doctor.py` and `test_doctor.py` (T18, T22; B-541), `_toolport.py` (T8b, T9, T12, T14, T16, T19a; T16 and
 T19a are not ordered, so whichever lands second adapts to the other in its own task, B-503; plan 0007 T13b adds a
 no-op hook and is not ordered with T16 either, B-569), `_hostport.py` (T10, T11b,
 T12b, plan 0007 T13, T19c, T23, T19a, then plan 0007 T13b; plan 0008 T3 and T5 after them, B-581; B-503, B-530, B-543, B-569), `_identity.py` and `test_csi_session_ops.py` (T10, T19c;
@@ -1140,6 +1140,11 @@ failure envelopes; `test_visible_launch` checks the fake's recorded `visible` fl
   when `profile.tables` is empty (SAFE before plan 0008 T5), keeping the prior fingerprint; required for SAFE AC6
   (`working_copy` on `.FDB`) and AC7 (session-operation suite with `product = SAFE`). Recorded in this plan's
   `_hostport.py` serialization above.
+- External amendment (B-584, from plan 0014 T3 / the B-302 writer): plan 0014 T3 amends
+  `packages/eng-harness/src/eng_harness/servers/_session.py` so `ServerManager._verify` calls `expected.status_tool`
+  (`BuildExpectation.status_tool`, default `csi_status`; IDEA `idea_status`) instead of the hardcoded `csi_status`, and
+  names that tool in the error message; required for IDEA AC3 workflow stops (`test_idea_script_enabled_stops_run`,
+  `test_idea_listed_run_script_stops_run`). Recorded in this plan's `_session.py` serialization above.
 - First live run (amendment B-475, lead decision D-32: the edit cycle of spec 0007 on a copy of a real ETABS model
   comes first). T16, T17 and T19b are off its path, and so are plan 0008 T1 to T3; none is deleted or weakened. Each
   returns before the first task that depends on it: T16, then T19b, with the first workflow that names a command-line
