@@ -234,8 +234,10 @@ def __getattr__(name: str) -> object:
 
 
 def discover() -> Registry:
-    """Return the shipped registry; no blocks exist yet (the shipped blocks arrive with their plans)."""
-    return Registry([])
+    """Return the shipped registry from `eng_harness.workflows.SHIPPED` (spec 0007 4.2; plan 0007 T9b)."""
+    import eng_harness.workflows as workflows  # inside the function: avoids an import cycle with block
+
+    return Registry(list(workflows.SHIPPED))
 
 
 def load_lock(path: Path) -> list[dict[str, object]]:

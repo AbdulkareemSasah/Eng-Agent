@@ -1,4 +1,4 @@
-"""Child blocks of the edit cycle, steps 3 to 15 (spec 0007 section 4.5; plan 0007 T8 and T9a).
+"""Child blocks of the edit cycle, steps 3 to 15 (spec 0007 section 4.5; plan 0007 T8, T9a and T9b).
 
 Purpose: `read_state` (steps 3 and 4), `obtain_change_set` (step 5), `apply_change_set` (steps 6 to 10),
 `edit_cycle_once` (the return to step 3 after a voided approval or a restore, spec 0007 4.5.1) and
@@ -165,6 +165,7 @@ class ApplyOutput(_M):
     effects: Ref | None
     readback: Ref | None
     snapshot: str | None
+    snapshot_sha256: str | None = None
 
 
 class CycleInput(_M):
@@ -184,6 +185,8 @@ class CycleOutput(_M):
     change_set: ChangeSetOutput | None
     effects: Ref | None
     readback: Ref | None
+    snapshot_sha256: str | None = None
+    fingerprint: str | None = None
 
 
 class DesignRun(StrEnum):
@@ -363,8 +366,12 @@ async def _after(ctx: Any, model: str, done: ApplyOutput) -> ApplyOutput:
 async def _record(ctx: Any, inp: ApplyInput) -> ApplyOutput:
     """An empty change set (after `hand_edit`): the engineer's changes are saved as a revision, nothing is written."""
     saved = await _save(ctx, inp.model, None)
-    snapshot = str(saved.summary["saved_file"]["name"])
-    done = ApplyOutput(route=Route.DONE, state=None, effects=None, readback=None, snapshot=snapshot)
+    file = saved.summary["saved_file"]
+    snapshot = str(file["name"])
+    done = ApplyOutput(
+        route=Route.DONE, state=None, effects=None, readback=None, snapshot=snapshot,
+        snapshot_sha256=str(file["sha256"]),
+    )  # fmt: skip
     return await _after(ctx, inp.model, done)
 
 
@@ -375,6 +382,15 @@ async def apply_change_set(ctx: Any, inp: ApplyInput) -> ApplyOutput:
     if change is None:
         return await _record(ctx, inp)
     resolved = await _data(ctx, change.check, "/resolved")
+    # Re-read before step 6 (spec 0007 4.5.1, AC13 second clause): a hand edit while the change set was open
+    # must start the next approval-void iteration, not appear as unexpected at step 9.
+    fresh = _state(await ctx.tool("csi_read_model_state", {"model": inp.model}))
+    reread = await ctx.calc(
+        "harness.model_diff",
+        {**_sides("before", inp.state), **_sides("after", fresh), "basis": ctx.basis.record_ref()},
+    )
+    if await _data(ctx, reread.ref, "/changes"):
+        return ApplyOutput(route=Route.VOID, state=None, effects=None, readback=None, snapshot=None)
     approval, accepted = await _approve(ctx, inp, resolved)
     if not approval.accepts(_REVISION):
         return ApplyOutput(route=Route.REJECTED, state=None, effects=None, readback=None, snapshot=None)
@@ -394,8 +410,12 @@ async def apply_change_set(ctx: Any, inp: ApplyInput) -> ApplyOutput:
         saved = await _save(ctx, inp.model, approval)
     except ApprovalVoid:  # before the first write: back to step 3 (spec 0007 4.5.1)
         return ApplyOutput(route=Route.VOID, state=None, effects=effects, readback=None, snapshot=None)
-    snapshot = str(saved.summary["saved_file"]["name"])
-    done = ApplyOutput(route=Route.DONE, state=None, effects=effects, readback=None, snapshot=snapshot)
+    file = saved.summary["saved_file"]
+    snapshot = str(file["name"])
+    done = ApplyOutput(
+        route=Route.DONE, state=None, effects=effects, readback=None, snapshot=snapshot,
+        snapshot_sha256=str(file["sha256"]),
+    )  # fmt: skip
     try:
         await _write(ctx, inp, change, resolved, approval)
     except ApprovalVoid:  # after a write: the engineer decides (spec 0007 4.5.1)
@@ -424,6 +444,12 @@ async def edit_cycle_once(ctx: Any, inp: CycleInput) -> CycleOutput:
     async for _ in ctx.attempts(ctx.basis.count("attempts.approval_void")):
         read = await ctx.block(read_state, ReadInput(model=inp.model, previous=before))
         before = read.state if before is None else before
+        # v1 exit for a locked model (spec 0007 4.5, AC15, amendment B-543): skip steps 5 to 14.
+        if await _data(ctx, read.state.status, "/locked"):
+            return CycleOutput(
+                route=Route.STOPPED, state=read.state, diff=read.diff, change_set=None, effects=None, readback=None,
+                snapshot_sha256=None, fingerprint=None,
+            )  # fmt: skip
         if inp.ask:
             kept = await ctx.block(obtain_change_set, ChangeSetInput(state=read.state, diff=read.diff, kept=kept))
         applied = await ctx.block(
@@ -434,7 +460,7 @@ async def edit_cycle_once(ctx: Any, inp: CycleInput) -> CycleOutput:
     state = read.state if applied.state is None else applied.state
     return CycleOutput(
         route=applied.route, state=state, diff=read.diff, change_set=kept, effects=applied.effects,
-        readback=applied.readback,
+        readback=applied.readback, snapshot_sha256=applied.snapshot_sha256, fingerprint=None,
     )  # fmt: skip
 
 
