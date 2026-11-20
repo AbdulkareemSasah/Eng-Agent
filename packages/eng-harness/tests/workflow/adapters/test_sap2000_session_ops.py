@@ -114,9 +114,7 @@ def test_working_copy_sdb(tmp_path: Path, make_config: ConfigFactory, control: P
     guard = ProcessGuard(inspector, run_dir, host_exes=[SAP2000_EXE])
     engine_id = ProcessIdentity(os.getpid(), "t0", "python")
     locks = HostLocks(tmp_path / "locks", run_id="b247", engine=engine_id, clock=clock)
-    manager = ServerManager(
-        config, run_dir, helpers=guard, check={"csi_sap2000": allowlist.build_expectation()}
-    )
+    manager = ServerManager(config, run_dir, helpers=guard, check={"csi_sap2000": allowlist.build_expectation()})
     port = AdapterHostPort(
         identity=IdentityStore(workspace=workspace, states=states, ids=ids),
         sessions=manager,

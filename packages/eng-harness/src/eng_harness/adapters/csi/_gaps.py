@@ -13,8 +13,8 @@ from eng_harness.errors import NotImplementedGap
 __all__ = [
     "SAFE_GAPS",
     "SAP2000_GAPS",
-    "STEP_GAPS",
     "SAP2000_STEP_GAPS",
+    "STEP_GAPS",
     "new_model",
     "raise_gap",
     "refuse_step",

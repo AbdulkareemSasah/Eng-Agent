@@ -44,9 +44,10 @@ def test_new_model_gap(tmp_path: Path, make_config: ConfigFactory, control: Path
         async with ServerManager(
             config, tmp_path / "run", check={"csi_sap2000": allowlist.build_expectation()}
         ) as manager:
-            for call in (lambda: new_model(product="SAP2000"), lambda: refuse_step("new_model", product="SAP2000")):
+            refusals = (lambda: new_model(product="SAP2000"), lambda: refuse_step("new_model", product="SAP2000"))
+            for refuse in refusals:
                 with pytest.raises(NotImplementedGap) as caught:
-                    call()
+                    refuse()
                 assert caught.value.code is HarnessCode.NOT_IMPLEMENTED
                 assert caught.value.evidence == ("SP-1",)
                 assert "SP-1" in caught.value.message or "prepared" in caught.value.message
