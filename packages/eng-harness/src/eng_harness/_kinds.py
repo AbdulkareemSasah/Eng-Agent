@@ -11,6 +11,7 @@ from eng_harness.kinds.column_design import COLUMN_DESIGN_KINDS
 from eng_harness.kinds.csi import CSI_KINDS
 from eng_harness.kinds.edit_cycle import EDIT_CYCLE_KINDS
 from eng_harness.kinds.footing import FOOTING_KINDS
+from eng_harness.kinds.revit import REVIT_KINDS
 
 # Same constraints as eng_contract.kinds._common.Name (contract 4.10.1); that symbol is not a public_modules export.
 Name = Annotated[str, StringConstraints(min_length=1, max_length=200)]
@@ -136,5 +137,5 @@ HARNESS_KINDS = NEUTRAL_KINDS.extend(
         "harness.model_points/1": ModelPoints,  # plan 0008 T5; spec 0008 section 4.4, AC9
         "harness.joint_loads/1": JointLoads,  # plan 0008 T5; spec 0008 section 4.3, 4.4, AC9
     }
-).extend(CALC_KINDS | FOOTING_KINDS | EDIT_CYCLE_KINDS | CSI_KINDS | COLUMN_DESIGN_KINDS)
-"""The neutral, harness, calc (0003 4.6 to 4.11), footing (0010 4.2), edit-cycle, CSI (0002 4.6) and column kinds."""
+).extend(CALC_KINDS | FOOTING_KINDS | EDIT_CYCLE_KINDS | CSI_KINDS | COLUMN_DESIGN_KINDS | REVIT_KINDS)
+"""Neutral, harness, calc, footing, edit-cycle, CSI, column and Revit kinds (0011 §4.5)."""
