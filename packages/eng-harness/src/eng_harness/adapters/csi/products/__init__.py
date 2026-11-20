@@ -5,7 +5,7 @@ the product of a model by its file extension fails with `INVALID_ARGUMENT` (`fie
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import PureWindowsPath
 
 from eng_contract.errors import ContractError, ErrorCode
@@ -17,20 +17,36 @@ __all__ = ["ProductProfile", "product_of_model", "profile"]
 
 @dataclass(frozen=True, slots=True)
 class ProductProfile:
-    """Per-product tables, model file extensions and companion files."""
+    """Per-product tables, model file extensions, companion files and gap registries."""
 
     name: str
     model_extensions: tuple[str, ...]  # upper case, with the dot
     tables: Mapping[str, str]
     readback: Mapping[str, tuple[str, str, str]]  # read-back tables: (table, key column, value column)
     companion_globs: tuple[str, ...] = ()  # files next to the model file that belong to it; empty until local test L2
+    gaps: Mapping[str, str] = field(default_factory=dict)  # gap id → message; empty until the product lists gaps
+    step_gaps: Mapping[str, str] = field(default_factory=dict)  # step name → gap id wired for that product
 
 
 _ETABS = ProductProfile("ETABS", _etabs.MODEL_EXTENSIONS, _etabs.TABLES, _etabs.READBACK)
 # Companion globs stay empty until each product's local test L2 (spec 0008 4.1, spec 0012 4.3).
-_SAFE = ProductProfile("SAFE", _safe.MODEL_EXTENSIONS, _safe.TABLES, _safe.READBACK, _safe.COMPANION_GLOBS)
+_SAFE = ProductProfile(
+    "SAFE",
+    _safe.MODEL_EXTENSIONS,
+    _safe.TABLES,
+    _safe.READBACK,
+    _safe.COMPANION_GLOBS,
+    _safe.GAPS,
+    _safe.STEP_GAPS,
+)
 _SAP2000 = ProductProfile(
-    "SAP2000", _sap2000.MODEL_EXTENSIONS, _sap2000.TABLES, _sap2000.READBACK, _sap2000.COMPANION_GLOBS
+    "SAP2000",
+    _sap2000.MODEL_EXTENSIONS,
+    _sap2000.TABLES,
+    _sap2000.READBACK,
+    _sap2000.COMPANION_GLOBS,
+    _sap2000.GAPS,
+    _sap2000.STEP_GAPS,
 )
 _PROFILES = {item.name: item for item in (_ETABS, _SAFE, _SAP2000)}
 
