@@ -91,6 +91,7 @@
       "refs": {
         "a_areas": {
           "result_id": "res_00000000000000000000000003",
+          "ref": "res_00000000000000000000000003",
           "kind": "model.area_placements/1",
           "complete": true,
           "model_id": "mdl_00000000000000000000000000",
@@ -100,6 +101,7 @@
         },
         "b_areas": {
           "result_id": "res_00000000000000000000000004",
+          "ref": "res_00000000000000000000000004",
           "kind": "model.area_placements/1",
           "complete": true,
           "model_id": "mdl_00000000000000000000000000",
@@ -109,6 +111,7 @@
         },
         "basis": {
           "result_id": "res_00000000000000000000000009",
+          "ref": "res_00000000000000000000000009",
           "kind": "basis.design_basis/1",
           "complete": true,
           "model_id": null,

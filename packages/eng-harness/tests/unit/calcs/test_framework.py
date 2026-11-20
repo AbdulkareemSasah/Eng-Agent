@@ -33,6 +33,7 @@ def fixtures() -> ModuleType:
 def _meta(fixtures: ModuleType) -> InputMeta:
     ref = RefMeta(
         result_id=fixtures.SYNTHETIC_ID,
+        ref=fixtures.SYNTHETIC_ID,
         kind="model.sections/1",
         complete=True,
         model_id=None,
