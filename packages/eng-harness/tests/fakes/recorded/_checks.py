@@ -165,14 +165,20 @@ def _state_problems(host: RecordedHost, *, product: str) -> list[str]:
     pid = first.arguments["target"]["pid"]
     path = (_body(first.result or {}) or {}).get("model_path")
     replay = RecordedHost(host.directory)
-    # SAFE tables: SafeStateReader (0008 T5). Others without joint_loads: CsiStateReader.
+    # Profile dispatch (spec 0008 AC2 / 0012 AC8): declared absences → Sap2000StateReader;
+    # joint_loads → SafeStateReader; else CsiStateReader. No product-name branch.
     from eng_harness.adapters.csi.products import profile
 
-    tables = profile(product).tables
-    if "joint_loads" in tables:
+    prof = profile(product)
+    tables = prof.tables
+    if prof.declared_absences:
+        from eng_harness.adapters.csi.products._sap2000_state import Sap2000StateReader
+
+        reader: Any = Sap2000StateReader(product=product, call=replay.host_call)
+    elif "joint_loads" in tables:
         from eng_harness.adapters.csi.products._safe_state import SafeStateReader
 
-        reader: Any = SafeStateReader(product=product, call=replay.host_call)
+        reader = SafeStateReader(product=product, call=replay.host_call)
     else:
         reader = CsiStateReader(product=product, call=replay.host_call)
     try:
@@ -195,3 +201,119 @@ def adapter_problems(host: RecordedHost, workspace: Path, *, product: str = "ETA
     for exchange in host.calls:
         problems += _call_problems(exchange, store, clock, ids, product=product)
     return problems + _state_problems(host, product=product)
+
+
+def applicable_revit_recordings(root: Path = RECORDINGS) -> list[Path]:
+    """Committed recordings whose tool fingerprint is the Revit write-role allowlist's (spec 0011 AC31, B-573)."""
+    from eng_harness.adapters.revit import revit_allowlist
+
+    fingerprint = revit_allowlist(role="write").tool_fingerprint
+    found: list[Path] = []
+    for path in committed_recordings(root):
+        manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
+        if manifest.get("tool_fingerprint") == fingerprint:
+            found.append(path)
+    return found
+
+
+def revit_fidelity_problems(host: RecordedHost, run_dir: Path) -> list[str]:
+    """Replay recorded Revit requests on a fresh synthetic fake; compare reply shape and error codes (AC31)."""
+    from fakes.recorded._session import replay_on_revit_fake
+
+    problems: list[str] = []
+    for exchange, answer in replay_on_revit_fake(host, run_dir):
+        label = f"{exchange.seq} {exchange.tool}"
+        if exchange.result is None:
+            continue
+        recorded, synthetic = _body(exchange.result), _body(answer)
+        if bool(exchange.result.get("isError")) != bool(answer.get("isError")):
+            problems.append(
+                f"{label}: recorded isError {exchange.result.get('isError')}, synthetic {answer.get('isError')}"
+            )
+        elif isinstance(recorded, dict) and recorded.get("code") != (synthetic or {}).get("code"):
+            # Revit errors are a single text; shape compare covers the success path. Code key only when JSON.
+            if "code" in (recorded or {}) or "code" in (synthetic or {}):
+                problems.append(
+                    f"{label}: error code {recorded.get('code') if isinstance(recorded, dict) else recorded} "
+                    f"recorded, {(synthetic or {}).get('code') if isinstance(synthetic, dict) else synthetic} synthetic"
+                )
+        else:
+            problems += [f"{label}{p}" for p in shape_differences(recorded, synthetic)]
+    return problems
+
+
+def _revit_call_problems(exchange: Exchange, ids: SeededIdSource) -> list[str]:
+    """Parse one recorded Revit reply through the adapter's parsers (AC31)."""
+    from eng_harness.adapters.revit import revit_allowlist
+    from eng_harness.adapters.revit._errors import REVIT_ERROR_TABLE, RevitErrorMapper, parse_revit_error_text
+    from eng_harness.adapters.revit._replies import parse_revit_reply
+
+    label = f"{exchange.seq} {exchange.tool}"
+    allowlist = revit_allowlist(role="write")
+    if exchange.tool not in allowlist.tool_names:
+        return [f"{label}: not an allowlisted tool"]
+    if exchange.result is None:
+        return [f"{label}: recorded as a JSON-RPC error {exchange.error}"]
+    if exchange.result.get("isError"):
+        texts = []
+        for block in exchange.result.get("content") or []:
+            if isinstance(block, dict) and block.get("type") == "text" and isinstance(block.get("text"), str):
+                texts.append(block["text"])
+        failure = parse_revit_error_text("\n".join(texts))
+        mapped = RevitErrorMapper(ids).map(
+            failure, effect=CallEffect(allowlist.descriptor(exchange.tool).effect), tool=exchange.tool, op_id="recorded"
+        )
+        known = failure.code in REVIT_ERROR_TABLE or failure.code is None
+        if not known and mapped.code is ErrorCode.INTERNAL:
+            return [f"{label}: the host error code {failure.code} is not in the error table"]
+        return []
+    try:
+        parse_revit_reply(exchange.result)
+    except (ContractError, ValueError, KeyError) as error:
+        return [f"{label}: the adapter cannot read the reply: {error}"]
+    return []
+
+
+def _revit_state_problems(host: RecordedHost) -> list[str]:
+    """Run the Revit model-state reader over the recording when it holds a metadata read (AC31)."""
+    from eng_harness.adapters.revit._parameters import load_role_map
+    from eng_harness.adapters.revit._state import RevitStateReader
+
+    first = next((e for e in host.calls if e.tool == "revit_get_model_metadata" and e.result is not None), None)
+    if first is None:
+        return []
+    path = (_body(first.result or {}) or {}).get("path")
+    replay = RecordedHost(host.directory)
+
+    async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+        reply = await replay.call("revit", "read", tool, arguments, effect)
+        return reply.model_dump(mode="json", by_alias=True, exclude_none=True)
+
+    reader = RevitStateReader(call=call, role_map=load_role_map({}), catalog_version="recorded")
+    bound = Path(path) if isinstance(path, str) else Path("<path>/<model-1>.rvt")
+
+    async def run() -> None:
+        await reader.read(bound_path=bound)
+
+    try:
+        anyio.run(run)
+    except (AssertionError, ContractError, TypeError) as error:
+        return [f"model-state read: {error}"]
+    return []
+
+
+def revit_adapter_problems(host: RecordedHost, workspace: Path) -> list[str]:
+    """Adapter on a Revit recording (AC31): tool-list fingerprint, replies, model-state read."""
+    from eng_harness.adapters.revit import revit_allowlist
+
+    allowlist = revit_allowlist(role="write")
+    listed = {n: s for n, s in host.tool_schemas.items() if n in allowlist.tool_names}
+    problems: list[str] = []
+    if host.manifest["tool_fingerprint"] != tool_list_fingerprint(listed):
+        problems.append("the manifest's tool fingerprint is not that of the recorded tool list")
+    if host.manifest["tool_fingerprint"] != allowlist.tool_fingerprint:
+        problems.append("the recorded tool fingerprint is not the allowlist's")
+    _, _, ids = _store(workspace)
+    for exchange in host.calls:
+        problems += _revit_call_problems(exchange, ids)
+    return problems + _revit_state_problems(host)
