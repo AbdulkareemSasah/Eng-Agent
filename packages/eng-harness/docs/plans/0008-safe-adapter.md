@@ -259,10 +259,10 @@ Every task is test-first: its first commit is `test:` with the tests in `tests_f
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds a `CHANGELOG.md` line. No
 public module is added (everything is internal), so `[tool.eng-gate] public_modules` is unchanged. Tasks that share a
 source file are serialized by `depends_on`: `_allowlist.toml` (T1, T3, T6, T7, T9), `_safe.py` (T3, T5, T6, T7; plan 0012 T3 after them for the gap and step-gap registries only, B-586),
-`products/__init__.py` (T1; plan 0012 T3 after it for the gap and step-gap registry fields only, B-586; plan 0012 T4 after it for ProductProfile.declared_absences only, B-590),
+`products/__init__.py` (T1; plan 0012 T3 after it for the gap and step-gap registry fields only, B-586; plan 0012 T4 after it for ProductProfile.declared_absences only, B-590; plan 0012 T5 after it for ProductProfile.add_frame_naming only, B-594),
 `_safe_state.py` (T4, T5), `_safe_results.py` (T7, T9), `_kinds.py` (T4, T5, T7, T9), `_gaps.py` (T3, T7, T9),
 `_hostport.py` (T3, T5; amendment B-581: T3 for AC6 and AC7 before T5's table map; plan 0012 T4 after them for absences-aware state-reader selection and fingerprint on save only, B-590),
-`_tools.py` (T6, T7; amendment B-588: T7 may only merge the SAFE result-reader tokens, argument models and readers from products/_safe_results.py into the shared registries, the T6 pattern), `_reconcile.py` (T6; plan 0012 T4 for absences-aware state-reader selection from the profile only, B-590).
+`_tools.py` (T6, T7; amendment B-588: T7 may only merge the SAFE result-reader tokens, argument models and readers from products/_safe_results.py into the shared registries, the T6 pattern; plan 0012 T5 and T6 after them, B-594: T5 may only merge the SAP2000 add-frame builders and tokens, the section check and the reply-name retarget, T6 may only merge the SAP2000 analysis, result-reader and design BUILDERS, TOKENS and READERS, serialize T5 then T6 or either order with the integrator merging), `_reconcile.py` (T6; plan 0012 T4 for absences-aware state-reader selection from the profile only, B-590).
 
 Reuse (spec §2): everything in plan 0002; the SAFE 22 table reference of the Sasaah repository only as a source of field
 keys recorded in `_safe_tables.toml` with status `reference`, never copied code.
@@ -377,6 +377,16 @@ local test shows that no allowlisted tool can run the SAFE designer, this task i
   the profile (no product-name branch; spec 0008 AC2); T4 may only make those profile-field and reader-selection
   changes. Recorded in this plan's `products/__init__.py`, `_hostport.py` and `_reconcile.py` serialization above. Plan 0002 records
   the matching external amendment for `_hostport.py`, `products/__init__.py` and `csi/_reconcile.py`.
+- External amendment (B-594, from plan 0012 T5 and T6 / the B-249 and B-250 writers): plan 0012 T5 amends
+  `packages/eng-harness/src/eng_harness/adapters/csi/_tools.py` so it may only merge the SAP2000 add-frame builders
+  and tokens, the section check and the reply-name retarget into the shared registries (no product-name branch), and
+  amends `packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py` so `ProductProfile` carries
+  `add_frame_naming` (wired from `_sap2000`; spec 0008 AC2); plan 0012 T6 amends the same `_tools.py` so it may
+  only merge the SAP2000 analysis, result-reader and design BUILDERS, TOKENS and READERS (the B-588 pattern);
+  T5 and T6 both edit `_tools.py` (serialize T5 then T6, or either order with the integrator merging); required for
+  SAP2000 AC11–AC13 and AC14–AC16 through the CSI tool port. Recorded in this plan's `_tools.py` and
+  `products/__init__.py` serialization above. Plan 0002 records the matching external amendment for `csi/_tools.py`
+  and `products/__init__.py`.
 
 ## 4. Verification
 

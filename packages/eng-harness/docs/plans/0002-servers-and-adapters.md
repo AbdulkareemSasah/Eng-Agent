@@ -759,9 +759,12 @@ whichever lands second adapts, B-569) and
 adapts to the other in its own task), `csi/_tools.py` (T12, T12b, T13, T15, T23; plan 0007 T5 and T13, B-503: T15 and
 those two are not ordered, and T15 and T23 are not ordered, B-543, so whichever lands second adapts; plan 0007 T13b
 after T13 and T23, not ordered with T15, B-569; plan 0008 T6 and T7 after them, B-588: T7 may only merge the SAFE
-result-reader tokens, argument models and readers),
+result-reader tokens, argument models and readers; plan 0012 T5 and T6 after them, B-594: T5 may only merge the
+SAP2000 add-frame builders and tokens, the section check and the reply-name retarget, T6 may only merge the SAP2000
+analysis, result-reader and design BUILDERS, TOKENS and READERS, serialize T5 then T6 or either order with the
+integrator merging),
 `_allowlist.toml` (T12, T13, T15), `_state.py` and `test_csi_state.py` (T11b, T12), `products/_etabs.py` (T11, T12,
-T12b, T13), `products/__init__.py` (T11, T12b; plan 0012 T3 for the gap and step-gap registry fields only, B-586; plan 0012 T4 for ProductProfile.declared_absences only, B-590), `_replies.py` (T11, T13, T21) and
+T12b, T13), `products/__init__.py` (T11, T12b; plan 0012 T3 for the gap and step-gap registry fields only, B-586; plan 0012 T4 for ProductProfile.declared_absences only, B-590; plan 0012 T5 for ProductProfile.add_frame_naming only, B-594), `_replies.py` (T11, T13, T21) and
 `test_csi_replies.py` (T11, T13), `test_toolport.py` (T8b, T12), `servers/__init__.py` (T1, T5, T22; T17 is not ordered with T22, so whichever lands second adapts, B-541), `servers/_config.py` and `test_config.py` (T1, T6, T20, T22; B-541),
 `_allowlist.py` (T6, T6b, T20) and `test_allowlist.py` (T6, T20) (B-465). `_kinds.py` is shared by T21 and every
 later task of another plan that adds kinds to `HARNESS_KINDS` (plan 0008 T4, T5, T7 and T9, plan 0011 T6, plan 0013 T2; B-503, B-589): none
@@ -1173,6 +1176,16 @@ failure envelopes; `test_visible_launch` checks the fake's recorded `visible` fl
   branch (spec 0008 AC2). Recorded in this plan's `_hostport.py`, `products/__init__.py` and `csi/_reconcile.py`
   serialization above. Plan 0008 records the matching external amendment for `products/__init__.py` and
   `csi/_reconcile.py`.
+- External amendment (B-594, from plan 0012 T5 and T6 / the B-249 and B-250 writers): plan 0012 T5 amends
+  `packages/eng-harness/src/eng_harness/adapters/csi/_tools.py` so it may only merge the SAP2000 add-frame builders
+  and tokens, the section check and the reply-name retarget into the shared registries (no product-name branch), and
+  amends `packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py` so `ProductProfile` carries
+  `add_frame_naming` (wired from `_sap2000`; spec 0008 AC2); plan 0012 T6 amends the same `_tools.py` so it may
+  only merge the SAP2000 analysis, result-reader and design BUILDERS, TOKENS and READERS (the B-588 pattern);
+  T5 and T6 both edit `_tools.py` (serialize T5 then T6, or either order with the integrator merging); required for
+  SAP2000 AC11–AC13 and AC14–AC16 through the CSI tool port. Recorded in this plan's `csi/_tools.py` and
+  `products/__init__.py` serialization above. Plan 0008 records the matching external amendment for `_tools.py` and
+  `products/__init__.py`.
 - First live run (amendment B-475, lead decision D-32: the edit cycle of spec 0007 on a copy of a real ETABS model
   comes first). T16, T17 and T19b are off its path, and so are plan 0008 T1 to T3; none is deleted or weakened. Each
   returns before the first task that depends on it: T16, then T19b, with the first workflow that names a command-line
