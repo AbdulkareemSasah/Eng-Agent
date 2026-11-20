@@ -142,7 +142,7 @@ def inputs(draw: st.DrawFn) -> dict[str, Any]:
             unique_by=lambda pair: pair[0],
         )
     )
-    links = {uid: fid for uid, fid in link_pairs} or None
+    links = dict(link_pairs) or None
     return {
         "frames": {"frames": frames},
         "elements": {"frames": element_frames},
@@ -177,7 +177,7 @@ def test_permutation_invariant(fields: dict[str, Any], data: st.DataObject) -> N
     mixed = copy.deepcopy(fields)
     mixed["frames"]["frames"] = data.draw(st.permutations(mixed["frames"]["frames"]))
     mixed["elements"]["frames"] = data.draw(st.permutations(mixed["elements"]["frames"]))
-    mixed["structure"]["elements"] = data.draw(st.permutations(mixed["structure"]["elements"]))
+    # harness.revit_structure/1 requires elements sorted by unique_id (spec 0011 §4.5); only valid inputs.
     if mixed["links"] is not None:
         items = list(mixed["links"].items())
         mixed["links"] = dict(data.draw(st.permutations(items)))

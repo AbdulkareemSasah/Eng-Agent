@@ -25,6 +25,7 @@ REPORT_KINDS = {
     "design_summary": "harness.design_summary/1",
     "section_size": "harness.section_size/1",
     "placement_comparison": "harness.placement_comparison/1",
+    "frame_element_map": "harness.frame_element_map/1",
 }
 Mutation = Callable[[dict[str, Any]], None]
 
@@ -395,6 +396,24 @@ def _pl_type(p: dict[str, Any]) -> None:
     p["counts"][2]["element"] = "frame"
 
 
+def _fem_pairs_unsorted(p: dict[str, Any]) -> None:
+    p["pairs"].append(
+        {
+            "frame_id": "F0",
+            "unique_id": "U0",
+            "element_id": 1,
+            "type_id": 2,
+            "basis": "geometry",
+            "lower_distance_mm": 0.0,
+            "upper_distance_mm": 0.0,
+        }
+    )
+
+
+def _fem_candidates_unsorted(p: dict[str, Any]) -> None:
+    p["ambiguous"][0]["candidates"] = ["U3", "U2"]
+
+
 REPORT_INVALID: list[tuple[str, Mutation, str]] = [
     ("readback_check", _rb_status, "by rule R4"),
     ("readback_check", _rb_not_read, "must be NEEDS_ENGINEER by rule R4"),
@@ -431,6 +450,8 @@ REPORT_INVALID: list[tuple[str, Mutation, str]] = [
     ("placement_comparison", _pl_difference, "difference must be b - a"),
     ("placement_comparison", _pl_equal, "equal must follow rule P6"),
     ("placement_comparison", _pl_type, "is not a type of"),
+    ("frame_element_map", _fem_pairs_unsorted, "pairs must be sorted and unique"),
+    ("frame_element_map", _fem_candidates_unsorted, "ambiguous candidates must be sorted and unique"),
 ]
 
 REPORT_VALID: list[tuple[str, Mutation]] = [

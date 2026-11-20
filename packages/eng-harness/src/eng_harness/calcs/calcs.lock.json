@@ -1,112 +1,117 @@
 {
   "calcs": [
     {
-      "content_sha256": "07267936bb08ae7e88c71c9be9561371f626c6759a46ddacdaf74ad1f3e8629f",
+      "content_sha256": "634e94382747892c4d68346ffac2ddfe7805ea23229f7b236f00f3976190bd8b",
       "id": "harness.analysis_summary",
       "version": 1
     },
     {
-      "content_sha256": "778470779324d9012e0bb35f04c6841efda0ba11799a51bfcf52c132bf1b84a6",
+      "content_sha256": "8e19856219a45d09ef7c0a1bf733a2ed59f6934c8b625d37703eaf80ded5508b",
       "id": "harness.change_set_check",
       "version": 1
     },
     {
-      "content_sha256": "48280c7e46b9775a0c83e076f9125ccb60d99adf1b149859e00a400a59222250",
+      "content_sha256": "f7ba40d7eaee4e90db114d570a12c421a330af48c8d0203ec10403fbaa267427",
       "id": "harness.column_change_set",
       "version": 1
     },
     {
-      "content_sha256": "33b8247ddd3d4dfd9744a143ed11cb6e955333223ff20f0ee6a4e2ce876b46de",
+      "content_sha256": "894509869523c6c0c3559b9471b878b04ea21c75b365ea97d80f9e74a7e275fe",
       "id": "harness.column_demands",
       "version": 1
     },
     {
-      "content_sha256": "0e500dccd1906b9addbe59d00eea6542f9ff181e87a877013742dcf980f16c22",
+      "content_sha256": "75c303c229d886042f0210cb1efc10a5ba24b5ee7349624b3c8e26003c7ff3ff",
       "id": "harness.column_review",
       "version": 1
     },
     {
-      "content_sha256": "3175b48d36b6db16874b1e64440aa1e70a7e797d7f95cbc96bff2fb26f9b3043",
+      "content_sha256": "a70295c687ed93ea0366ef4c60b9de70f584a05c75037512a8aca2260536e4e6",
       "id": "harness.column_section_match",
       "version": 1
     },
     {
-      "content_sha256": "55998c522c431105471a5c77456ad252de144c4ef9c0ceb76d8559a0b0928d06",
+      "content_sha256": "e5ad30fc7592b38434aac8fa48c108ee1899e096c99f4d034019107dfea13364",
       "id": "harness.column_select",
       "version": 1
     },
     {
-      "content_sha256": "33c02a8e2922503d14d8597dd4fefb255ef726c83f56b568f687dd6eadb8226e",
+      "content_sha256": "ca70d586b52b647b7fcab5863c62e7175965e9348d73984779ebf9fed0fb5c35",
       "id": "harness.design_summary",
       "version": 1
     },
     {
-      "content_sha256": "3d0a65668d63d139aa259c63503343fc9286231c749609d9f6075666715dfaa8",
+      "content_sha256": "1fea54b7b599b1579726a3c9ed1d4f3cedb1f8ffb8f751a3ed8f4d7c92efd123",
       "id": "harness.expected_effects",
       "version": 1
     },
     {
-      "content_sha256": "42d4c0e1b8967d26b715e343c9f05f21c26b1dd4daf480babd403303d9c7c180",
+      "content_sha256": "9db96b393b62f4bfb89cb3d86aa101b0155f799fa8330ce8fc30e3e71e2caad8",
       "id": "harness.footing_layout",
       "version": 1
     },
     {
-      "content_sha256": "02e956834edac5f767c55de2b8d7c42671a241fb63c2b465569d91caf6de29b7",
+      "content_sha256": "8330ffa4b1adb261a28ef2e2132a37c9b80ff851911d8629cd6ca0020ccdf805",
       "id": "harness.footing_plan_size",
       "version": 1
     },
     {
-      "content_sha256": "a13b74764eb45eecbaad7ba8a24847dcdccf9170683594678f75c451ae8efd4c",
+      "content_sha256": "0113f25a59d1a07250be40728493ea099f775dbf6b122aa0cea903fc7bcdc8b0",
       "id": "harness.footing_resize",
       "version": 1
     },
     {
-      "content_sha256": "b0e55b805078f3f65f1805e04a389b191ab72bfe60b147962003efa1913e9218",
+      "content_sha256": "6e165b4f5803e682bcd1205f4d71663f1bb939f54d77357d67f884edf25615c2",
       "id": "harness.footing_schedule",
       "version": 1
     },
     {
-      "content_sha256": "9fd7f9c96bd95e72ee112931a9c1412cb2335d7d8e6fda3919bb96fc5160c7fc",
+      "content_sha256": "d10b33ad332b2d0757a531fc5ba638104428654ab4f526f604933875f5c9a469",
       "id": "harness.footing_status",
       "version": 1
     },
     {
-      "content_sha256": "5eab9374397ea4dcc1b14190aa3abc558b2fe38ea53a3d28ec8d94ae38d87118",
+      "content_sha256": "273136e554ad7d750c5027e9d172004847eb0e03ee20141ff914efd015255457",
       "id": "harness.footing_subjects",
       "version": 1
     },
     {
-      "content_sha256": "2170ef2ef05a2d9228dde87616cc0c3150df4c04f8c1b7101ccd54f98bded6d1",
+      "content_sha256": "df80253f60a1ad7a6186ec977122c697179f84c435262a2c94866c81f60ec776",
+      "id": "harness.frame_element_map",
+      "version": 1
+    },
+    {
+      "content_sha256": "eca43bde6ddb2e420c22e2cb561a8d34cbc60d9f799e8140bdfc933def8c1f8e",
       "id": "harness.host_design_verdicts",
       "version": 1
     },
     {
-      "content_sha256": "215c1ad970bf4a79087ab6a8f582e97b1dd749234fcb28c647870c648509703b",
+      "content_sha256": "104880a4f26188105e01fba271c396a92a95ff843d6bf9e1d55cab5d2d3b5b66",
       "id": "harness.model_diff",
       "version": 1
     },
     {
-      "content_sha256": "57eeb2893e6d39b6924ad327fc9ab7aac89032ac4f8fdf33bf4e273c25f0eda2",
+      "content_sha256": "027188b390c0162e355856b63af322a8584e400ec68331db0527bc97a4664560",
       "id": "harness.model_fingerprint",
       "version": 1
     },
     {
-      "content_sha256": "b2e49954f2aea5621b0c9a296f804ef0afc9682f2713bfccfea0b32b6e661b6d",
+      "content_sha256": "5c3455b113c71eeee12cd4f0b2030379477649a6bb6335791a788cb4f133e286",
       "id": "harness.placement_compare",
       "version": 1
     },
     {
-      "content_sha256": "da4738f86a28bdbe4deb9d5e18de6b069e6a6118a4f7fa313494fb59115e58ae",
+      "content_sha256": "fd070ff9ddcc5fa34b9f121b6d41b285b61d46a1bfb97b4d681c0e6857424c71",
       "id": "harness.reactions_to_joint_loads",
       "version": 1
     },
     {
-      "content_sha256": "488f530d638dbf289ea078123b3525073cb5f3a2d1063714e18700d384e01119",
+      "content_sha256": "b0c4f8c5e3a3e07731fe466ddf293da4005a3f997db58c4fef4a1ac0c7acfc48",
       "id": "harness.readback_check",
       "version": 1
     },
     {
-      "content_sha256": "48511f8ecd661e52bfe578395126401ef7bb809483973c7a3fb20d8815f61a23",
+      "content_sha256": "3eec287215bb2bb2bb5c8df6f201ab2507673557f3269cb5de50e12b28e72a3a",
       "id": "harness.safe_equilibrium",
       "version": 1
     },
