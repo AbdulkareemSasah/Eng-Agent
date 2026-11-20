@@ -71,6 +71,9 @@ class FakeBinder:
     async def binding(self, host_key: str, model: str | None, descriptor: Any) -> Binding:
         return self.binding_of
 
+    def revision(self, model_id: str) -> int | None:
+        return None
+
 
 def _config() -> ServersConfig:
     return ServersConfig.model_validate(
@@ -92,27 +95,35 @@ def _config() -> ServersConfig:
     )
 
 
+def _reader(reply: Any, binding: Binding) -> tuple[dict[str, Any], dict[str, Any]]:
+    return {"value": reply}, {}
+
+
+_TIMEOUT_TOOLS = frozenset(
+    {"idea_list_connections", "idea_native_calculate", "idea_calculate", "idea_native_set_loads"}
+)
+
+
 class Rig:
-    """ToolPort over the IDEA allowlist with a scripted caller."""
+    """ToolPort over the IDEA tools used for timeout mapping, with a scripted caller."""
 
     def __init__(self, run_dir: Path, store: ResultStore, ids: SeededIdSource, clock: Any) -> None:
         self.ledger = WriteLedger(run_dir)
         self.caller = FakeCaller(self.ledger)
         self.binder = FakeBinder(Binding(target=TARGET, units_system=None, host=HOST, pre_image_ref=None))
         self.health = HostHealth()
+        full = idea_allowlist()
+        tools = tuple(t for t in full.tools if t.name in _TIMEOUT_TOOLS)
+        allowlist = full.model_copy(update={"tools": tools})
         arg_models = {
-            "StatusArgs": idea_tools.StatusArgs,
             "ListConnectionsArgs": idea_tools.ListConnectionsArgs,
             "CalculateArgs": idea_tools.CalculateArgs,
             "NativeCalculateArgs": idea_tools.NativeCalculateArgs,
             "NativeSetLoadsArgs": idea_tools.NativeSetLoadsArgs,
-            "NativeGetLoadsArgs": idea_tools.NativeGetLoadsArgs,
-            "GetCheckResultsArgs": idea_tools.GetCheckResultsArgs,
-            "OpenProjectArgs": idea_tools.OpenProjectArgs,
-            "CloseProjectArgs": idea_tools.CloseProjectArgs,
         }
+        readers = {name: _reader for name in _TIMEOUT_TOOLS}
         self.port = AdapterToolPort(
-            allowlist=idea_allowlist(),
+            allowlist=allowlist,
             config=_config(),
             server="idea",
             caller=self.caller,
@@ -123,6 +134,7 @@ class Rig:
             ids=ids,
             check=CHECK,
             arg_models=arg_models,
+            readers=readers,
             health=self.health,
             errors=IdeaErrorMapper(ids),
         )
