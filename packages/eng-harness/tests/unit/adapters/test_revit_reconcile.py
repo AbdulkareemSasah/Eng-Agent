@@ -53,15 +53,53 @@ def test_combine_outcomes() -> None:
     assert combine(("not_applied", "unknown")) == "unknown"
 
 
-def test_host_args_setters_and_open() -> None:
+def test_host_args_all_write_models() -> None:
+    from eng_harness.adapters.revit._tools import (
+        SetParameterValueByGuidArgs,
+        SetTypeParameterValuesArgs,
+    )
+
     setter = SetElementParameterValuesArgs(
         element_ids=[1], parameter_name="b", value="450", value_type="double"
     )
-    assert _host_args(setter)["parameterName"] == "b"
-    open_args = OpenModelArgs(path=str(BOUND))
-    assert _host_args(open_args) == {"path": str(BOUND), "activate": True}
+    assert _host_args(setter) == {
+        "elementIds": [1],
+        "parameterName": "b",
+        "value": "450",
+        "valueType": "double",
+    }
+    typed = SetTypeParameterValuesArgs(
+        parameter_name="b",
+        value="450",
+        value_type="double",
+        type_ids=[2001],
+        expected_instances=[3001],
+        element_ids=[3001],
+    )
+    type_args = _host_args(typed)
+    assert type_args["typeIds"] == [2001]
+    assert type_args["elementIds"] == [3001]
+    assert "expected_instances" not in type_args
+    guid = SetParameterValueByGuidArgs(
+        element_ids=[3001],
+        guid="11111111-1111-1111-1111-111111111111",
+        value="450",
+        value_type="double",
+        unit="mm",
+        target="instance",
+    )
+    guid_args = _host_args(guid)
+    assert guid_args["guid"] == "11111111-1111-1111-1111-111111111111"
+    assert guid_args["unit"] == "mm"
+    assert guid_args["target"] == "instance"
+    change = ChangeElementTypeArgs(element_ids=[3001], type_id=2002)
+    assert _host_args(change) == {"elementIds": [3001], "typeId": 2002}
+    dup = DuplicateFamilyTypeArgs(source_type_id="2001", new_type_name="C450x450")
+    assert _host_args(dup) == {"source_type_id": "2001", "new_type_name": "C450x450"}
+    open_args = OpenModelArgs(path=str(BOUND), activate=False)
+    assert _host_args(open_args) == {"path": str(BOUND), "activate": False}
     with pytest.raises(TypeError):
-        _host_args(object())
+        _host_args(cast(Any, object()))
 
 
 def test_open_model_path_rules() -> None:
