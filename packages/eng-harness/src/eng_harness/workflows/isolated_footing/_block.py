@@ -440,7 +440,8 @@ async def design_isolated_footing(ctx: Any, inp: DesignIsolatedFootingInput) -> 
     closures: list[Closure] = []
     decisions: list[str] = []
     verdict_sets: list[Ref] = []
-    rounds = 0
+    # 1-based round count without arithmetic in block source (block-module rule forbids `+`).
+    round_marks: list[None] = []
 
     service_cases_ref = await _cases_value_ref(ctx, inp.service_cases)
     dims = await ctx.calc(
@@ -463,7 +464,7 @@ async def design_isolated_footing(ctx: Any, inp: DesignIsolatedFootingInput) -> 
     async for attempt in ctx.attempts(ctx.basis.count("attempts.footing_rounds")):
         if not open_ids:
             break
-        rounds = attempt.index
+        round_marks.append(None)
         design = await ctx.calc(
             "harness.footing_layout",
             {"dims": dims.ref, "subjects": inp.subjects, "basis": ctx.basis.record_ref()},
@@ -592,5 +593,5 @@ async def design_isolated_footing(ctx: Any, inp: DesignIsolatedFootingInput) -> 
         closures=tuple(closures),
         decisions=tuple(decisions),
         verdict_sets=tuple(verdict_sets),
-        rounds=rounds,
+        rounds=len(round_marks),
     )
