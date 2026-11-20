@@ -1,4 +1,4 @@
-"""SIGKILL the real engine after SAP2000 host writes; resume with new production ports (plan 0012 T7; spec 0012 AC18)."""
+"""SIGKILL the real engine after SAP2000 host writes; resume with new ports (plan 0012 T7; spec 0012 AC18)."""
 
 import json
 import multiprocessing

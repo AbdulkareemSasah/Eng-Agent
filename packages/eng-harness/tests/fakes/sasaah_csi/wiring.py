@@ -608,7 +608,7 @@ def sap2000_config(control: Path) -> ServersConfig:
 def _sap2000_seed() -> dict[str, Any]:
     """SAP2000 frame seed: state of plan 0012 T4 plus force/reaction results of T6 (spec 0012 §4.3, AC15).
 
-    Section and result values come from `test_sap2000_state._seed` and `test_sap2000_results._SEED` (no invented numbers).
+    Section and result values come from `test_sap2000_state._seed` and `test_sap2000_results._SEED`.
     """
     from workflow.adapters.test_sap2000_results import _SEED as _RESULTS_SEED
     from workflow.adapters.test_sap2000_state import _seed

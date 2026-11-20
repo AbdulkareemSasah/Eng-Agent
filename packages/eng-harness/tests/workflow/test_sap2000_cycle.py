@@ -1,4 +1,4 @@
-"""SAP2000 end-to-end cycle through Engine and production ports (plan 0012 T7; spec 0012 AC18)."""
+"""SAP2000 end-to-end cycle through Engine and production ports (plan 0012 T7; AC18)."""
 
 import json
 from pathlib import Path
