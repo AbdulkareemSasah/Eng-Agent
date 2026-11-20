@@ -135,7 +135,7 @@ tasks:
     max_changed_lines: 80
     max_sessions: 1
     tests_first:
-      # Amendment (B-452): a golden case node of tests/golden/column_design/test_golden.py cannot be test-first
+      # Amendment (B-596, after the B-452 rule of plan 0011 T12): a golden case node of tests/golden/column_design/test_golden.py cannot be test-first
       # evidence (gate TF008, TF010; see the B-452 comment in plan 0011 T12); the refreshed golden JSON goes in the
       # first test commit and runs in the tests step.
       - "packages/eng-harness/tests/unit/calcs/test_column_demands.py::test_m2_only_symmetric_puts_sole_moment_in_mu"
