@@ -253,7 +253,8 @@ punching).
 Every task is test-first: its first commit is `test:` with the tests in `tests_first`, failing on `build/v1`
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds a `CHANGELOG.md` line. No
 public module is added (everything is internal), so `[tool.eng-gate] public_modules` is unchanged. Tasks that share a
-source file are serialized by `depends_on`: `_allowlist.toml` (T1, T3, T6, T7, T9), `_safe.py` (T3, T5, T6, T7),
+source file are serialized by `depends_on`: `_allowlist.toml` (T1, T3, T6, T7, T9), `_safe.py` (T3, T5, T6, T7; plan 0012 T3 after them for the gap and step-gap registries only, B-586),
+`products/__init__.py` (T1; plan 0012 T3 after it for the gap and step-gap registry fields only, B-586),
 `_safe_state.py` (T4, T5), `_safe_results.py` (T7, T9), `_kinds.py` (T4, T5, T7, T9), `_gaps.py` (T3, T7, T9),
 `_hostport.py` (T3, T5; amendment B-581: T3 for AC6 and AC7 before T5's table map).
 
@@ -356,6 +357,12 @@ local test shows that no allowlisted tool can run the SAFE designer, this task i
 - Specs: `eng-contract` 0.1.0 merged. The edit-cycle workflow spec 0007 is not needed; the footing workflow spec uses the
   kinds and gaps defined here.
 - Owner decisions that do not block T1 to T8: Q1 to Q7 of the spec (the recommendations are implemented). Q8 (whether a candidate-mapped soil-pressure result may feed a verdict) is for the footing-workflow spec and does not affect T1 to T9.
+- External amendment (B-586, from plan 0012 T3 / the B-247 writer): plan 0012 T3 amends
+  `packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py` and
+  `packages/eng-harness/src/eng_harness/adapters/csi/products/_safe.py` so the gap and step-gap registries live on
+  `ProductProfile` (`profile(product).step_gaps`); T3 may only move those registries onto the profile (no other change);
+  required for spec 0008 AC2 (`test_no_product_branches_in_shared`). Recorded in this plan's `_safe.py` and
+  `products/__init__.py` serialization above.
 
 ## 4. Verification
 

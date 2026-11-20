@@ -51,12 +51,20 @@ tasks:
     depends_on: [T1]
   - id: T3
     title: Session operations for .SDB, SAP2000 gap entries and product isolation
+    # Amendment (B-586, documents only): spec 0008 AC2 (shared modules ask the product profile;
+    # test_no_product_branches_in_shared) fails while adapters/csi/_gaps.py branches on product names; the B-247 writer
+    # measured that the gap and step-gap registries must live on ProductProfile (profile(product).step_gaps) in
+    # products/__init__.py and products/_safe.py (not previously in T3's files). Optionally tests/fakes/sasaah_csi/server.py
+    # records product on csi_launch and confirm on csi_open_model (test only).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_session_ops.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_gaps.py"
+      - "packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py"  # T3 may only move the gap and step-gap registries onto the product profile (no other change) (amendment B-586)
+      - "packages/eng-harness/src/eng_harness/adapters/csi/products/_safe.py"  # T3 may only move the gap and step-gap registries onto the product profile (no other change) (amendment B-586)
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_sap2000.py"
+      - "packages/eng-harness/tests/fakes/sasaah_csi/server.py"  # may only record product on csi_launch and confirm on csi_open_model (amendment B-586)
       - "packages/eng-harness/tests/workflow/adapters/test_sap2000_session_ops.py"
       - "packages/eng-harness/tests/workflow/adapters/test_sap2000_isolation.py"
       - "packages/eng-harness/tests/workflow/adapters/test_sap2000_gaps.py"
@@ -180,6 +188,9 @@ renamed added frames, no sections in a blank model.
 
 **T3 Session and gaps** (AC4 to AC6, AC17). Working copy of a `.SDB`, the session-operation suite parametrized over
 three products, epoch isolation, gaps SP-1, SP-2, SP-5, SP-7, SP-8 as `NotImplementedGap`.
+T3 may move only the gap and step-gap registries onto the product profile (`products/__init__.py`, `products/_safe.py`)
+so shared `_gaps.py` asks `profile(product).step_gaps` (spec 0008 AC2; amendment B-586); the fake may record only
+`product` on launch and `confirm` on open.
 
 **T4 State** (AC7 to AC10). `_sap2000_tables.toml` with every entry `unknown`, the state reader with declared absences
 (`LEVELS_NOT_AVAILABLE`, `GRID_NOT_AVAILABLE`), truncation, the fingerprint over the profile's kinds.
