@@ -77,6 +77,7 @@ def _fingerprint(fields: dict[str, Any]) -> str:
             "refs": {
                 name: {
                     "result_id": "res_00000000000000000000000001",
+                    "ref": "res_00000000000000000000000001",
                     "kind": KINDS[name],
                     "complete": True,
                     "model_id": "mdl_00000000000000000000000000",

@@ -55,8 +55,10 @@ def _basis(value: Any = 3, *, unit: str | None = None, confirmed: bool = True) -
 
 
 def _ref(n: int, kind: str, *, complete: bool = True, revision: int | None = None) -> dict[str, Any]:
+    result_id = f"res_{n:026d}"
     return {
-        "result_id": f"res_{n:026d}",
+        "result_id": result_id,
+        "ref": result_id,
         "kind": kind,
         "complete": complete,
         "model_id": MDL if revision is not None else None,

@@ -118,6 +118,7 @@
       "refs": {
         "frames": {
           "result_id": "res_00000000000000000000000001",
+          "ref": "res_00000000000000000000000001",
           "kind": "model.frame_placements/1",
           "complete": true,
           "model_id": "mdl_00000000000000000000000000",
@@ -127,6 +128,7 @@
         },
         "areas": {
           "result_id": "res_00000000000000000000000003",
+          "ref": "res_00000000000000000000000003",
           "kind": "model.area_placements/1",
           "complete": true,
           "model_id": "mdl_00000000000000000000000000",
@@ -136,6 +138,7 @@
         },
         "sections": {
           "result_id": "res_00000000000000000000000002",
+          "ref": "res_00000000000000000000000002",
           "kind": "model.sections/1",
           "complete": true,
           "model_id": "mdl_00000000000000000000000000",
