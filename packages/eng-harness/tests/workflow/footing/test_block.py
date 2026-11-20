@@ -83,8 +83,8 @@ def test_enlarge_until_pass(tmp_stand_root: Path) -> None:
         tmp_stand_root / "enlarge",
         subjects=subjects_payload(subject()),
         reactions=reactions_payload(
-            reaction_row("J1", "S1", fz_kN=576.0, my_kNm=50.0),
-            reaction_row("J1", "U1", fz_kN=800.0, my_kNm=50.0),
+            reaction_row("J1", "S1", fz=576.0, my=50.0),
+            reaction_row("J1", "U1", fz=800.0, my=50.0),
         ),
     )
     outcome = stand.play(_auto)
@@ -108,8 +108,8 @@ def test_shear_deepens(tmp_stand_root: Path) -> None:
         tmp_stand_root / "shear",
         subjects=subjects_payload(subject(cx_mm=500.0, cy_mm=500.0)),
         reactions=reactions_payload(
-            reaction_row("J1", "S1", fz_kN=400.0),
-            reaction_row("J1", "U1", fz_kN=2500.0),
+            reaction_row("J1", "S1", fz=400.0),
+            reaction_row("J1", "U1", fz=2500.0),
         ),
         basis={"foundation.min_depth_mm": (400.0, "mm"), "foundation.max_depth_mm": (1500.0, "mm")},
     )
@@ -132,8 +132,8 @@ def test_flexure_reduces_spacing(tmp_stand_root: Path) -> None:
         tmp_stand_root / "flexure",
         subjects=subjects_payload(subject()),
         reactions=reactions_payload(
-            reaction_row("J1", "S1", fz_kN=400.0),
-            reaction_row("J1", "U1", fz_kN=900.0, my_kNm=200.0),
+            reaction_row("J1", "S1", fz=400.0),
+            reaction_row("J1", "U1", fz=900.0, my=200.0),
         ),
         basis={"reinforcement.max_spacing_mm": (400.0, "mm"), "reinforcement.min_spacing_mm": (100.0, "mm")},
     )
@@ -157,8 +157,8 @@ def test_attempts_exhausted_closes_open_footings(tmp_stand_root: Path) -> None:
         tmp_stand_root / "exhausted",
         subjects=subjects_payload(subject()),
         reactions=reactions_payload(
-            reaction_row("J1", "S1", fz_kN=576.0, my_kNm=50.0),
-            reaction_row("J1", "U1", fz_kN=800.0, my_kNm=50.0),
+            reaction_row("J1", "S1", fz=576.0, my=50.0),
+            reaction_row("J1", "U1", fz=800.0, my=50.0),
         ),
         basis={
             "attempts.footing_rounds": (1, None),
@@ -182,8 +182,8 @@ def test_eccentric_reaction_needs_engineer(tmp_stand_root: Path) -> None:
         tmp_stand_root / "eccentric",
         subjects=subjects_payload(subject()),
         reactions=reactions_payload(
-            reaction_row("J1", "S1", fz_kN=576.0, my_kNm=300.0),
-            reaction_row("J1", "U1", fz_kN=800.0, my_kNm=0.0),
+            reaction_row("J1", "S1", fz=576.0, my=300.0),
+            reaction_row("J1", "U1", fz=800.0, my=0.0),
         ),
         basis={"reinforcement.max_spacing_mm": (100.0, "mm")},
     )
@@ -201,8 +201,8 @@ def test_engineer_dimensions(tmp_stand_root: Path) -> None:
         tmp_stand_root / "engineer",
         subjects=subjects_payload(subject()),
         reactions=reactions_payload(
-            reaction_row("J1", "S1", fz_kN=576.0, my_kNm=50.0),
-            reaction_row("J1", "U1", fz_kN=800.0, my_kNm=50.0),
+            reaction_row("J1", "S1", fz=576.0, my=50.0),
+            reaction_row("J1", "U1", fz=800.0, my=50.0),
         ),
     )
 
@@ -235,8 +235,8 @@ def test_combine_closes(tmp_stand_root: Path) -> None:
         tmp_stand_root / "combine",
         subjects=subjects_payload(subject()),
         reactions=reactions_payload(
-            reaction_row("J1", "S1", fz_kN=576.0, my_kNm=50.0),
-            reaction_row("J1", "U1", fz_kN=800.0, my_kNm=50.0),
+            reaction_row("J1", "S1", fz=576.0, my=50.0),
+            reaction_row("J1", "U1", fz=800.0, my=50.0),
         ),
     )
 
@@ -257,8 +257,8 @@ def test_limit_closes(tmp_stand_root: Path) -> None:
         tmp_stand_root / "limit",
         subjects=subjects_payload(subject()),
         reactions=reactions_payload(
-            reaction_row("J1", "S1", fz_kN=576.0, my_kNm=50.0),
-            reaction_row("J1", "U1", fz_kN=800.0, my_kNm=50.0),
+            reaction_row("J1", "S1", fz=576.0, my=50.0),
+            reaction_row("J1", "U1", fz=800.0, my=50.0),
         ),
         basis={
             "foundation.max_plan_dimension_mm": (2000.0, "mm"),

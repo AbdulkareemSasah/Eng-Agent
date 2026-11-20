@@ -28,8 +28,8 @@ def _failing_stand(root: Path, *, model: Any = None) -> Stand:
         root,
         subjects=subjects_payload(subject()),
         reactions=reactions_payload(
-            reaction_row("J1", "S1", fz_kN=576.0, my_kNm=50.0),
-            reaction_row("J1", "U1", fz_kN=800.0, my_kNm=50.0),
+            reaction_row("J1", "S1", fz=576.0, my=50.0),
+            reaction_row("J1", "U1", fz=800.0, my=50.0),
         ),
         model=model,
     )
@@ -78,12 +78,12 @@ def test_one_screen_per_round(tmp_stand_root: Path) -> None:
             subject("F3", "J3", "C3", cx_mm=400.0, cy_mm=400.0),
         ),
         reactions=reactions_payload(
-            reaction_row("J1", "S1", fz_kN=576.0, my_kNm=50.0),
-            reaction_row("J1", "U1", fz_kN=800.0, my_kNm=50.0),
-            reaction_row("J2", "S1", fz_kN=576.0, my_kNm=50.0),
-            reaction_row("J2", "U1", fz_kN=800.0, my_kNm=50.0),
-            reaction_row("J3", "S1", fz_kN=576.0, my_kNm=50.0),
-            reaction_row("J3", "U1", fz_kN=800.0, my_kNm=50.0),
+            reaction_row("J1", "S1", fz=576.0, my=50.0),
+            reaction_row("J1", "U1", fz=800.0, my=50.0),
+            reaction_row("J2", "S1", fz=576.0, my=50.0),
+            reaction_row("J2", "U1", fz=800.0, my=50.0),
+            reaction_row("J3", "S1", fz=576.0, my=50.0),
+            reaction_row("J3", "U1", fz=800.0, my=50.0),
         ),
         # Force the engineer path: mixed failures so no single-family rule matches.
         basis={"attempts.footing_rounds": (2, None)},

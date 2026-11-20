@@ -1,4 +1,3 @@
-# ruff: noqa: N803  # reaction helpers keep contract unit suffixes (FZ_kN, MY_kNm)
 """Stand of the isolated-footing block tests (plan 0010 T8).
 
 Test code, never shipped. Every basis and reaction value below is a synthetic test input labelled so; no case
@@ -403,21 +402,21 @@ def reaction_row(
     joint: str,
     case: str,
     *,
-    fz_kN: float,
-    mx_kNm: float = 0.0,
-    my_kNm: float = 0.0,
-    fx_kN: float = 0.0,
-    fy_kN: float = 0.0,
+    fz: float,
+    mx: float = 0.0,
+    my: float = 0.0,
+    fx: float = 0.0,
+    fy: float = 0.0,
 ) -> dict[str, JsonValue]:
     """One joint reaction row (synthetic; forces.joint_reactions/1)."""
     return {
         "joint": joint,
         "case": {"case": case, "case_type": "load_combination", "step": None},
-        "FX_kN": fx_kN,
-        "FY_kN": fy_kN,
-        "FZ_kN": fz_kN,
-        "MX_kNm": mx_kNm,
-        "MY_kNm": my_kNm,
+        "FX_kN": fx,
+        "FY_kN": fy,
+        "FZ_kN": fz,
+        "MX_kNm": mx,
+        "MY_kNm": my,
         "MZ_kNm": 0.0,
     }
 
