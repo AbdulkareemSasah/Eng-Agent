@@ -26,9 +26,10 @@ from eng_contract.kinds.model import Combination, LoadSet
 from eng_contract.params import eng_param
 from pydantic import BaseModel, ConfigDict
 
+from eng_harness._kinds import ModelPoints
 from eng_harness.calc import CalcInput, InputMeta, TraceBuilder, calc
 from eng_harness.calcs._compare import as_fraction
-from eng_harness.kinds.footing import FootingSubjects, JointLoadRow, ModelPoints
+from eng_harness.kinds.footing import FootingSubjects, JointLoadRow
 
 _LENGTH = "compare.length_mm"
 BASIS_FIELDS = (_LENGTH,)

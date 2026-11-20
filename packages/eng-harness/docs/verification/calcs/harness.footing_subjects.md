@@ -2,7 +2,7 @@
 
 - Calc id: `harness.footing_subjects`
 - Version: 1
-- Content hash: `a2ba878aef45649087d51f9dcc9f6b990d1b3c0366b2ac77246e280a9f6991bd` (from `calcs.lock.json`; any later change to the calc or to a module it imports changes it and the owner re-verifies)
+- Content hash: `5eab9374397ea4dcc1b14190aa3abc558b2fe38ea53a3d28ec8d94ae38d87118` (from `calcs.lock.json`; any later change to the calc or to a module it imports changes it and the owner re-verifies)
 - Status: draft (not approved; ADR-0028 section 4: no entry in `approvals.yaml`)
 - Method source: eng-harness spec 0010 section 4.4.1 (rules S1 to S6), acceptance criterion AC6; basis field `compare.angle_deg` read as spec 0003 section 4.4 states (confirmed, unit deg, value >= 0)
 - Constants: five `Cited` angles (0, 90, 180, 270, 360 deg), source "Geometry"; no engineering number. The angle tolerance is the basis field `compare.angle_deg`, never a literal.

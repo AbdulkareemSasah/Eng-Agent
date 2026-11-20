@@ -20,9 +20,10 @@ from eng_contract.kinds.model import LoadSet
 from eng_contract.params import eng_param
 from pydantic import BaseModel, ConfigDict, Field
 
+from eng_harness._kinds import BaseReactions, JointLoads
 from eng_harness.calc import CalcInput, InputMeta, TraceBuilder, calc
 from eng_harness.calcs._compare import as_fraction
-from eng_harness.kinds.footing import BaseReactions, JointLoads, PatternRow
+from eng_harness.kinds.footing import PatternRow
 
 _TOLERANCE = "checks.equilibrium_relative_tolerance_ratio"
 BASIS_FIELDS = (_TOLERANCE,)
@@ -109,12 +110,12 @@ def safe_equilibrium(inp: EquilibriumInput, meta: InputMeta, trace: TraceBuilder
     }
     applied: dict[str, Fraction] = {}
     for load in inp.loads.loads:
-        # harness.joint_loads/1 (spec 0008 §4.3): wire name FZ_kN on the calc-facing footing kind
-        applied[load.pattern] = applied.get(load.pattern, Fraction()) + Fraction(load.FZ_kN)
+        # harness.joint_loads/1 (spec 0008 §4.3): Python attr fz_kn, wire alias FZ_kN on registered kind
+        applied[load.pattern] = applied.get(load.pattern, Fraction()) + Fraction(load.fz_kn)
     reactions: dict[str, Fraction] = {}
     for row in inp.base_reactions.rows:
-        # harness.base_reactions/1 (spec 0008 §4.6): case is HarnessCaseRef; wire name FZ_kN
-        reactions[row.case.case] = reactions.get(row.case.case, Fraction()) + Fraction(row.FZ_kN)
+        # harness.base_reactions/1 (spec 0008 §4.6): case is HarnessCaseRef; Python attr fz_kn
+        reactions[row.case.case] = reactions.get(row.case.case, Fraction()) + Fraction(row.fz_kn)
     patterns = sorted(set(applied) | set(reactions))
     trace.input("load_rows", len(inp.loads.loads), ref=meta.refs["loads"].result_id)
     trace.input("reaction_rows", len(inp.base_reactions.rows), ref=meta.refs["base_reactions"].result_id)

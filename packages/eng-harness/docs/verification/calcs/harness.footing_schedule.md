@@ -2,7 +2,7 @@
 
 - Calc id: `harness.footing_schedule`
 - Version: 1
-- Content hash: `ed6fe80cbcdf5f7e1f9f79809982205fc03030ae6e8b04dceb77227e2c7d8982` (from `calcs.lock.json`; any later change to the calc or to a module it imports changes it and the owner re-verifies)
+- Content hash: `b0e55b805078f3f65f1805e04a389b191ab72bfe60b147962003efa1913e9218` (from `calcs.lock.json`; any later change to the calc or to a module it imports changes it and the owner re-verifies)
 - Status: draft (not approved; ADR-0028 section 4: no entry in `approvals.yaml`)
 - Method source: eng-harness spec 0010 section 4.4.6 (schedule assembly and clearance), acceptance criterion AC11; basis field `foundation.min_clear_distance_mm` (confirmed, in mm by the unit suffix of its path, value >= 0)
 - Constants: three `Cited`: the divisor 2 of "half the length to each side" (Geometry, plans centred on their joints, BP 2), the length 0 mm (Geometry; the lower bound of the clear distance) and the calc version 1. The clear distance is the basis field, never a literal. No engineering number.
