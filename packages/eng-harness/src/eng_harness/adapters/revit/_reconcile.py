@@ -5,8 +5,9 @@ read with the same helpers as `check_model` (`_checks.expect_write`, `_observe`,
 and tolerance are the read-back's: floats compare within `tolerance_ratio`, the frozen basis field
 `checks.readback_relative_tolerance_ratio`, never a constant here (without it a quantity is
 `unknown`). Rules per tool are the table of §4.10. `reconcile` first reads `revit_get_model_metadata`
-(active document is the bound one, else `unknown`). A host read that times out, fails, is truncated
-or cannot be compared is `unknown` — never a certain `applied` or `not_applied`.
+(active document is the bound one, else `unknown`). A host read that times out, fails, is truncated,
+malformed or cannot be compared is `unknown` — never a certain `applied` or `not_applied`; a
+`ContractError` from the host read propagates to the caller.
 """
 
 from __future__ import annotations
@@ -214,6 +215,15 @@ class RevitReconciler:
             raise _ReadError(f"{tool} reply is not a mapping")
         if body.get("truncated") is True:
             raise _ReadError(f"{tool} reply was truncated")
+        if tool in {"revit_get_element_parameters", "revit_get_type_parameters"}:
+            items = body.get("items")
+            if not isinstance(items, list) or not items:
+                raise _ReadError(f"{tool} reply has no non-empty items list")
+            first = items[0]
+            if not isinstance(first, Mapping):
+                raise _ReadError(f"{tool} reply first item is not a mapping")
+            if not isinstance(first.get("parameters"), list):
+                raise _ReadError(f"{tool} reply parameters are not a list")
         return _as_mcp(body)
 
     def _shows_requested(self, item: Expect, got: Want | None) -> bool | None:
@@ -224,7 +234,7 @@ class RevitReconciler:
 
     def _equals_pre_image(self, item: Expect, got: Want | None, pre_image: JsonValue) -> bool:
         if pre_image is None:
-            return got is None
+            return False
         if not isinstance(pre_image, dict):
             return False
         pre_item = Expect(
@@ -275,14 +285,15 @@ class RevitReconciler:
             raise TypeError(f"not a setter model: {type(model).__name__}")
         return expect_write(lost.descriptor.name, host_args, unique_id=unique_id)
 
-    def _pre_for_target(self, lost: LostWrite, target_id: int) -> JsonValue:
+    def _pre_for_target(self, lost: LostWrite, target_id: int) -> JsonValue | object:
         """Per-target pre-image; a single want dict applies to every target (homogeneous batch)."""
         pre = lost.pre_image
         if not isinstance(pre, dict):
             return pre
         by_target = pre.get("by_target")
         if isinstance(by_target, dict):
-            return by_target.get(str(target_id))
+            key = str(target_id)
+            return by_target.get(key, _NO_PRE)
         return pre
 
     async def _observe_one(self, read: HostRead, item: Expect) -> Want | None:
@@ -303,6 +314,14 @@ class RevitReconciler:
 
     async def _setters(self, lost: LostWrite, read: HostRead) -> Decision:
         """Setters: every target equals the request → applied; every equals pre-image → not_applied; mixed → partial."""
+        if isinstance(lost.model, SetParameterValueByGuidArgs) and lost.model.target != "instance":
+            return Decision(
+                outcome="unknown",
+                evidence={
+                    "reason": "type-bound GUID value is not read by the instance-parameter read-back",
+                    "target": lost.model.target,
+                },
+            )
         targets = self._setter_targets(lost)
         if not targets:
             return Decision(outcome="unknown", evidence={"reason": "no setter targets"})
@@ -310,6 +329,7 @@ class RevitReconciler:
         missing: list[str] = []
         observed_rows: dict[str, JsonValue] = {}
         requested: Want | None = None
+        read_error: str | None = None
         for tid in targets:
             item = self._expect_one(lost, tid)
             if requested is None:
@@ -317,9 +337,11 @@ class RevitReconciler:
             subject = item.subject.id or str(tid)
             try:
                 got = await self._observe_one(read, item)
-            except _ReadError:
+            except _ReadError as exc:
                 outcomes.append("unknown")
                 observed_rows[str(tid)] = None
+                if read_error is None:
+                    read_error = exc.reason
                 continue
             observed_rows[str(tid)] = cast(JsonValue, got)
             shows = self._shows_requested(item, got)
@@ -334,7 +356,10 @@ class RevitReconciler:
                 outcomes.append("unknown")
                 continue
             pre = self._pre_for_target(lost, tid)
-            if self._equals_pre_image(item, got, pre):
+            if pre is _NO_PRE:
+                outcomes.append("unknown")
+                continue
+            if self._equals_pre_image(item, got, cast(JsonValue, pre)):
                 outcomes.append("not_applied")
                 missing.append(subject)
                 continue
@@ -346,6 +371,8 @@ class RevitReconciler:
             "pre_image_known": lost.known,
             "pre_image": lost.pre_image,
         }
+        if read_error is not None:
+            evidence["reason"] = read_error
         return Decision(
             outcome=combined,
             missing=tuple(missing) if combined == "partial" else (),
@@ -426,10 +453,7 @@ class RevitReconciler:
                 outcomes.append("applied")
                 continue
             pre_type = self._pre_type_for_element(lost, int(eid))
-            if pre_type is _NO_PRE:
-                outcomes.append("unknown")
-                continue
-            if pre_type is None:
+            if pre_type is _NO_PRE or pre_type is None:
                 # Known pre-image of None: no type to compare → unknown (§4.10: every element has its pre-image type).
                 outcomes.append("unknown")
                 continue
@@ -488,7 +512,7 @@ class RevitReconciler:
             if not rows:
                 raise _ReadError("revit_list_family_types_in_family truncated with no rows")
             pages += 1
-            if pages > _MAX_PAGES:
+            if pages >= _MAX_PAGES:
                 raise _ReadError("revit_list_family_types_in_family paging did not complete")
             start += len(rows)
 
@@ -579,7 +603,6 @@ class RevitReconciler:
             "family_name": family_name,
         }
         if match is None:
-            got = None
             base["observed"] = None
             if lost.known and lost.pre_image is None:
                 return Decision(outcome="not_applied", evidence=base)
@@ -616,12 +639,16 @@ class RevitReconciler:
         evidence: dict[str, JsonValue] = {
             "requested": {"path": requested},
             "observed": {"path": path if isinstance(path, str) else None},
+            "activate": lost.model.activate,
             "pre_image_known": lost.known,
             "pre_image": lost.pre_image,
             "path": path if isinstance(path, str) else None,
         }
         if not isinstance(path, str) or not path:
             # No document path read: cannot show another document is active (§4.10 otherwise unknown).
+            return Decision(outcome="unknown", evidence=evidence)
+        if not lost.model.activate:
+            # A background open does not change the active document, so metadata cannot prove its outcome.
             return Decision(outcome="unknown", evidence=evidence)
         if revit_document_loaded(path, Path(requested)):
             return Decision(outcome="applied", evidence=evidence)
@@ -638,9 +665,7 @@ class RevitReconciler:
             return "not_applied"
         if any(o == "unknown" for o in outcomes):
             return "unknown"
-        if "applied" in outcomes and "not_applied" in outcomes:
-            return "partial"
-        return "unknown"
+        return "partial" if "applied" in outcomes and "not_applied" in outcomes else "unknown"
 
 
 _NO_PRE = object()

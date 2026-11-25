@@ -378,7 +378,8 @@ def test_outcomes_per_tool(tool: str, applied: bool, expected: str, tmp_path: Pa
         # Evidence always carries the observed read; open_model also carries path (§4.10).
         assert "observed" in found.evidence
         if tool == "revit_open_model":
-            assert "path" in found.evidence or "requested" in found.evidence
+            assert found.evidence["observed"] == {"path": str(COPY) if applied else str(helpers.BOUND)}
+            assert found.evidence["requested"] == {"path": str(COPY)}
         else:
             assert "requested" in found.evidence
 

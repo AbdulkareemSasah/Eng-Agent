@@ -18,12 +18,20 @@ from pydantic import JsonValue
 from eng_harness.adapters._args import HostTarget
 from eng_harness.adapters._toolport import Binding, LostWrite
 from eng_harness.adapters.revit import revit_allowlist
-from eng_harness.adapters.revit._reconcile import RevitReconciler, _host_args
+from eng_harness.adapters.revit._reconcile import (
+    _MAX_PAGES,
+    _NO_PRE,
+    _PAGE,
+    RevitReconciler,
+    _host_args,
+)
 from eng_harness.adapters.revit._tools import (
     ChangeElementTypeArgs,
     DuplicateFamilyTypeArgs,
     OpenModelArgs,
     SetElementParameterValuesArgs,
+    SetParameterValueByGuidArgs,
+    SetTypeParameterValuesArgs,
 )
 from eng_harness.servers import CallEffect
 
@@ -156,6 +164,23 @@ def test_open_model_path_rules() -> None:
             read,
         )
         assert other.outcome == "not_applied"
+
+    anyio.run(body)
+
+
+def test_open_model_without_activation_cannot_be_decided_from_active_path() -> None:
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            return {"path": str(BOUND)}
+
+        found = await reconciler.decide(
+            _lost("revit_open_model", OpenModelArgs(path=r"C:\models\background.rvt", activate=False)),
+            read,
+        )
+        assert found.outcome == "unknown"
+        assert found.evidence["activate"] is False
 
     anyio.run(body)
 
@@ -1364,5 +1389,264 @@ def test_open_model_empty_path_is_unknown() -> None:
 
         found = await reconciler.decide(_lost("revit_open_model", OpenModelArgs(path=str(BOUND))), read)
         assert found.outcome == "unknown"
+
+    anyio.run(body)
+
+
+def test_setter_by_target_missing_key_has_no_pre_image() -> None:
+    reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
+    lost = _lost(
+        "revit_set_element_parameter_values",
+        SetElementParameterValuesArgs(element_ids=[3001], parameter_name="b", value="450", value_type="double"),
+        pre_image={"by_target": {}},
+    )
+    assert reconciler._pre_for_target(lost, 3001) is _NO_PRE
+
+
+@pytest.mark.parametrize(
+    ("tool", "model", "read_tool"),
+    [
+        (
+            "revit_set_element_parameter_values",
+            SetElementParameterValuesArgs(element_ids=[3001], parameter_name="b", value="450", value_type="double"),
+            "revit_get_element_parameters",
+        ),
+        (
+            "revit_set_type_parameter_values",
+            SetTypeParameterValuesArgs(
+                parameter_name="b",
+                value="450",
+                value_type="double",
+                type_ids=[2001],
+                expected_instances=[3001],
+            ),
+            "revit_get_type_parameters",
+        ),
+        (
+            "revit_set_parameter_value_by_guid",
+            SetParameterValueByGuidArgs(
+                element_ids=[3001],
+                guid="11111111-1111-1111-1111-111111111111",
+                value="450",
+                value_type="double",
+                unit="mm",
+                target="instance",
+                all_or_nothing=True,
+            ),
+            "revit_get_element_parameters",
+        ),
+    ],
+    ids=["element-name", "type-name", "instance-guid"],
+)
+def test_setter_absent_before_and_after_is_unknown(tool: str, model: Any, read_tool: str) -> None:
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
+
+        async def read(name: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if name == "revit_get_model_metadata":
+                return _meta_bound()
+            if name == read_tool:
+                return {"items": [{"parameters": []}]}
+            raise AssertionError(name)
+
+        found = await reconciler.decide(_lost(tool, model, pre_image=None), read)
+        assert found.outcome == "unknown"
+
+    anyio.run(body)
+
+
+@pytest.mark.parametrize(
+    "malformed",
+    [
+        {"items": []},
+        {"items": "not-a-list"},
+        {"items": ["not-a-mapping"]},
+        {"items": [{"parameters": "not-a-list"}]},
+    ],
+    ids=["empty-items", "items-not-list", "item-not-mapping", "parameters-not-list"],
+)
+@pytest.mark.parametrize(
+    ("tool", "model", "read_tool"),
+    [
+        (
+            "revit_set_element_parameter_values",
+            SetElementParameterValuesArgs(element_ids=[3001], parameter_name="b", value="450", value_type="double"),
+            "revit_get_element_parameters",
+        ),
+        (
+            "revit_set_type_parameter_values",
+            SetTypeParameterValuesArgs(
+                parameter_name="b",
+                value="450",
+                value_type="double",
+                type_ids=[2001],
+                expected_instances=[3001],
+            ),
+            "revit_get_type_parameters",
+        ),
+    ],
+    ids=["element-parameters", "type-parameters"],
+)
+def test_setter_malformed_parameter_reply_is_unknown(
+    tool: str,
+    model: Any,
+    read_tool: str,
+    malformed: dict[str, Any],
+) -> None:
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
+
+        async def read(name: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if name == "revit_get_model_metadata":
+                return _meta_bound()
+            if name == read_tool:
+                return malformed
+            raise AssertionError(name)
+
+        found = await reconciler.decide(_lost(tool, model, pre_image=None), read)
+        assert found.outcome == "unknown"
+        assert "reply" in str(found.evidence.get("reason", ""))
+
+    anyio.run(body)
+
+
+def test_guid_type_target_is_unknown_but_instance_target_is_observed() -> None:
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
+        guid = "11111111-1111-1111-1111-111111111111"
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if tool == "revit_get_model_metadata":
+                return _meta_bound()
+            if tool == "revit_get_element_parameters":
+                return {
+                    "items": [
+                        {
+                            "parameters": [
+                                {
+                                    "name": "b",
+                                    "guid": guid,
+                                    "rawValue": FEET_450,
+                                    "specId": LENGTH_SPEC,
+                                    "storageType": "Double",
+                                }
+                            ]
+                        }
+                    ]
+                }
+            raise AssertionError(tool)
+
+        type_target = SetParameterValueByGuidArgs(
+            element_ids=[3001],
+            guid=guid,
+            value="450",
+            value_type="double",
+            unit="mm",
+            target="type",
+            all_or_nothing=True,
+        )
+        type_found = await reconciler.decide(
+            _lost("revit_set_parameter_value_by_guid", type_target, pre_image=None), read
+        )
+        assert type_found.outcome == "unknown"
+        assert type_found.evidence["target"] == "type"
+        assert "not read" in str(type_found.evidence["reason"])
+
+        instance_target = type_target.model_copy(update={"target": "instance"})
+        instance_found = await reconciler.decide(
+            _lost("revit_set_parameter_value_by_guid", instance_target, pre_image={guid: 300.0}), read
+        )
+        assert instance_found.outcome == "applied"
+
+    anyio.run(body)
+
+
+def test_quantity_without_tolerance_is_unknown() -> None:
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=None, bound_path=BOUND)
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if tool == "revit_get_model_metadata":
+                return _meta_bound()
+            if tool == "revit_get_element_parameters":
+                return {"items": [{"parameters": [_param(FEET_450)]}]}
+            raise AssertionError(tool)
+
+        found = await reconciler.decide(
+            _lost(
+                "revit_set_element_parameter_values",
+                SetElementParameterValuesArgs(element_ids=[3001], parameter_name="b", value="450", value_type="double"),
+                pre_image={"b": 300.0},
+            ),
+            read,
+        )
+        assert found.outcome == "unknown"
+
+    anyio.run(body)
+
+
+def test_duplicate_family_scoped_paging_stops_at_page_cap() -> None:
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
+        model = DuplicateFamilyTypeArgs(source_type_id="2001", new_type_name="N")
+        calls: list[dict[str, Any]] = []
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if tool == "revit_get_model_metadata":
+                return _meta_bound()
+            if tool == "revit_list_family_types_in_family":
+                if "family_id" not in arguments:
+                    return {
+                        "items": [{"name": "C300x300", "type_id": 2001, "family": "F", "family_id": 1}],
+                        "truncated": False,
+                    }
+                calls.append(dict(arguments))
+                start = int(arguments["start_index"])
+                return {
+                    "items": [{"name": f"Other-{start}", "type_id": start + 3000, "family": "F"}],
+                    "truncated": True,
+                }
+            raise AssertionError(tool)
+
+        found = await reconciler.decide(_lost("revit_duplicate_family_type", model, pre_image=None), read)
+        assert found.outcome == "unknown"
+        assert found.evidence["reason"] == "revit_list_family_types_in_family paging did not complete"
+        assert len(calls) == _MAX_PAGES
+
+    anyio.run(body)
+
+
+def test_duplicate_family_scoped_paging_advances_by_multirow_page_size() -> None:
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
+        model = DuplicateFamilyTypeArgs(source_type_id="2001", new_type_name="N")
+        calls: list[dict[str, Any]] = []
+        rows = [
+            {"name": f"Other-{index}", "type_id": 3000 + index, "family": "F", "family_id": 1} for index in range(_PAGE)
+        ]
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if tool == "revit_get_model_metadata":
+                return _meta_bound()
+            if tool == "revit_list_family_types_in_family":
+                if "family_id" not in arguments:
+                    return {
+                        "items": [{"name": "C300x300", "type_id": 2001, "family": "F", "family_id": 1}],
+                        "truncated": False,
+                    }
+                calls.append(dict(arguments))
+                if arguments["start_index"] == 0:
+                    return {"items": rows, "truncated": True}
+                return {
+                    "items": [{"name": "N", "type_id": 5000, "family": "F", "family_id": 1}],
+                    "truncated": False,
+                }
+            if tool == "revit_get_type_parameters":
+                return {"items": [{"parameters": [_param(1.0)]}]}
+            raise AssertionError(tool)
+
+        found = await reconciler.decide(_lost("revit_duplicate_family_type", model, pre_image=None), read)
+        assert found.outcome == "applied"
+        assert [call["start_index"] for call in calls] == [0, _PAGE]
 
     anyio.run(body)
