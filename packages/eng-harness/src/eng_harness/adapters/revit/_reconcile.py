@@ -21,6 +21,7 @@ from pydantic import JsonValue
 
 from eng_harness.adapters._toolport import Decision, HostRead, LostWrite
 from eng_harness.adapters.revit._checks import Expect, Want, _observe, compare, expect_write
+from eng_harness.adapters.revit._state import revit_document_loaded
 from eng_harness.adapters.revit._tools import (
     ChangeElementTypeArgs,
     DuplicateFamilyTypeArgs,
@@ -48,6 +49,9 @@ _SETTERS = frozenset(
 )
 _UNAVAILABLE = "READBACK_UNAVAILABLE"
 _PAGE = 100  # host default max_types for revit_list_family_types_in_family (S-12 / ListFamilyTypesInFamilyArgs)
+# Adapter paging guard, not an engineering number: stop a host that keeps answering `truncated`
+# from looping forever; reaching it is a read issue (unknown, §4.10).
+_MAX_PAGES = 50
 
 
 class _ReadError(Exception):
@@ -198,10 +202,9 @@ class RevitReconciler:
         return None
 
     def _active_is_bound(self, meta: Mapping[str, Any]) -> bool:
-        bound = str(self._bound)
-        # Spec 0011 §4.10 / AC13: compare get_model_metadata `path` (inventory key).
+        # Spec 0011 §4.10 / AC13: get_model_metadata `path` (inventory key), Windows path semantics.
         path = meta.get("path")
-        return isinstance(path, str) and path == bound
+        return self._bound is not None and revit_document_loaded(path if isinstance(path, str) else None, self._bound)
 
     async def _call(
         self, read: HostRead, tool: str, arguments: dict[str, Any], effect: CallEffect
@@ -452,7 +455,7 @@ class RevitReconciler:
         self,
         read: HostRead,
         *,
-        family_id: int | str | None = None,
+        family_id: str | None = None,
         family_name: str | None = None,
     ) -> list[Mapping[str, Any]]:
         """Page `revit_list_family_types_in_family` until complete; truncated mid-page is a read issue."""
@@ -485,11 +488,11 @@ class RevitReconciler:
             if not rows:
                 raise _ReadError("revit_list_family_types_in_family truncated with no rows")
             pages += 1
-            if pages > 50:
+            if pages > _MAX_PAGES:
                 raise _ReadError("revit_list_family_types_in_family paging did not complete")
             start += len(rows)
 
-    async def _source_family(self, read: HostRead, source_type_id: str | int) -> tuple[int | str | None, str | None]:
+    async def _source_family(self, read: HostRead, source_type_id: str | int) -> tuple[str | None, str | None]:
         """Family id/name of the source type (§4.10: exists in the family)."""
         wanted = _as_int(source_type_id)
         if wanted is None:
@@ -500,8 +503,9 @@ class RevitReconciler:
             raise _ReadError(f"source type {wanted} was not found in the family list")
         family_id = match.get("family_id")
         family_name = match.get("family")
-        fid: int | str | None = (
-            family_id if isinstance(family_id, (int, str)) and not isinstance(family_id, bool) else None
+        # Inventory schema: `family_id` of revit_list_family_types_in_family is a string.
+        fid: str | None = (
+            str(family_id) if isinstance(family_id, (int, str)) and not isinstance(family_id, bool) else None
         )
         fname = family_name if isinstance(family_name, str) and family_name else None
         if fid is None and fname is None:
@@ -513,7 +517,7 @@ class RevitReconciler:
         read: HostRead,
         name: str,
         *,
-        family_id: int | str | None,
+        family_id: str | None,
         family_name: str | None,
     ) -> Mapping[str, Any] | None:
         rows = await self._list_family_types(read, family_id=family_id, family_name=family_name)
@@ -571,7 +575,7 @@ class RevitReconciler:
             "requested": {"name": lost.model.new_type_name},
             "pre_image_known": lost.known,
             "pre_image": lost.pre_image,
-            "family_id": family_id if isinstance(family_id, (int, str)) else None,
+            "family_id": family_id,
             "family_name": family_name,
         }
         if match is None:
@@ -616,12 +620,13 @@ class RevitReconciler:
             "pre_image": lost.pre_image,
             "path": path if isinstance(path, str) else None,
         }
-        if isinstance(path, str) and path == requested:
+        if not isinstance(path, str) or not path:
+            # No document path read: cannot show another document is active (§4.10 otherwise unknown).
+            return Decision(outcome="unknown", evidence=evidence)
+        if revit_document_loaded(path, Path(requested)):
             return Decision(outcome="applied", evidence=evidence)
-        if isinstance(path, str) and path != requested:
-            # Spec §4.10: the path is another document → not_applied.
-            return Decision(outcome="not_applied", evidence=evidence)
-        return Decision(outcome="unknown", evidence=evidence)
+        # Spec §4.10: the path is another document → not_applied.
+        return Decision(outcome="not_applied", evidence=evidence)
 
     @staticmethod
     def _combine(outcomes: Sequence[_Outcome]) -> _Outcome:

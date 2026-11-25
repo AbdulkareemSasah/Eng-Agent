@@ -227,7 +227,7 @@ def test_duplicate_absent_and_present_branches() -> None:
                 rows = [
                     row
                     for row in state["types"]
-                    if (family_id is None or row.get("family_id") == family_id)
+                    if (family_id is None or str(row.get("family_id")) == family_id)
                     and (family_name is None or row.get("family") == family_name)
                 ]
                 return {"items": list(rows), "truncated": False}
@@ -666,7 +666,7 @@ def test_observe_duplicate_and_change_type_exact() -> None:
                 assert arguments.get("start_index") == 0
                 assert arguments.get("max_types") == 100
                 family_id = arguments.get("family_id")
-                rows = [r for r in types if family_id is None or r.get("family_id") == family_id]
+                rows = [r for r in types if family_id is None or str(r.get("family_id")) == family_id]
                 return {"items": rows, "truncated": False}
             if tool == "revit_get_type_parameters":
                 return {"items": [{"id": int(arguments["typeIds"][0]), "parameters": [_param(1.0)]}]}
@@ -778,7 +778,7 @@ def test_list_family_types_pages_until_complete() -> None:
             if tool == "revit_list_family_types_in_family":
                 start = int(arguments.get("start_index") or 0)
                 # Unfiltered source lookup pages; family-scoped name lookup uses page 0 only after family known.
-                if arguments.get("family_id") == 1:
+                if arguments.get("family_id") == "1":
                     return {"items": pages[1]["items"], "truncated": False}
                 return pages[start]
             if tool == "revit_get_type_parameters":
@@ -812,7 +812,7 @@ def test_duplicate_scoped_to_source_family() -> None:
                 rows = [
                     row
                     for row in types
-                    if (family_id is None or row.get("family_id") == family_id)
+                    if (family_id is None or str(row.get("family_id")) == family_id)
                     and (family_name is None or row.get("family") == family_name)
                 ]
                 return {"items": rows, "truncated": False}
@@ -1204,5 +1204,165 @@ def test_change_type_continue_across_elements() -> None:
         observed = cast(dict[str, Any], found.evidence["observed"])
         assert observed["2"] == {"type_id": 99}
         assert observed["1"] is None
+
+    anyio.run(body)
+
+
+def _family_scoped_read(scoped_pages: dict[int, dict[str, Any]], calls: list[dict[str, Any]]) -> Any:
+    """Unscoped source lookup is complete; the family-scoped lookup pages by `start_index`."""
+    source = {"name": "C300x300", "type_id": 2001, "family": "F", "family_id": 1}
+
+    async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+        if tool == "revit_get_model_metadata":
+            return _meta_bound()
+        if tool == "revit_list_family_types_in_family":
+            if "family_id" not in arguments:
+                return {"items": [dict(source)], "truncated": False}
+            calls.append(dict(arguments))
+            return scoped_pages[int(arguments["start_index"])]
+        if tool == "revit_get_type_parameters":
+            tid = int(arguments["typeIds"][0])
+            return {"items": [{"id": tid, "parameters": [_param(1.0)]}]}
+        raise AssertionError(tool)
+
+    return read
+
+
+def test_duplicate_family_scoped_lookup_pages_past_truncation() -> None:
+    """A truncated family-scoped page is not the whole family: the next page holds the new name (§4.10)."""
+
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
+        model = DuplicateFamilyTypeArgs(source_type_id="2001", new_type_name="N")
+        calls: list[dict[str, Any]] = []
+        pages = {
+            0: {"items": [{"name": "C300x300", "type_id": 2001, "family": "F", "family_id": 1}], "truncated": True},
+            1: {"items": [{"name": "N", "type_id": 55, "family": "F", "family_id": 1}], "truncated": False},
+        }
+        found = await reconciler.decide(
+            _lost("revit_duplicate_family_type", model, pre_image=None), _family_scoped_read(pages, calls)
+        )
+        assert found.outcome == "applied"
+        assert [c["start_index"] for c in calls] == [0, 1]
+        # Inventory schema: family_id is a string (ListFamilyTypesInFamilyArgs.family_id).
+        assert all(c["family_id"] == "1" for c in calls)
+
+    anyio.run(body)
+
+
+def test_duplicate_family_scoped_truncated_empty_page_is_unknown() -> None:
+    """A truncated page with no rows cannot prove absence: unknown, never not_applied (§4.10, R1)."""
+
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
+        model = DuplicateFamilyTypeArgs(source_type_id="2001", new_type_name="N")
+        calls: list[dict[str, Any]] = []
+        pages = {
+            0: {"items": [{"name": "C300x300", "type_id": 2001, "family": "F", "family_id": 1}], "truncated": True},
+            1: {"items": [], "truncated": True},
+        }
+        found = await reconciler.decide(
+            _lost("revit_duplicate_family_type", model, pre_image=None), _family_scoped_read(pages, calls)
+        )
+        assert found.outcome == "unknown"
+        assert "truncated" in str(found.evidence.get("reason", ""))
+
+    anyio.run(body)
+
+
+def test_change_type_truncated_details_is_unknown() -> None:
+    """A truncated get_element_details reply is a read issue: unknown, never not_applied (§4.10)."""
+
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND, unique_ids={3001: "u1"})
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if tool == "revit_get_model_metadata":
+                return _meta_bound()
+            if tool == "revit_get_element_details":
+                return {"items": [{"unique_id": "u1", "type_id": 2001}], "truncated": True}
+            raise AssertionError(tool)
+
+        found = await reconciler.decide(
+            _lost(
+                "revit_change_element_type",
+                ChangeElementTypeArgs(element_ids=[3001], type_id=2002),
+                pre_image={"type_id": 2001},
+            ),
+            read,
+        )
+        assert found.outcome == "unknown"
+        assert cast(dict[str, Any], found.evidence["observed"])["3001"] is None
+
+    anyio.run(body)
+
+
+def test_setter_none_pre_image_other_value_is_unknown() -> None:
+    """Known pre-image None and a read showing another value: neither requested nor pre-image → unknown."""
+
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND, unique_ids={3001: "col-3001"})
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if tool == "revit_get_model_metadata":
+                return _meta_bound()
+            if tool == "revit_get_element_parameters":
+                return {"items": [{"parameters": [_param(FEET_400)]}]}
+            raise AssertionError(tool)
+
+        found = await reconciler.decide(
+            _lost(
+                "revit_set_element_parameter_values",
+                SetElementParameterValuesArgs(element_ids=[3001], parameter_name="b", value="450", value_type="double"),
+                known=True,
+                pre_image=None,
+            ),
+            read,
+        )
+        assert found.outcome == "unknown"
+
+    anyio.run(body)
+
+
+def test_paths_compare_as_windows_paths() -> None:
+    """Metadata path differing only by case or slash direction is the same document (PureWindowsPath, §4.10)."""
+
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND, unique_ids={3001: "col-3001"})
+        same = "c:/MODELS/Edits.RVT"
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if tool == "revit_get_model_metadata":
+                return {"path": same}
+            if tool == "revit_get_element_parameters":
+                return {"items": [{"parameters": [_param(FEET_450)]}]}
+            raise AssertionError(tool)
+
+        opened = await reconciler.decide(_lost("revit_open_model", OpenModelArgs(path=str(BOUND))), read)
+        assert opened.outcome == "applied"
+        setter = await reconciler.decide(
+            _lost(
+                "revit_set_element_parameter_values",
+                SetElementParameterValuesArgs(element_ids=[3001], parameter_name="b", value="450", value_type="double"),
+                pre_image={"b": 300.0},
+            ),
+            read,
+        )
+        assert setter.outcome == "applied"
+
+    anyio.run(body)
+
+
+def test_open_model_empty_path_is_unknown() -> None:
+    """An empty metadata path names no document, so it cannot prove another document is active."""
+
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            return {"path": ""}
+
+        found = await reconciler.decide(_lost("revit_open_model", OpenModelArgs(path=str(BOUND))), read)
+        assert found.outcome == "unknown"
 
     anyio.run(body)
