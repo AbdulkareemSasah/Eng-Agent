@@ -184,30 +184,30 @@ tasks:
     title: "Mutation scope: the section 9 modules in r1_modules"
     # Amendment (B-601, owner decision D-46, 2026-11-20): CI mutates only modules listed in
     # [tool.eng-gate] r1_modules; spec 0012 section 9 names products/_sap2000.py and the
-    # add-frame reconcile rule (held in adapters/csi/_reconcile.py: _add_frame_by_geometry /
-    # add_frame_naming == "reply") that are merged but absent from that list. This task adds
-    # those paths to r1_modules, adds a contract guard that the section 9 list is covered by a
-    # glob, and strengthens the existing tests until each module reaches mutation_min (80 %)
-    # with real tests. No exclusions, pragmas or lowered thresholds; no module may be removed
-    # from r1_modules to pass MU001. No source module is listed: the work strengthens tests
-    # only. products/_sap2000.py is mostly declarative profile data; if it cannot reach 80 %
-    # without a source change, the implementing writer reports NEEDS_PLAN_AMENDMENT. The
-    # blocked tables-and-loads work formerly sketched as T8 in section 2 stays out of the
-    # front matter and takes the next free id when it is amended in.
+    # add-frame reconcile rule that are merged but absent from that list. This task adds
+    # products/_sap2000.py to r1_modules; adapters/csi/_reconcile.py, holding the add-frame
+    # rule, is added by plan 0002 T24, which also owns its tests. It adds a contract guard that
+    # the section 9 list is covered by a glob. products/_sap2000.py holds constants only (no
+    # function body). The gate's mutation step skips such a file with MU003 (eng-dev-gate spec
+    # AC53a), so it has no score and needs no exclusion. It stays in r1_modules because spec
+    # 0012 section 9 names it, so MU001 applies once a function body is added. No test is
+    # strengthened for it. No exclusions, pragmas or lowered thresholds; no module may be
+    # removed from r1_modules to pass MU001. No source module is listed.
+    # The writer measures one module at a time: an unpushed scratch commit that adds a comment
+    # line to that module only, then `uv run eng-gate mutation --package eng-harness --base HEAD~1`;
+    # the writer records each module's score in the verification record and drops the commit
+    # (the step prints the score only in MU001; no MU001 means at or above mutation_min); for
+    # products/_sap2000.py the record is MU003.
     files:
       - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/tests/contract/test_mutation_scope.py"  # shared by the five B-601 tasks; this task adds test_spec_0012_section_9_modules_in_r1
-      - "packages/eng-harness/tests/unit/adapters/test_products.py"  # adapters/csi/products/_sap2000.py profile data
-      - "packages/eng-harness/tests/unit/adapters/test_allowlist.py"  # adapters/csi/products/_sap2000.py allowlist/gap coverage
-      - "packages/eng-harness/tests/workflow/adapters/test_sap2000_reconcile.py"  # add-frame reconcile rule in adapters/csi/_reconcile.py
-      - "packages/eng-harness/tests/workflow/adapters/test_sap2000_edits.py"  # add-frame edit path that feeds the reconcile rule
-    max_changed_lines: 60
-    max_sessions: 2
+    max_changed_lines: 20
+    max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/contract/test_mutation_scope.py::test_spec_0012_section_9_modules_in_r1"
     covers: []  # section 9 mutation scope is not an AC; this plan's covers style lists ACs only
-    depends_on: [T1, T5]  # T1 products/_sap2000.py; T5 add-frame reconcile rule in csi/_reconcile.py
+    depends_on: [T1, T3, T4, T5, T6]  # T1, T3, T4, T5 and T6 each edit products/_sap2000.py; external: plan 0002 T24 (csi/_reconcile.py in r1_modules, which the guard asserts)
 ---
 
 # Implementation plan: SAP2000 through the CSI adapter
@@ -219,7 +219,8 @@ on the framework of [plan 0002](0002-servers-and-adapters.md) and the product me
 (profile registry, per-product fingerprint, `[servers.<name>].product`, table framework, gap module). Nothing is reused
 by copying. Risky parts first: the allowlist and the pinned fingerprint (T1, the barrier against escape hatches), then
 the state reader with declared absences (T4) and the add-frame reconciliation by geometry (T5), because the host ignores
-the requested frame name. Every table is `unknown`, so no task reads or writes a table; that work is T8.
+the requested frame name. Every table is `unknown`, so no task reads or writes a table; that work is the blocked
+tables-and-loads task in section 2.
 
 ## 2. Tasks
 
@@ -264,10 +265,17 @@ adapter; verified against the real server only once the owner commits SAP2000 re
 B-573), the SAP2000 part of `docs/local-testing.md` (spec §12 L1 to L9; amendment B-573). If plan 0008 T8 has not
 created that file, T7 creates it with the SAP2000 part only.
 
-**T8 Tables and loads (blocked, not in the front matter).** Starts only after the owner has run L4 and committed
-recordings, and decided Q3 and Q5. Then: table entries `unknown` to `reference` or `candidate`, the load and
-restraint edits with their read-back, replacing the SP-4 gap tests (a spec change, not a test changed to pass). Its own
-plan amendment lists its files and budget. If no recording is committed, SP-4 stays.
+**T8 Mutation scope** (amendment B-601, decision D-46; spec §9). Adds `products/_sap2000.py` to `r1_modules`;
+`adapters/csi/_reconcile.py`, holding the add-frame rule, is added by plan 0002 T24, which also owns its tests. The
+guard `test_mutation_scope.py::test_spec_0012_section_9_modules_in_r1` holds the spec section 9 paths as a literal tuple
+and asserts that each matches a glob of `r1_modules`, read from `pyproject.toml` through `tomllib` (`**` crosses
+directories, as in the gate). `products/_sap2000.py` holds constants only, so the gate's mutation step skips it with
+MU003 and no test is strengthened for it (see the task's front-matter comment).
+
+**Tables and loads (blocked, not in the front matter; takes the next free id when amended in).** Starts only after the
+owner has run L4 and committed recordings, and decided Q3 and Q5. Then: table entries `unknown` to `reference` or
+`candidate`, the load and restraint edits with their read-back, replacing the SP-4 gap tests (a spec change, not a test
+changed to pass). Its own plan amendment lists its files and budget. If no recording is committed, SP-4 stays.
 
 ## 3. Dependencies
 

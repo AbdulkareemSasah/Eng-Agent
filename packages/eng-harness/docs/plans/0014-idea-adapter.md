@@ -244,8 +244,12 @@ tasks:
     # exclusions, pragmas or lowered thresholds; no module may be removed from r1_modules to
     # pass MU001. No source module is listed: the work strengthens tests only. If the module
     # cannot reach 80 % without a source change, the implementing writer reports
-    # NEEDS_PLAN_AMENDMENT. The blocked typed-loads work formerly sketched as T10 in section 2
-    # stays out of the front matter and takes the next free id when it is amended in.
+    # NEEDS_PLAN_AMENDMENT. The blocked typed-loads work sketched in section 2 stays out of the
+    # front matter and takes the next free id when it is amended in.
+    # The writer measures one module at a time: an unpushed scratch commit that adds a comment
+    # line to that module only, then `uv run eng-gate mutation --package eng-harness --base HEAD~1`;
+    # the writer records each module's score in the verification record and drops the commit
+    # (the step prints the score only in MU001; no MU001 means at or above mutation_min).
     files:
       - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
       - "packages/eng-harness/CHANGELOG.md"
@@ -321,10 +325,18 @@ pre-flight and the stub refusal, host verdicts out, reconciliation of `idea_nati
 in `docs/local-testing.md` and a record script under `acceptance/scripts/`. If another plan's task has not created
 `docs/local-testing.md`, T9 creates it with the IDEA part only.
 
-**T10 Typed loads on the REST route (blocked, not in the front matter).** Starts only after the owner has run L4 and
-decided Q1 and, in the Sasaah repository, a typed tool that sends loads to the REST service exists (project lane,
-ADR-0026). Then: the tool's allowlist entry, its unit header, its read-back, and the replacement of the IG-1 and IG-3
-gap tests for that tool (a spec change, not a test changed to pass). Its own plan amendment lists files and budget.
+**T10 Mutation scope** (amendment B-601, decision D-46; spec §9). Adds `adapters/idea/_errors.py` to `r1_modules`
+(`_stub.py`, `_verdicts.py` and `_loads.py` are already listed; `_reconcile.py` is T8's). The guard
+`test_mutation_scope.py::test_spec_0014_section_9_modules_in_r1` holds the spec section 9 paths as a literal tuple and
+asserts that each matches a glob of `r1_modules`, read from `pyproject.toml` through `tomllib` (`**` crosses
+directories, as in the gate). The existing unit tests are strengthened until the module reaches `mutation_min`, measured
+as the task's front-matter comment states.
+
+**Typed loads on the REST route (blocked, not in the front matter; takes the next free id when amended in).** Starts
+only after the owner has run L4 and decided Q1 and, in the Sasaah repository, a typed tool that sends loads to the REST
+service exists (project lane, ADR-0026). Then: the tool's allowlist entry, its unit header, its read-back, and the
+replacement of the IG-1 and IG-3 gap tests for that tool (a spec change, not a test changed to pass). Its own plan
+amendment lists files and budget.
 
 ## 3. Dependencies
 

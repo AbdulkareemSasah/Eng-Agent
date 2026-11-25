@@ -553,7 +553,7 @@ versioned with the package; a new Sasaah build is a new allowlist header and new
 
 | Id | Question or gap | Owner | Recommendation |
 |---|---|---|---|
-| Q1 | Route for loads: the file route (native, hidden calculator, tools described as 21.x) is the only one where loads provably reach the calculation; the REST route can only check a project as it is | Owner | Accept the two routes as specified; ask Sasaah (project lane, ADR-0026) for a typed tool that sends loads to the REST service, then serve it on route `rest` (plan T10, blocked) |
+| Q1 | Route for loads: the file route (native, hidden calculator, tools described as 21.x) is the only one where loads provably reach the calculation; the REST route can only check a project as it is | Owner | Accept the two routes as specified; ask Sasaah (project lane, ADR-0026) for a typed tool that sends loads to the REST service, then serve it on route `rest` (the blocked typed-loads task of the plan) |
 | Q2 | One server role (the process holds the project) instead of `main` and `long` | Owner | Accept; the doctor warns about the shared timeout |
 | Q3 | Host status wins; a disagreement with `ratio` against 1.0 is `NEEDS_ENGINEER` | Owner | Accept: never recompute, never relabel |
 | Q4 | `check_value` read as percent | Owner | Accept as `declared`; confirm at L6 |

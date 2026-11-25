@@ -242,27 +242,30 @@ tasks:
     title: "Mutation scope: the section 9 modules in r1_modules"
     # Amendment (B-601, owner decision D-46, 2026-11-20): CI mutates only modules listed in
     # [tool.eng-gate] r1_modules; spec 0008 section 9 names products/_safe_loads.py, _tables.py
-    # and the SAFE reconcile rules (held in adapters/csi/_reconcile.py: the joint_loads / SAFE
-    # profile branch) that are merged but absent from that list. This task adds those paths to
-    # r1_modules, adds a contract guard that the section 9 list is covered by a glob, and
-    # strengthens the existing tests until each module reaches mutation_min (80 %) with real
-    # tests. No exclusions, pragmas or lowered thresholds; no module may be removed from
-    # r1_modules to pass MU001. No source module is listed: the work strengthens tests only.
-    # If a module cannot reach 80 % without a source change, the implementing writer reports
-    # NEEDS_PLAN_AMENDMENT.
+    # and the SAFE reconcile rules that are merged but absent from that list. This task adds
+    # products/_safe_loads.py and csi/_tables.py to r1_modules; adapters/csi/_reconcile.py,
+    # holding the SAFE rules, is added by plan 0002 T24. It adds a contract guard that the
+    # section 9 list is covered by a glob, and strengthens the existing tests until each module
+    # reaches mutation_min (80 %) with real tests. No exclusions, pragmas or lowered
+    # thresholds; no module may be removed from r1_modules to pass MU001. No source module is
+    # listed: the work strengthens tests only. If a module cannot reach 80 % without a source
+    # change, the implementing writer reports NEEDS_PLAN_AMENDMENT.
+    # The writer measures one module at a time: an unpushed scratch commit that adds a comment
+    # line to that module only, then `uv run eng-gate mutation --package eng-harness --base HEAD~1`;
+    # the writer records each module's score in the verification record and drops the commit
+    # (the step prints the score only in MU001; no MU001 means at or above mutation_min).
     files:
       - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/tests/contract/test_mutation_scope.py"  # shared by the five B-601 tasks; this task adds test_spec_0008_section_9_modules_in_r1
       - "packages/eng-harness/tests/workflow/adapters/test_safe_loads.py"  # adapters/csi/products/_safe_loads.py
       - "packages/eng-harness/tests/unit/adapters/test_safe_tables.py"  # adapters/csi/_tables.py
-      - "packages/eng-harness/tests/workflow/adapters/test_safe_reconcile.py"  # SAFE reconcile rules in adapters/csi/_reconcile.py
-    max_changed_lines: 60
+    max_changed_lines: 50
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/contract/test_mutation_scope.py::test_spec_0008_section_9_modules_in_r1"
     covers: []  # section 9 mutation scope is not an AC; this plan's covers style lists ACs only
-    depends_on: [T4, T6]  # T4 _tables.py; T6 _safe_loads.py and the SAFE reconcile rules in csi/_reconcile.py
+    depends_on: [T4, T6]  # T4 _tables.py; T6 _safe_loads.py; external: plan 0002 T24 (csi/_reconcile.py in r1_modules, which the guard asserts)
 ---
 
 # Implementation plan: SAFE through the CSI adapter
@@ -371,6 +374,13 @@ and of `csi_design_run` on SAFE, and decided whether `csi_design_run` and a desi
 the field-map entries (`unknown` to `reference` or `candidate`), the `kind` of the design run, the readers, and the
 gap tests for SG-5 replaced because the accepted behavior changes (a spec change, not a test changed to pass). If the
 local test shows that no allowlisted tool can run the SAFE designer, this task is cancelled and SG-5 stays.
+
+**T10 Mutation scope** (amendment B-601, decision D-46; spec §9). Adds `products/_safe_loads.py` and `csi/_tables.py` to
+`r1_modules`; `adapters/csi/_reconcile.py`, holding the SAFE reconcile rules, is added by plan 0002 T24, which also owns
+its tests. The guard `test_mutation_scope.py::test_spec_0008_section_9_modules_in_r1` holds the spec section 9 paths as
+a literal tuple and asserts that each matches a glob of `r1_modules`, read from `pyproject.toml` through `tomllib` (`**`
+crosses directories, as in the gate). The existing tests are strengthened until each module reaches `mutation_min`,
+measured per module as the task's front-matter comment states.
 
 ## 3. Dependencies
 

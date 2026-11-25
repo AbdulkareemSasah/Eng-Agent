@@ -725,10 +725,17 @@ tasks:
     # absent from that list, so they have never been mutated. This task adds those paths to
     # r1_modules, adds a contract guard that the section 9 list is covered by a glob, and
     # strengthens the existing unit and workflow tests until each module reaches mutation_min
-    # (80 %) with real tests. No exclusions, pragmas or lowered thresholds; no module may be
+    # (80 %) with real tests. adapters/csi/_reconcile.py also holds the SAFE reconcile rules
+    # (spec 0008 section 9) and the add-frame rule (spec 0012 section 9); mutation scores the
+    # whole file, so this task alone adds it and owns its tests, including the SAFE and SAP2000
+    # reconcile test files. No exclusions, pragmas or lowered thresholds; no module may be
     # removed from r1_modules to pass MU001. No source module is listed: the work strengthens
     # tests only. If a module cannot reach 80 % without a source change, the implementing
     # writer reports NEEDS_PLAN_AMENDMENT.
+    # The writer measures one module at a time: an unpushed scratch commit that adds a comment
+    # line to that module only, then `uv run eng-gate mutation --package eng-harness --base HEAD~1`;
+    # the writer records each module's score in the verification record and drops the commit
+    # (the step prints the score only in MU001; no MU001 means at or above mutation_min).
     files:
       - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
       - "packages/eng-harness/CHANGELOG.md"
@@ -736,16 +743,18 @@ tasks:
       - "packages/eng-harness/tests/unit/adapters/test_csi_errors.py"  # adapters/_errors.py and adapters/csi/_errors.py
       - "packages/eng-harness/tests/unit/adapters/test_timeouts.py"  # adapters/_errors.py timeout paths
       - "packages/eng-harness/tests/workflow/adapters/test_reconcile.py"  # adapters/csi/_reconcile.py
+      - "packages/eng-harness/tests/workflow/adapters/test_safe_reconcile.py"  # SAFE reconcile rules in adapters/csi/_reconcile.py (spec 0008 section 9)
+      - "packages/eng-harness/tests/workflow/adapters/test_sap2000_reconcile.py"  # add-frame rule in adapters/csi/_reconcile.py (spec 0012 section 9)
       - "packages/eng-harness/tests/unit/adapters/test_args.py"  # adapters/_args.py
       - "packages/eng-harness/tests/unit/servers/test_buildcheck.py"  # servers/_buildcheck.py
       - "packages/eng-harness/tests/unit/servers/test_hostlock.py"  # servers/_hostlock.py
       - "packages/eng-harness/tests/workflow/servers/test_guard.py"  # servers/_guard.py
-    max_changed_lines: 80
+    max_changed_lines: 110
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/contract/test_mutation_scope.py::test_spec_0002_section_9_modules_in_r1"
     covers: []  # section 9 mutation scope is not an AC; this plan's covers style lists ACs only
-    depends_on: [T6b, T7, T8, T9, T14]  # T6b _buildcheck; T7 _hostlock and _guard; T8 _args; T9 _errors and csi/_errors; T14 _reconcile
+    depends_on: [T6b, T7, T8, T9, T14, T19a]  # T6b _buildcheck; T7 _hostlock and _guard; T8 _args; T9 _errors and csi/_errors; T14 and T19a _reconcile; T15 is not a dependency: it is blocked on ADR-0031, and its own diff to csi/_errors.py is mutated once this task lists the module; external: plan 0008 T6 (SAFE rules) and plan 0012 T4 and T5 (add-frame rule) in csi/_reconcile.py
 ---
 
 # Implementation plan: eng-harness servers and adapters
@@ -1148,6 +1157,14 @@ binder (as `tests/workflow/adapters/test_csi_reopened.py` builds one; the produc
 is T19a's, B-530, which comes after T23), then `locate`, `read_units` and `working_copy` (one
 launch, the copy in the same instance); `test_open_refusals_are_envelopes` checks the three refusals of AC51 return
 failure envelopes; `test_visible_launch` checks the fake's recorded `visible` flag, the run state's and the default.
+
+**T24 Mutation scope** (amendment B-601, decision D-46; spec §9). Adds the seven modules of spec §9 to `r1_modules`,
+among them `adapters/csi/_reconcile.py`, which also holds the SAFE reconcile rules (spec 0008 §9) and the add-frame rule
+(spec 0012 §9), so this task owns that file's tests for all three specs. The guard
+`test_mutation_scope.py::test_spec_0002_section_9_modules_in_r1` holds the spec section 9 paths as a literal tuple and
+asserts that each matches a glob of `r1_modules`, read from `pyproject.toml` through `tomllib` (`**` crosses
+directories, as in the gate). The existing tests are strengthened until each module reaches `mutation_min`, measured per
+module as the task's front-matter comment states.
 
 ## 3. Dependencies
 

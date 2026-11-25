@@ -316,6 +316,10 @@ tasks:
     # r1_modules to pass MU001. No source module is listed: the work strengthens tests only.
     # If a module cannot reach 80 % without a source change, the implementing writer reports
     # NEEDS_PLAN_AMENDMENT.
+    # The writer measures one module at a time: an unpushed scratch commit that adds a comment
+    # line to that module only, then `uv run eng-gate mutation --package eng-harness --base HEAD~1`;
+    # the writer records each module's score in the verification record and drops the commit
+    # (the step prints the score only in MU001; no MU001 means at or above mutation_min).
     files:
       - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
       - "packages/eng-harness/CHANGELOG.md"
@@ -328,7 +332,7 @@ tasks:
     tests_first:
       - "packages/eng-harness/tests/contract/test_mutation_scope.py::test_spec_0011_section_9_modules_in_r1"
     covers: []  # section 9 mutation scope is not an AC; this plan's covers style lists ACs only
-    depends_on: [T5, T8, T10]  # T5 _errors and _units; T8 _edits; T10 (B-239) also edits r1_modules for _reconcile.py
+    depends_on: [T5, T8, T9, T10]  # T5 _errors and _units; T8 and T9 _edits; T10 (B-239) also edits r1_modules for _reconcile.py
 ---
 
 # Implementation plan: the `sasaah-revit-mcp` adapter
@@ -436,6 +440,13 @@ queue deadline (spec §4.2 rule 1).
 
 **T15 Wiring and documents** (AC22, AC29). Port wiring for the Revit adapter, the crash matrix against real fake
 processes, the stale-map test, and the Revit section of `docs/local-testing.md` (spec §12, L1 to L15).
+
+**T16 Mutation scope** (amendment B-601, decision D-46; spec §9). Adds `adapters/revit/_errors.py`, `_edits.py` and
+`_units.py` to `r1_modules` (`_reconcile.py` is T10's; `calcs/frame_element_map.py` is already covered by `calcs/**`).
+The guard `test_mutation_scope.py::test_spec_0011_section_9_modules_in_r1` holds the spec section 9 paths as a literal
+tuple and asserts that each matches a glob of `r1_modules`, read from `pyproject.toml` through `tomllib` (`**` crosses
+directories, as in the gate). The existing tests are strengthened until each module reaches `mutation_min`, measured per
+module as the task's front-matter comment states.
 
 ## 3. Dependencies
 
