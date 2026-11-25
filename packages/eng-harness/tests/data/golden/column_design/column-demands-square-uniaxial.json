@@ -1,8 +1,8 @@
 {
-  "source": "eng-harness spec 0013 section 4.4.2 (rules E3 to E5); synthetic data, no project value",
-  "method_ref": "\u00a74.4.2 E3",
+  "source": "eng-harness spec 0013 section 4.4.2 (rules E3 to E5; amendment B-596 / OQ-Q98); synthetic data, no project value",
+  "method_ref": "§4.4.2 E3",
   "synthetic": true,
-  "derivation": "Square symmetric column C1: section C40 (b = 400 mm, h = 400 mm, length_mm = 3500.0 mm), layout n_bars_b = 4, n_bars_h = 4, A_bar = 314.0 mm2, d_prime = 50.0 mm. Ag_mm2 = 400 * 400 = 160000.0. Bar count = 2*4 + 2*4 - 4 = 12, so Ast_mm2 = 314.0 * 12 = 3768.0. Since b_mm == h_mm and n_bars_b == n_bars_h, axial_flexure_uniaxial items take Mu_kNm = |M3_kNm| and Mu_other_kNm = |M2_kNm|: at station 0.0, P = -800, M2 = 0, M3 = -60 gives Pu = 800.0, Mu = 60.0, Mu_other = 0.0; at station 3500.0, P = -800, M2 = -15, M3 = 0 gives Pu = 800.0, Mu = 0.0, Mu_other = 15.0.",
+  "derivation": "Square symmetric column C1: section C40 (b = 400 mm, h = 400 mm, length_mm = 3500.0 mm), layout n_bars_b = 4, n_bars_h = 4, A_bar = 314.0 mm2, d_prime = 50.0 mm. Ag_mm2 = 400 * 400 = 160000.0. Bar count = 2*4 + 2*4 - 4 = 12, so Ast_mm2 = 314.0 * 12 = 3768.0. Since b_mm == h_mm and n_bars_b == n_bars_h, axial_flexure_uniaxial items use Mu = |M3| and Mu_other = |M2|, except the M2-only case (|M3|=0 and |M2|!=0 => Mu = |M2|, Mu_other = 0; amendment B-596 / OQ-Q98): at station 0.0, P = -800, M2 = 0, M3 = -60 gives Pu = 800.0, Mu = 60.0, Mu_other = 0.0; at station 3500.0, P = -800, M2 = -15, M3 = 0 gives Pu = 800.0, Mu = 15.0, Mu_other = 0.0.",
   "input": {
     "selection": {
       "calc": {
@@ -254,8 +254,8 @@
           },
           "inputs": {
             "Pu_kN": 800.0,
-            "Mu_kNm": 0.0,
-            "Mu_other_kNm": 15.0,
+            "Mu_kNm": 15.0,
+            "Mu_other_kNm": 0.0,
             "b_mm": 400.0,
             "h_mm": 400.0,
             "d_prime_mm": 50.0,
@@ -394,7 +394,7 @@
         "uses": [
           "layouts"
         ],
-        "formula": "tied (spirals NOT_IMPLEMENTED, spec 0013 \u00a76)"
+        "formula": "tied (spirals NOT_IMPLEMENTED, spec 0013 §6)"
       },
       "col_0_row_0_Pu_kN": {
         "value": 800.0,
@@ -433,22 +433,22 @@
         "formula": "-P_kN (host_local/1: host axial tension positive; check axial compression positive)"
       },
       "col_0_row_1_Mu_kNm": {
-        "value": 0.0,
-        "unit": "kN.m",
-        "source": "spec 0013 4.4.2 E3",
-        "uses": [
-          "forces"
-        ],
-        "formula": "|M3_kNm|"
-      },
-      "col_0_row_1_Mu_other_kNm": {
         "value": 15.0,
         "unit": "kN.m",
         "source": "spec 0013 4.4.2 E3",
         "uses": [
           "forces"
         ],
-        "formula": "|M2_kNm|"
+        "formula": "|M2_kNm| when |M3_kNm|=0 and |M2_kNm|!=0 (amendment B-596 / OQ-Q98)"
+      },
+      "col_0_row_1_Mu_other_kNm": {
+        "value": 0.0,
+        "unit": "kN.m",
+        "source": "spec 0013 4.4.2 E3",
+        "uses": [
+          "forces"
+        ],
+        "formula": "0 when |M3_kNm|=0 and |M2_kNm|!=0 (amendment B-596 / OQ-Q98)"
       }
     }
   }
