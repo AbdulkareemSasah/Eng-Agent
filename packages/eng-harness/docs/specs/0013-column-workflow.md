@@ -82,12 +82,14 @@ values are synthetic and say so.
   `issues` equal the expected ones. Test: `tests/golden/column_design/test_golden.py::test_case[column-select-*]`.
 - AC5. Given any permutation of the frames, sections or scope lists, when `harness.column_select` runs, then the output
   and its content hash are equal. Test: `tests/property/test_column_select.py::test_permutation_invariant`.
-- AC6. Given the golden cases of §4.4.2 (compression and tension rows, one moment zero, both moments non-zero, a square
-  section, a layout missing, a circular and an `other` section, the bar area copied from the layout answer as a literal
-  `A_bar_mm2` (`column-demands-layout-bar-area`; never a basis reference), a square section with
-  `n_bars_b ≠ n_bars_h`, the one-per-column `longitudinal_reinforcement_limits` item with `Ag_mm2` and `case: null`), when
-  `harness.column_demands` runs, then the items per check, their converted values and units, `not_checked` and the
-  trace equal the expected ones. Test: `tests/golden/column_design/test_golden.py::test_case[column-demands-*]`.
+- AC6. Given the golden cases of §4.4.2 (compression and tension rows, one moment zero on a symmetric section (an
+  M2-only row puts the sole nonzero magnitude in `Mu`, `Mu_other` = 0; amendment B-596, OQ-Q98), both moments
+  non-zero (`Mu = |M3|`, `Mu_other = |M2|`), a square section, a layout missing, a circular and an `other`
+  section, the bar area copied from the layout answer as a literal `A_bar_mm2` (`column-demands-layout-bar-area`; never
+  a basis reference), a square section with `n_bars_b ≠ n_bars_h`, the one-per-column
+  `longitudinal_reinforcement_limits` item with `Ag_mm2` and `case: null`), when `harness.column_demands` runs, then the
+  items per check, their converted values and units, `not_checked` and the trace equal the expected ones. Test:
+  `tests/golden/column_design/test_golden.py::test_case[column-demands-*]`.
 - AC7. Given forces whose `sign_convention` is not `host_local/1` (enforced by the `forces.member_end/1` kind at input
   validation), or a basis without a confirmed field of §4.7 A it reads, when `harness.column_demands` runs, then
   `ContractError` `INVALID_ARGUMENT` (for the basis check, `field` is that basis path, `basis.fields.<path>`) and
@@ -286,13 +288,15 @@ scope answer), `basis` (`materials.concrete_fc_MPa`, `materials.rebar_fy_MPa`,
 - E2 rows: every row of a selected column whose `case` is a selected combination, sorted by member, case, station.
   A selected column without a row for a selected combination is `not_checked` `FORCES_MISSING`.
 - E3 `Pu_kN = −P_kN`: `host_local/1` reports axial tension positive (contract G-3, CSI convention; a C item for the
-  owner and local test 3, §12). `Mu_kNm` and `Mu_other_kNm` are the magnitudes of the moments about the axes parallel
-  to `b` and to `h`. Which of `M2`, `M3` that is depends on how the adapter maps `b_mm` and `h_mm` to the local axes,
-  which no spec states (CW-G9): only for a section that is symmetric by geometry and layout (`b_mm == h_mm` and
-  `n_bars_b == n_bars_h`) does the axial-flexure item take `Mu = |M3|`, `Mu_other = |M2|` (the labels are then
-  interchangeable); for any other rectangular section, a square one with unequal bar counts included, no axial-flexure
-  item is built (`not_checked` `AXES_UNDECLARED`) until spec 0002 declares the mapping. Both moments non-zero give an item that the check answers
-  `NEEDS_ENGINEER` (AF G-1).
+  owner and local test 3, §12). `Mu_kNm` and `Mu_other_kNm` are magnitudes of the moments about the axes parallel to
+  `b` and to `h`. Which of `M2`, `M3` that is depends on how the adapter maps `b_mm` and `h_mm` to the local axes,
+  which no spec states (CW-G9). Only for a section that is symmetric by geometry and layout (`b_mm == h_mm` and
+  `n_bars_b == n_bars_h`) is an axial-flexure item built. For that section `Mu = |M3|` and `Mu_other = |M2|` (the
+  labels are then interchangeable), except that when `|M3|` is 0 and `|M2|` is non-zero, `Mu = |M2|` and
+  `Mu_other` is 0 (amendment B-596; owner answer OQ-Q98, 2026-11-20); both moments non-zero keep `Mu = |M3|`,
+  `Mu_other = |M2|` and give an item that the check answers `NEEDS_ENGINEER` (AF G-1). For any other rectangular
+  section, a square one with unequal bar counts included, no axial-flexure item is built (`not_checked`
+  `AXES_UNDECLARED`) until spec 0002 declares the mapping.
 - E4 `lu_mm = length_mm`: the distance between the frame's end joints, not less than the clear height of 6.2.3, so the
   slenderness applicability limit is tested on the safe side (C item, CW-G11). `k_factor` from the basis.
 - E5 section: `b_mm`, `h_mm` from `model.sections/1`; `Ag_mm2 = b_mm·h_mm` (rectangular, a geometry identity);
@@ -550,7 +554,7 @@ Errors of the engine, adapters, calcs and code pack pass through unchanged.
 
 | Risk | Class | Mitigation |
 |---|---|---|
-| A wrong demand reaches a check (sign, axis, station) | R1 | E1 refusal, E3 symmetric-section-only axis rule, golden cases, C items, local test 3 |
+| A wrong demand reaches a check (sign, axis, station) | R1 | E1 refusal, E3 M2-only exception on a symmetric section (B-596 / OQ-Q98), golden cases, C items, local test 3 |
 | A draft check is mistaken for an approved one | R1 | Trial run class, `draft: true`, DRAFT SOURCES mark, production refusal (AC13) |
 | A section change hits a frame the engineer edited | R1 | EC difference report, K6 warning, approval binding (AC20) |
 | Revit gets a size from a stale ETABS state | R1 | Fingerprint gate (AC24), references and `REF_STALE` (§4.10) |
