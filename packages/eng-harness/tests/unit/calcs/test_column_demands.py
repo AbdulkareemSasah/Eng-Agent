@@ -425,6 +425,51 @@ def test_m2_only_symmetric_puts_sole_moment_in_mu() -> None:
     assert out["not_checked"] == []
 
 
+@pytest.mark.parametrize(
+    ("m2", "m3", "mu", "mu_other", "mu_formula", "mu_other_formula"),
+    [
+        # Hand derivation, spec 0013 §4.4.2 E3 as amended by B-596: the M2-only exception needs |M3|=0 AND |M2|!=0.
+        (-15.0, 0.0, 15.0, 0.0, "|M2_kNm| when", "0 when"),
+        (0.0, 0.0, 0.0, 0.0, "|M3_kNm|", "|M2_kNm|"),
+        (0.0, -20.0, 20.0, 0.0, "|M3_kNm|", "|M2_kNm|"),
+        (-15.0, -20.0, 20.0, 15.0, "|M3_kNm|", "|M2_kNm|"),
+    ],
+)
+def test_e3_trace_formulas_symmetric(
+    m2: float, m3: float, mu: float, mu_other: float, mu_formula: str, mu_other_formula: str
+) -> None:
+    """E3 (B-596, OQ-Q98): the trace formula follows the branch; M2 = M3 = 0 keeps the default |M3| / |M2| map."""
+    data = _base_inputs()
+    data["selection"]["columns"] = [data["selection"]["columns"][0]]
+    data["forces"]["rows"] = [
+        {
+            "member": "C1",
+            "case": {"case": "ULS1", "case_type": "load_combination", "step": None},
+            "end": "j",
+            "station_mm": 3000.0,
+            "P_kN": -800.0,
+            "V2_kN": 0.0,
+            "V3_kN": 0.0,
+            "T_kNm": 0.0,
+            "M2_kNm": m2,
+            "M3_kNm": m3,
+        }
+    ]
+    data["sections"]["frame_sections"] = [data["sections"]["frame_sections"][0]]
+    data["layouts"]["sections"] = [data["layouts"]["sections"][0]]
+    trace = TraceBuilder()
+    out = column_demands(DemandsInput.model_validate(data), _meta(), trace).model_dump(mode="json")
+    inputs = out["items"][AXIAL_FLEXURE_ID][0]["inputs"]
+    assert (inputs["Mu_kNm"], inputs["Mu_other_kNm"]) == (mu, mu_other)
+    steps = {s.name: s for s in trace.build(REGISTRY[CALC_ID], _DIGEST).steps}
+    mu_step = next(s for name, s in steps.items() if name.endswith("_row_0_Mu_kNm"))
+    other_step = next(s for name, s in steps.items() if name.endswith("_row_0_Mu_other_kNm"))
+    assert mu_step.formula.startswith(mu_formula)
+    assert other_step.formula.startswith(mu_other_formula)
+    if mu_formula == "|M3_kNm|":
+        assert (mu_step.formula, other_step.formula) == ("|M3_kNm|", "|M2_kNm|")
+
+
 def test_items_validate_against_checks(tmp_path: Path) -> None:
     """Plan 0013 T3: every emitted item validates against its aci318_14 CheckInputs model under require_refs=True."""
     port, store, args, basis_id = _setup_port(tmp_path, _base_inputs())

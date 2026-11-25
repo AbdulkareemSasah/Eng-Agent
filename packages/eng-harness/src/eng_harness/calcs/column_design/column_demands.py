@@ -450,10 +450,11 @@ def column_demands(inp: DemandsInput, meta: InputMeta, trace: TraceBuilder) -> D
                 abs_m3 = abs(Fraction(row.M3_kNm))
                 # Spec 0013 section 4.4.2 E3 (amendment B-596 / OQ-Q98): default Mu=|M3|, Mu_other=|M2|;
                 # when |M3|=0 and |M2|!=0 the sole nonzero magnitude goes in Mu (Mu_other=0).
-                m2_only = abs_m3 == 0 and abs_m2 != 0
+                # No bare literal (gate FB005): `not abs_m3` is |M3|=0; Mu_other takes |M3|, which is 0 here.
+                m2_only = not abs_m3 and bool(abs_m2)
                 if m2_only:
                     mu_knm = float(abs_m2)
-                    mu_other_knm = 0.0
+                    mu_other_knm = float(abs_m3)
                     mu_formula = "|M2_kNm| when |M3_kNm|=0 and |M2_kNm|!=0 (amendment B-596 / OQ-Q98)"
                     mu_other_formula = "0 when |M3_kNm|=0 and |M2_kNm|!=0 (amendment B-596 / OQ-Q98)"
                 else:
