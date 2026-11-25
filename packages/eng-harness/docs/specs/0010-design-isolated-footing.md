@@ -367,7 +367,7 @@ Input: `dims`, `actions` (per footing: `enlarge_plan`, `increase_depth`, `reduce
 top-level references per call (the CalcPort resolves top-level references only, calcs §4.7), taken by the footings
 of that call whose action is `engineer_set`; the block (plan T8, run by the workflow of plan T9) therefore calls the
 resize once per engineer answer (§4.6 step 7), and once for the footings with the other actions, each call on a record
-of the open footings only (§4.6, amendment B-597). The bounds of R4 are
+of only the open footings of that call (§4.6, amendment B-597). The bounds of R4 are
 `min_plan_dimension_mm` to `max_plan_dimension_mm` for `L`, `min_depth_mm` to `max_depth_mm` for `h` and
 `min_spacing_mm` to `max_spacing_mm` for `s` (amendment B-567, OQ-Q64: the three lower or upper bounds
 `min_plan_dimension_mm`, `min_depth_mm` and `max_spacing_mm` join the six fields listed before). Footings stay square (FG-1): `Lx = Ly = L` in every output. R1 `enlarge_plan`: `L' = (⌊L/i⌋ + 1)·i`, the smallest multiple of
@@ -438,18 +438,19 @@ the footing's last result, below), `decisions`, `verdict_sets`, `rounds`.
    6. `ask_engineer`: `ctx.ask(FootingDimensions, title=...)` per such footing (`L` the square plan size, `h`, `s`,
       with units; no separate `Lx` and `Ly`, Q17);
       `combine_with_neighbor`: closes `COMBINE_REQUESTED`.
-   7. `dims = ctx.calc("harness.footing_resize", ...)` on the open footings' record of `dims`, with an action for
-      each of its footings; `LIMIT_REACHED` closes.
+   7. `dims = ctx.calc("harness.footing_resize", ...)` once per engineer answer and once for the other actions
+      (§4.4.4), each call on a record of only the open footings that call acts on, with an action for each of them;
+      `LIMIT_REACHED` closes.
 
 Open footings only (amendment B-597; owner answer of 2026-11-20, OQ-Q93, option (b)): the block passes the open
 footings only. Each round, the layout and the resize read a `harness.footing_dims/1`, and the check batches and the
-status a `harness.footing_design/1`, that hold only the footings still open, their rows copied unchanged from the last
-record of that kind; a footing that closes at any step leaves every later record and is never laid out, checked,
-judged or resized again (so the numbers of a `WIDTH_TOO_SMALL` row never reach a check, §4.4.3 L1). A closed footing
-keeps its last result aside: its closure holds its status, its reason and the references of the last records that
-hold its row (`harness.footing_dims/1`, and `harness.footing_design/1` and `harness.footing_status/1` when it reached
-them). No merged calc changes: the calcs of §4.4 keep their versions, inputs and rules (Q22). How block code stores an
-open footings' record is Q23.
+status a `harness.footing_design/1`, that hold only the footings still open, each row copied unchanged from the last
+record of that kind that holds it; a footing that closes at any step leaves every later record and is never laid out,
+checked, judged or resized again (so the numbers of a `WIDTH_TOO_SMALL` row never reach a check, §4.4.3 L1). A closed
+footing keeps its last result aside: its closure holds its status, its reason and the references of the last records
+that hold its row (`harness.footing_dims/1`, and `harness.footing_design/1` and `harness.footing_status/1` when it
+reached them). No merged calc changes: the calcs of §4.4 keep their versions, inputs and rules (Q22). How block code
+stores an open footings' record is Q23.
 
 The `for` over footings builds argument lists only; every engineering value is a calc output or a reference.
 
