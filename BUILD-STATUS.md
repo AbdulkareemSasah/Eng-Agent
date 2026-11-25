@@ -663,6 +663,10 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 Approvals and answers only the owner can give. Each item has the lead's recommendation; the build took the safest
 option and continued.
 
+New on 2026-11-25 (second pause): spec 0010 Q23 (how block code stores an open-footings record: a copy calc or an
+engine call; blocks B-399) and Q24 (footing_schedule and footings closed in an earlier round; affects T9, B-599). Details
+in [docs/build/resume/PAUSE-2026-11-25b.md](docs/build/resume/PAUSE-2026-11-25b.md) section 3.
+
 ### 6.1 Approvals
 
 | Id | Item | Recommendation |

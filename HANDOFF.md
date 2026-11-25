@@ -1,5 +1,7 @@
 # HANDOFF: resume point of the v1 build
 
+> **Current resume point (2026-11-25, second pause): [docs/build/resume/PAUSE-2026-11-25b.md](docs/build/resume/PAUSE-2026-11-25b.md).** Earlier:
+
 > **Current resume point (2026-11-25): [docs/build/resume/PAUSE-2026-11-25.md](docs/build/resume/PAUSE-2026-11-25.md).** The owner moved the writing to a cloud session; that file holds the state (306 of 360 plan tasks merged), every branch in flight with its head and next step, and the resume prompt. It supersedes the pause notes below.
 
 > **Current owner pause (2026-11-18).** Start at the [authoritative build handoff](docs/build/HANDOFF.md) and the [next-agent resume checklist](docs/build/resume/PAUSE-2026-11-18.md). The notes below are historical.
