@@ -28,7 +28,7 @@ from eng_contract.envelope import (
     SuccessEnvelope,
     make_success,
 )
-from eng_contract.errors import ContractError, ErrorCode
+from eng_contract.errors import ContractError, ErrorCode, Precondition
 from eng_contract.ids import Clock
 from eng_contract.kinds.verdicts import VerdictSet
 from eng_contract.store import ResultStore
@@ -54,7 +54,6 @@ __all__ = [
 ]
 
 _ADAPTER = "sasaah-idea-mcp"
-_RATIO_LIMIT = 1.0  # contract default (spec 0014 section 4.5); same value as _verdicts (not exported; T8 file list)
 _REST_CODE_ASSUMPTION = "design code declared in the design basis, not read from the host"
 _REST_LOADS_ASSUMPTION = "loads as stored in the opened file"
 
@@ -100,7 +99,6 @@ def _error_verdict(*, connection_name: str, design_code: str, route: str, errors
         demand=None,
         capacity=None,
         ratio=None,
-        ratio_limit=_RATIO_LIMIT,
         status=VerdictStatus.ERROR,
         governing=False,
         trace_ref=None,
@@ -431,11 +429,28 @@ async def _process_success(
 
 
 def _file_source(path: Path | str) -> FileSource:
-    """Native-route file input for provenance (spec 0002 §4.5.3 `files`; base name only)."""
+    """Native-route file input for provenance (spec 0002 §4.5.3 `files`; base name only).
+
+    A missing or unreadable file is refused before any host call; hash and size come from the bytes read.
+    """
     resolved = Path(path)
-    digest = hashlib.sha256(resolved.read_bytes() if resolved.is_file() else b"").hexdigest()
-    size = resolved.stat().st_size if resolved.is_file() else 0
-    return FileSource(name=resolved.name, sha256=digest, size_bytes=size)
+    if not resolved.is_file():
+        raise ContractError(
+            ErrorCode.PRECONDITION_FAILED,
+            f"native model file {resolved.name!r} does not exist",
+            field="path",
+            precondition=Precondition.model_open,
+        )
+    try:
+        data = resolved.read_bytes()
+    except OSError as error:
+        raise ContractError(
+            ErrorCode.PRECONDITION_FAILED,
+            f"native model file {resolved.name!r} cannot be read",
+            field="path",
+            precondition=Precondition.model_open,
+        ) from error
+    return FileSource(name=resolved.name, sha256=hashlib.sha256(data).hexdigest(), size_bytes=len(data))
 
 
 async def calculate_native(

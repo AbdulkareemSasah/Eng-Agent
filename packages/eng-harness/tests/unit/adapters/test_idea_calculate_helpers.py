@@ -907,13 +907,15 @@ def test_calculate_native_success_tool_args_effect_and_route(monkeypatch: pytest
         return sentinel
 
     monkeypatch.setattr(m, "_process_success", _fake_process)
+    work = Path(tmp_path) / "model.ideaCon"
+    work.write_bytes(b"native-model")
 
     async def body() -> None:
         out: Any = await m.calculate_native(
             sessions=_Sessions(),
             server="idea",
             role="main",
-            path=Path("model.ideaCon"),
+            path=work,
             connection_id="CON1",
             design_code=_DESIGN_CODE,
             load_map_confirmed=True,
@@ -931,7 +933,7 @@ def test_calculate_native_success_tool_args_effect_and_route(monkeypatch: pytest
     assert tool == "idea_native_calculate"
     assert effect is CallEffect.READ
     assert args["save"] is False
-    assert args["path"] == "model.ideaCon"
+    assert args["path"] == str(work)
     assert args["connection_id"] == "CON1"
     assert "out_path" not in args
     assert len(process_kwargs) == 1
@@ -959,6 +961,8 @@ def test_calculate_native_error_raises_host(monkeypatch: pytest.MonkeyPatch, tmp
         )
 
     monkeypatch.setattr(m, "_raise_host", _fake_raise)
+    work = Path(tmp_path) / "model.ideaCon"
+    work.write_bytes(b"native-model")
 
     async def body() -> None:
         with pytest.raises(ContractError) as raised:
@@ -966,7 +970,7 @@ def test_calculate_native_error_raises_host(monkeypatch: pytest.MonkeyPatch, tmp
                 sessions=_Sessions(),
                 server="idea",
                 role="main",
-                path=Path("model.ideaCon"),
+                path=work,
                 connection_id=None,
                 design_code=_DESIGN_CODE,
                 load_map_confirmed=False,
@@ -1325,3 +1329,30 @@ def test_calculate_rest_passes_op_id_on_timeout(monkeypatch: pytest.MonkeyPatch,
 
     anyio.run(body)
     assert raise_kwargs[0]["op_id"] == "op_from_caller"
+
+
+@pytest.mark.parametrize("route", ["native", "rest"])
+@pytest.mark.parametrize("extras", [(), ("host text",)])
+def test_assumptions_match_verdicts_module(route: str, extras: tuple[str, ...]) -> None:
+    """The REST assumption strings duplicated from `_verdicts` must stay identical (spec 0014 AC12, AC15)."""
+    from eng_harness.adapters.idea import _verdicts
+
+    assert m._assumptions(route=route, extras=extras) == _verdicts._assumptions(route=route, extras=extras)
+
+
+def test_file_source_read_error_is_contract_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+    """0002 §4.5.3: an unreadable native file is refused as ContractError on `path`, never a bare OSError."""
+    from pathlib import Path
+
+    work = tmp_path / "locked.ideaCon"
+    work.write_bytes(b"locked")
+
+    def _deny(self: Path) -> bytes:
+        raise PermissionError("denied")
+
+    monkeypatch.setattr(Path, "read_bytes", _deny)
+    with pytest.raises(ContractError) as raised:
+        m._file_source(work)
+    assert raised.value.detail.code is ErrorCode.PRECONDITION_FAILED
+    assert raised.value.detail.field == "path"
+    assert str(tmp_path) not in raised.value.detail.message

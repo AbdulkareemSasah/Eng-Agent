@@ -797,3 +797,109 @@ def test_stored_verdict_set_stale_after_revision_bump(tmp_path: Path) -> None:
             current_revision,
         )
     assert raised.value.detail.code is ErrorCode.REF_STALE
+
+
+def _native_ok_body() -> dict[str, Any]:
+    """Minimal live native check reply (spec 0014 §4.5 raw kind); values are test labels only."""
+    return {
+        "route": "native",
+        "backend": None,
+        "offline_stub": False,
+        "connections": [
+            {
+                "connection_id": 1,
+                "name": "CON1",
+                "passed": True,
+                "calculated": True,
+                "checks": [
+                    {
+                        "name": "Plates",
+                        "check_value": 50.0,
+                        "check_status": True,
+                        "skipped": False,
+                        "message": "OK",
+                        "load_case_id": "LC1",
+                    }
+                ],
+                "errors": [],
+                "warnings": [],
+            }
+        ],
+    }
+
+
+class _RecordingSessions:
+    """Fake session manager: records every host call and answers with one fixed reply."""
+
+    def __init__(self, reply: dict[str, Any]) -> None:
+        self.reply = reply
+        self.calls: list[str] = []
+
+    async def call(self, server: str, role: str, tool: str, args: dict[str, Any], effect: CallEffect) -> Any:
+        from mcp.types import CallToolResult, TextContent
+
+        self.calls.append(tool)
+        return CallToolResult(content=[TextContent(type="text", text=json.dumps(self.reply))], is_error=False)
+
+
+def test_native_missing_path_refused_before_host_call(tmp_path: Path) -> None:
+    """0002 §4.5.3: a missing native file is PRECONDITION_FAILED on `path`; no host call, no invented hash."""
+    from eng_harness.adapters.idea import _calculate as calculate
+
+    sessions = _RecordingSessions(_native_ok_body())
+    store = _TrackingStore(_store(tmp_path))
+
+    async def body() -> None:
+        with pytest.raises(ContractError) as raised:
+            await calculate.calculate_native(
+                sessions=sessions,
+                server="idea",
+                role="main",
+                path=tmp_path / "missing.ideaCon",
+                connection_id=None,
+                design_code=_DESIGN_CODE,
+                load_map_confirmed=False,
+                store=store.as_store(),
+                ids=SeededIdSource(b"idea-calc-missing", FixedClock(_START)),
+                provenance=_provenance(),
+            )
+        assert raised.value.detail.code is ErrorCode.PRECONDITION_FAILED
+        assert raised.value.detail.field == "path"
+        assert str(tmp_path) not in raised.value.detail.message
+
+    anyio.run(body)
+    assert sessions.calls == []
+    assert _kinds_put(store) == []
+
+
+def test_native_file_provenance_hash_and_size(tmp_path: Path) -> None:
+    """0002 §4.5.3: provenance `files` carries the real sha256 and byte size of the native input file."""
+    from eng_harness.adapters.idea import _calculate as calculate
+
+    work = tmp_path / "joint.ideaCon"
+    content = b"idea-native-provenance-bytes"
+    work.write_bytes(content)
+    sessions = _RecordingSessions(_native_ok_body())
+
+    async def body() -> None:
+        result = await calculate.calculate_native(
+            sessions=sessions,
+            server="idea",
+            role="main",
+            path=work,
+            connection_id=None,
+            design_code=_DESIGN_CODE,
+            load_map_confirmed=False,
+            store=_store(tmp_path),
+            ids=SeededIdSource(b"idea-calc-files", FixedClock(_START)),
+            provenance=_provenance(),
+        )
+        for envelope in (result.raw_envelope, result.verdict_envelope):
+            files = envelope.provenance.files
+            assert len(files) == 1
+            assert files[0].name == work.name
+            assert files[0].sha256 == hashlib.sha256(content).hexdigest()
+            assert files[0].size_bytes == len(content)
+
+    anyio.run(body)
+    assert sessions.calls == ["idea_native_calculate"]
