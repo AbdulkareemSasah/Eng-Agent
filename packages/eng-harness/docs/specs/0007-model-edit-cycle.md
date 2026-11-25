@@ -50,6 +50,13 @@ blocks read `ctx.read` results through `ReadResult.data` and `ctx.ask` answers t
 §4.3.2, plan T8b); and the first `ctx.basis` read from a block loads the stored basis as engine work (engine §4.3.4
 rule 1, engine plan 0001 T24), so the edit-cycle tests run over the production `StoreBasisPort` (plan T8).
 
+**Amendment B-587 (documents only, AC23 order).** The B-527 writer's AC23 run found that in `approve_each_write` the
+engine inserted the analysis or design `p~pre.approve` preview before the invariant-7 `p~pre.save`, which voided the
+approval. The owner settled the order (owner decision OQ-Q101 of 2026-11-20): after any working-copy swap, the
+invariant-7 save runs, then the pre approval preview, then the write (§4.5 steps 11 and 12, §4.7, AC23; engine §4.6
+invariant 7, AC43), so the engineer approves exactly what will be written. The engine change is plan T9b; no criterion
+is added.
+
 ## 1. Problem
 
 The edit cycle is where the owner's time goes: 342 agent minutes and 500 engineer minutes in one reviewed task, against
@@ -238,8 +245,9 @@ defines its method; values are synthetic and say so.
   the outputs, one item `exc_<n>` per exception in the order of spec 0006 §4.4.6, the sign-off screen shows a reason
   field for each, and the run is signed with a reason per exception or rejected (§4.5 step 17; amendment B-544). Test:
   `tests/workflow/edit_cycle/test_promotion.py::test_sign_off_exception_items`.
-- AC23. Given the same scripted cycle in each permission mode, then the approvals journaled match the table of §4.7.
-  Test: `tests/workflow/edit_cycle/test_modes.py::test_approvals_per_mode`.
+- AC23. Given the same scripted cycle in each permission mode, then the approvals journaled match the table of §4.7,
+  and each analysis or design preview follows its invariant-7 `p~pre.save` (owner decision OQ-Q101 of 2026-11-20;
+  amendment B-587). Test: `tests/workflow/edit_cycle/test_modes.py::test_approvals_per_mode`.
 - AC24. Given the change-set data request, then it carries `x-eng-input: data`; an answer that fails `ChangeSetDraft`
   is refused and presented again (engine AC61); an answer whose check is `FAIL` is asked again in the next attempt
   with the check result as evidence; exhausting `attempts.change_set` escalates. Test:
@@ -559,7 +567,7 @@ paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever 
 | 8 | If the step 3 status shows `locked` (after plan 0002 T15 only; v1 exit below): `ctx.tool("csi_unlock_model", ..., under=approval, item="unlock")`. Then per accepted item and target: `ctx.tool(<tool>, args, under=approval, item=<id>)`, arguments from `resolved` (references only) | Re-check before the first write and between writes (`ApprovalVoid`); invariant 2 (references for engineering parameters); always-ask list; `approve_each_write` previews |
 | 9 | `ctx.tool("csi_read_model_state", ...)` (S'), `ctx.calc("harness.readback_check", {"effects": <the step 6 expected effects>, "before_frames": S[k].frames, "after_frames": S'.frames, ..., "basis"})` (flat fields as in step 4); then D-2 (§4.6) | Invariant 1 inserts `check_model` before the read; read-back independence R0 (spec 0003 §4.8) |
 | 10 | `ctx.tool("csi_save_model", {"model": m})` | `model_saved` |
-| 11 | `ctx.tool("csi_run_analysis", {"model": m})` | Invariant 7 save first; long role and timeout (spec 0002 AC28); invariant 6 on a timeout: `engine.in_flight`, outcome unknown in v1 (spec 0002 Q4, H-G7); invariant 9 units after a timeout |
+| 11 | `ctx.tool("csi_run_analysis", {"model": m})` | Invariant 7 save first (after any working-copy swap, before the `p~pre.approve` preview; owner decision OQ-Q101 of 2026-11-20); long role and timeout (spec 0002 AC28); invariant 6 on a timeout: `engine.in_flight`, outcome unknown in v1 (spec 0002 Q4, H-G7); invariant 9 units after a timeout |
 | 12 | Per kind in `B.choice("design.run", DesignRun)`: `ctx.tool("csi_design_run", {"model": m, "kind": ...})` | Same as step 11 |
 | 13 | `ctx.parallel(ctx.tool("csi_read_analysis_messages", ...), ctx.tool("csi_results_story_drifts", {"model": m, "cases": [], "combos": <every combination of R[k]'s name lists>}), ctx.tool("csi_design_results", ...), ctx.tool("csi_read_model_state", {"model": m}))` (the last is `F`; amendment B-544; reads of one model in one parallel are allowed, engine §4.3.1) | Invariant 1; units labels converted by the adapter |
 | 14 | `ctx.calc("harness.analysis_summary", ...)`, then D-3; per kind of `design.run`, steel before concrete: `ctx.calc("harness.host_design_verdicts", {"results", "kind", "basis"})`, then `ctx.calc("harness.design_summary", {"verdicts": <that kind's>, "frames": F.frames, "previous": <that kind's summary of cycle k-1>, "basis"})` (amendment B-544) | Invariant 3 |
@@ -694,7 +702,7 @@ and no result reference, so a replay could not name it.
 | Step 7 revision save | `under=` step 6 (item `revision`) | `under=` step 6, no per-write preview (Q3) | direct |
 | Step 8 writes | `under=` step 6 | `under=` step 6, plus the engine's `p~pre.approve` preview per write | direct |
 | Unlock (after plan 0002 T15 only, §4.5), combination delete | `under=` step 6, listed as items | same | the engine inserts its always-ask approval (Q5) |
-| Steps 11, 12 | none | engine preview per call (analysis and design are writes) | none |
+| Steps 11, 12 | none | invariant-7 save, then engine preview per call (analysis and design are writes; amendment B-587) | none |
 | Step 15 engineer turn | page | page | page |
 | Steps 16, 17 | page (always ask) | page | page |
 
