@@ -6,8 +6,8 @@ squared-distance tolerance), with optional etabs_link strings as hints only, the
 Inputs: `frames` / `elements` (`model.frame_placements/1`), `structure` (`harness.revit_structure/1`),
 optional `links` (`unique_id` → ETABS frame id string), and `basis` (`compare.length_mm`,
 `mapping.offset_x_mm` / `_y_mm` / `_z_mm`). No input is `stale_ok` (spec 0011 §4.11).
-Units: millimetres; distances compared as exact squared `Fraction`s (M2); display distances are
-`sqrt` of d² in float.
+Units: millimetres; offsets, translated ends and squared distances stay exact `Fraction`s (M1, M2;
+0003 §4.11 P2); display distances are `sqrt` of d² in float. A link whose frame id is not in `frames` is ignored (M4).
 Errors: `ContractError` `INVALID_ARGUMENT` for a basis given without a record, a basis field missing,
 unconfirmed, wrong unit or a non-numeric value; `OUT_OF_RANGE` for a confirmed numeric
 `compare.length_mm` below 0 (spec 0011 §4.11 / 0003 §4.4 inclusive lower bound).
@@ -181,12 +181,13 @@ def _require_offset(basis: DesignBasis, path: str, basis_id: str, trace: TraceBu
     return value
 
 
-def _squared(a: Any, b: Any) -> Fraction:
-    """Exact squared distance between two points in millimetres (M2)."""
-    dx = Fraction(a.x_mm) - Fraction(b.x_mm)
-    dy = Fraction(a.y_mm) - Fraction(b.y_mm)
-    dz = Fraction(a.z_mm) - Fraction(b.z_mm)
-    return dx * dx + dy * dy + dz * dz
+Point = tuple[Fraction, Fraction, Fraction]
+"""An exact (x, y, z) point in millimetres."""
+
+
+def _squared(a: Point, b: Point) -> Fraction:
+    """Exact squared distance between two points in millimetres (M2; 0003 §4.11 P2)."""
+    return sum(((p - q) * (p - q) for p, q in zip(a, b, strict=True)), Fraction())
 
 
 def _display(distance_sq: Fraction) -> float:
@@ -194,24 +195,16 @@ def _display(distance_sq: Fraction) -> float:
     return math.sqrt(float(distance_sq))
 
 
-def _translate(point: Any, ox: Fraction, oy: Fraction, oz: Fraction) -> Any:
-    """M1: translate an ETABS end by the confirmed origin offset into Revit coordinates."""
-    return type(point)(
-        x_mm=float(Fraction(point.x_mm) + ox),
-        y_mm=float(Fraction(point.y_mm) + oy),
-        z_mm=float(Fraction(point.z_mm) + oz),
-    )
+def _elevation_key(point: Point) -> Point:
+    x, y, z = point
+    return z, x, y
 
 
-def _ordered_ends(frame: Frame, ox: Fraction, oy: Fraction, oz: Fraction, *, translate: bool) -> tuple[Any, Any]:
-    """M1: order ends by elevation (then x, then y) into (lower, upper)."""
-    first = _translate(frame.i, ox, oy, oz) if translate else frame.i
-    second = _translate(frame.j, ox, oy, oz) if translate else frame.j
-
-    def elevation_key(point: Any) -> tuple[float, float, float]:
-        return (point.z_mm, point.x_mm, point.y_mm)
-
-    lower, upper = sorted((first, second), key=elevation_key)
+def _ordered_ends(frame: Frame, offset: Point) -> tuple[Point, Point]:
+    """M1: translate both ends exactly by `offset`, then order by elevation (then x, then y) into (lower, upper)."""
+    ox, oy, oz = offset
+    ends = [(Fraction(end.x_mm) + ox, Fraction(end.y_mm) + oy, Fraction(end.z_mm) + oz) for end in (frame.i, frame.j)]
+    lower, upper = sorted(ends, key=_elevation_key)
     return lower, upper
 
 
@@ -220,8 +213,8 @@ def _within(distance_sq: Fraction, tolerance_sq: Fraction) -> bool:
 
 
 def _candidates(
-    left_ends: Mapping[str, tuple[Any, Any]],
-    right_ends: Mapping[str, tuple[Any, Any]],
+    left_ends: Mapping[str, tuple[Point, Point]],
+    right_ends: Mapping[str, tuple[Point, Point]],
     tolerance_sq: Fraction,
 ) -> dict[str, list[str]]:
     """M2: ids on the right whose lower and upper ends are each within the tolerance of the left id."""
@@ -269,8 +262,9 @@ def frame_element_map(inp: FrameElementMapInput, meta: InputMeta, trace: TraceBu
     trace.input("elements", len(inp.elements.frames), ref=elements_ref.result_id)
     trace.input("structure", len(inp.structure.elements), ref=structure_ref.result_id)
 
-    frame_ends = {frame.id: _ordered_ends(frame, ox, oy, oz, translate=True) for frame in inp.frames.frames}
-    element_ends = {frame.id: _ordered_ends(frame, ox, oy, oz, translate=False) for frame in inp.elements.frames}
+    no_offset: Point = (Fraction(), Fraction(), Fraction())
+    frame_ends = {frame.id: _ordered_ends(frame, (ox, oy, oz)) for frame in inp.frames.frames}
+    element_ends = {frame.id: _ordered_ends(frame, no_offset) for frame in inp.elements.frames}
     frame_to_elements = _candidates(frame_ends, element_ends, tolerance_sq)
     element_to_frames = _candidates(element_ends, frame_ends, tolerance_sq)
 
@@ -315,6 +309,8 @@ def frame_element_map(inp: FrameElementMapInput, meta: InputMeta, trace: TraceBu
     conflicts: list[ConflictRow] = []
     conflicted_frames: set[str] = set()
     for unique_id, frame_id in sorted(links.items()):
+        if frame_id not in frame_ends:
+            continue  # M4: only a link naming a frame of `frames` is checked against geometry
         geometric = matched.get(frame_id)
         if geometric != unique_id:
             conflicts.append(ConflictRow(frame_id=frame_id, unique_id=unique_id, geometric_unique_id=geometric))

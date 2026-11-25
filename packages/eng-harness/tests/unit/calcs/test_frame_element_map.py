@@ -171,3 +171,45 @@ def test_basis_fields_required() -> None:
         "the basis must be a record reference",
         "basis",
     )
+
+
+def _placement(fid: str, x: float) -> dict[str, Any]:
+    return {**_frame(fid), "i": _point(x, 0.0, 0.0), "j": _point(x, 0.0, 3000.0)}
+
+
+def test_offset_translation_is_exact() -> None:
+    """§4.11 M1/M2 (0003 P2): translated ends stay exact fractions, so float rounding cannot pull d² onto t².
+
+    In units of 2^-46 mm: 1234.5678 = 86874985688181456, 100.7 = 7086132538690765, 1340.2678 = 94312961947760544,
+    so dx = 94312961947760544 - 93961118226872221 = 351843720888323 > 5 = 351843720888320 and d² > t² = 25.
+    """
+    fields = {
+        **_fields(),
+        "frames": {"frames": [_placement("F1", 1234.5678)]},
+        "elements": {"frames": [_placement("U1", 1340.2678)]},
+        "basis": _basis(offsets=(100.7, 0.0, 0.0)),
+    }
+    out = _run(fields, _refs())
+    assert out["pairs"] == []
+    assert out["unmatched_frames"] == [{"frame_id": "F1"}]
+    assert out["unmatched_elements"] == [{"unique_id": "U1"}]
+
+
+def test_link_to_frame_outside_frames_is_ignored() -> None:
+    """§4.11 M4: only a link naming a frame of `frames` can conflict; a beam link beside selected columns does not."""
+    fields = {**_fields(), "links": {"U1": "F1", "U9": "B7"}}
+    out = _run(fields, _refs())
+    assert out["conflicts"] == []
+    assert [(p["frame_id"], p["unique_id"], p["basis"]) for p in out["pairs"]] == [("F1", "U1", "both")]
+
+
+def test_basis_non_numeric_refused() -> None:
+    """§4.11 / 0003 §4.4: a basis field with a non-numeric value is refused (a wrong unit fails basis validation)."""
+    fields = _fields()
+    refs = _refs()
+    for path in (LENGTH, *OFFSETS):
+        not_number = _basis()
+        not_number["fields"][path] = _field("five")
+        detail = _refusal({**fields, "basis": not_number}, refs).detail
+        assert detail.code == ErrorCode.INVALID_ARGUMENT
+        assert detail.message.startswith(f"basis field {path} must be a number")
