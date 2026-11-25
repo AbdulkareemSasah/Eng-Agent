@@ -1,6 +1,6 @@
 {
  "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits; checkpoint B-487 of 2026-11-14 (build/v1 at beccdb9) renamed B-433, B-138 and B-229 to the split tasks I.T18a, S.T19a and P.T10a, added B-485, B-486, B-488, B-489, B-490 and B-491, and fixed the dependencies on S.T19 and P.T10. Entries of merged work items stay in the file. Checkpoint of 2026-11-16 (build/v1 at 4c4be4d) added B-518 to B-528 and B-534, applied the registry changes of amendments B-510, B-511, B-513 and B-533, and removed merged dependencies. Checkpoint of 2026-11-17 (build/v1 at d5ea640) added B-546 to B-554, set merged_pr on every merged entry, fixed B-138 (risk r1, r2, r3; waits only for S.T23) and removed merged dependencies. Resume update on 2026-11-17 at 2a2171ea: added B-560, corrected B-554 merged_pr #409 and branch_pushed, recorded resumed B-550/B-552 branch states and reviews, and added B-560 as B-551 dependency. Current integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412, B-560/#413 merged; B-550 adds one merged plan task, B-552 adds plan T40; cleared B-138 S.T23, B-551 DOC.B560 and B-553 DOC.B552 dependencies. Integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412 and B-560/#413 merged; fulfilled dependencies S.T23, DOC.B552 and DOC.B560 cleared. Current continuation checkpoint 2026-11-17: registered B-561/DOC.B561 for B-553 RF001 risk amendment; B-553 depended on DOC.B561 until B-561 merged as PR #414. Integrated B-551/#415 and B-553/#416 in the batch; cleared DOC.B561 from B-553 and recorded B-553 risk r2, r3, and cleared B-559 I.T9b after B-518/#378 merged. Owner-approved contract checkpoint 2026-11-17: registered DOC.B562 as the explicit conservative original-open capability and scope prerequisite of B-138; plan progress remains 232/354, registry has 184 entries. Owner pause checkpoint 2026-11-18 at integration head 686578fe: B-556/#417 and B-562/#418 merged; cleared W.T7b and DOC.B562. B-138 WIP pushed at 0a407606 with 3 of 3 sessions used; registered DOC.B563 as its only pending prerequisite. B-202 records both W.T17 and W.T16b. Plan progress 233/354; registry 185 entries. Checkpoint of 2026-11-18 (hand-over 2): merged_pr refreshed, B-564 to B-566 added, B-138 integration-only.",
- "count": 193,
+ "count": 194,
  "tasks": [
   {
    "id": "B-437",
@@ -3862,6 +3862,30 @@
    "merged_pr": null,
    "instructions": [
     "code follow-up of L-B282-1 / OQ-Q98, registered after documents amendment B-596 (#520) added plan 0013 T3b"
+   ]
+  },
+  {
+   "id": "B-601",
+   "task": "DOC.B601",
+   "plan": "packages/eng-harness/docs/plans/0002-servers-and-adapters.md",
+   "planTask": null,
+   "kind": "docs",
+   "title": "Plans 0002, 0008, 0011, 0012, 0014: mutation scope tasks for the spec section 9 modules",
+   "branch": "docs/b601-mutation-scope-plan-tasks",
+   "prTitle": "docs(eng-harness): plan tasks that put the spec section 9 mutation modules in r1_modules (B-601)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "opencode",
+   "reviewer": "opus, high",
+   "verifier_lenses": [
+    "consistency",
+    "fidelity"
+   ],
+   "open_pr": null,
+   "branch_pushed": false,
+   "merged_pr": null,
+   "instructions": [
+    "owner decision D-46 (2026-11-20): code tasks B-602 onward are registered from the merged plan tasks"
    ]
   }
  ]
