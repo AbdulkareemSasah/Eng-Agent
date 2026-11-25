@@ -90,11 +90,13 @@ T14c, whichever merges first. (4) Block code reads a result through the read-onl
 `Answered.answer`, because the attribute `value` is refused, and the block-module rules test also reports the forms
 that reach `value` around that rule (§4.3.2, AC12, AC61, AC19), built by plan 0007 T8b.
 
-**Amendment B-587.** The B-527 writer's AC23 run found that, in `approve_each_write`, the engine inserted the
-`p~pre.approve` preview before the invariant-7 `p~pre.save`, so the save voided the approval (`ApprovalVoid`); the
-owner settled the order (owner decision OQ-Q101 of 2026-11-20): after any working-copy swap, the invariant-7 save
-runs, then the pre approval preview, then the write (§4.6 invariant 7, §4.7 `approve_each_write`, AC43). The engineer
-therefore approves exactly what will be written. It adds no criterion; the engine change is plan 0007 T9b.
+**Amendment B-587.** The B-527 writer's run of spec 0007 AC23 found that, in `approve_each_write`, the engine
+inserted the `p~pre.approve` preview of an analysis or design step before its invariant-7 `p~pre.save`, so the save
+changed the bound model and the write met `ApprovalVoid` (§4.9). The owner settled the order (owner decision OQ-Q101
+of 2026-11-20): after any working-copy swap, the invariant-7 save runs, then the `p~pre.approve` preview, then the
+write (§4.6 invariant 7, §4.7 `approve_each_write`, AC43), so the engineer approves exactly what will be written. It
+amends AC43 and adds no criterion; the engine change is built by plan 0007 T9b, an external amendment of this plan's
+files recorded in plan 0001 section 3.
 
 ## 1. Problem
 
@@ -391,9 +393,9 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
 - AC42. Invariant 6: given `TIMEOUT_UNKNOWN_OUTCOME` or `HOST_WEDGED` from any step on a host, then reconciliation
   runs before any further step on that host, while steps on other hosts continue. Test:
   `tests/workflow/test_honest_outcomes.py::test_reconcile_before_next_step_on_host`.
-- AC43. Invariant 7: given a tool whose action is `analysis` or `design`, then a save step of that model runs after
-  any working-copy swap and before the `p~pre.approve` preview of that step, and its `model_saved` is journaled
-  (owner decision OQ-Q101 of 2026-11-20; amendment B-587). Test:
+- AC43. Invariant 7: given a tool whose action is `analysis` or `design`, then a save step of that model runs before
+  it, after any working-copy swap and before that step's `p~pre.approve` preview where it has one, and its
+  `model_saved` is journaled (owner decision OQ-Q101 of 2026-11-20; amendment B-587). Test:
   `tests/workflow/test_invariants.py::test_save_before_analysis`.
 - AC44. Invariant 8: given a server check that fails (build below the workflow's minimum, or tool-list fingerprint
   mismatch), then the run stops with `RunRefused` (`SERVER_CHECK_FAILED`) before any write, at start and at resume.

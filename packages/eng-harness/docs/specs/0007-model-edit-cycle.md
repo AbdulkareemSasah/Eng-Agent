@@ -51,11 +51,11 @@ blocks read `ctx.read` results through `ReadResult.data` and `ctx.ask` answers t
 rule 1, engine plan 0001 T24), so the edit-cycle tests run over the production `StoreBasisPort` (plan T8).
 
 **Amendment B-587 (documents only, AC23 order).** The B-527 writer's AC23 run found that in `approve_each_write` the
-engine inserted the analysis or design `p~pre.approve` preview before the invariant-7 `p~pre.save`, which voided the
-approval. The owner settled the order (owner decision OQ-Q101 of 2026-11-20): after any working-copy swap, the
-invariant-7 save runs, then the pre approval preview, then the write (§4.5 steps 11 and 12, §4.7, AC23; engine §4.6
-invariant 7, AC43), so the engineer approves exactly what will be written. The engine change is plan T9b; no criterion
-is added.
+engine inserted the analysis or design `p~pre.approve` preview before the invariant-7 `p~pre.save`, so the save
+changed the bound working copy and the write met `ApprovalVoid` (engine §4.9). The owner settled the order (owner
+decision OQ-Q101 of 2026-11-20): after any working-copy swap, the invariant-7 save runs, then the `p~pre.approve`
+preview, then the write (§4.5 steps 11 and 12, §4.7, AC23; engine §4.6 invariant 7, AC43), so the engineer approves
+exactly what will be written. The engine change is plan T9b; AC23 gains the order and no criterion is added.
 
 ## 1. Problem
 
