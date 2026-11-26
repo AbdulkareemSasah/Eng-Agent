@@ -192,7 +192,7 @@ tasks:
   - id: T10
     title: Reconciliation by reading for the Revit write tools
     files:
-      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.revit (amendment B-356)
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.revit (amendment B-356); r1_modules entry for adapters/revit/_reconcile.py (amendment B-601)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/revit/_reconcile.py"
       - "packages/eng-harness/tests/workflow/adapters/test_revit_reconcile.py"
@@ -318,8 +318,12 @@ tasks:
     # NEEDS_PLAN_AMENDMENT.
     # The writer measures one module at a time: an unpushed scratch commit that adds a comment
     # line to that module only, then `uv run eng-gate mutation --package eng-harness --base HEAD~1`;
-    # the writer records each module's score in the verification record and drops the commit
-    # (the step prints the score only in MU001; no MU001 means at or above mutation_min).
+    # the writer records each module's score in the verification record and drops the commit.
+    # The measurement runs on Linux (CI, a Linux cloud session, or WSL); a notice other than
+    # MU003 is not a score, and only a scored run with no MU001 is at or above mutation_min.
+    # The independent reviewer re-runs the per-module measurement on Linux and attaches its
+    # output (killed/total per module) to the pull request under "Review"; the work item does
+    # not merge without it (amendment B-601).
     files:
       - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
       - "packages/eng-harness/CHANGELOG.md"
@@ -445,8 +449,9 @@ processes, the stale-map test, and the Revit section of `docs/local-testing.md` 
 `_units.py` to `r1_modules` (`_reconcile.py` is T10's; `calcs/frame_element_map.py` is already covered by `calcs/**`).
 The guard `test_mutation_scope.py::test_spec_0011_section_9_modules_in_r1` holds the spec section 9 paths as a literal
 tuple and asserts that each matches a glob of `r1_modules`, read from `pyproject.toml` through `tomllib` (`**` crosses
-directories, as in the gate). The existing tests are strengthened until each module reaches `mutation_min`, measured per
-module as the task's front-matter comment states.
+directories, as in the gate). Whichever of the five B-601 tasks lands first creates `test_mutation_scope.py` and its
+shared helper; the others add only their own test function (amendment B-601). The existing tests are strengthened until
+each module reaches `mutation_min`, measured per module as the task's front-matter comment states.
 
 ## 3. Dependencies
 

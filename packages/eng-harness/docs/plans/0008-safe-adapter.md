@@ -252,8 +252,12 @@ tasks:
     # change, the implementing writer reports NEEDS_PLAN_AMENDMENT.
     # The writer measures one module at a time: an unpushed scratch commit that adds a comment
     # line to that module only, then `uv run eng-gate mutation --package eng-harness --base HEAD~1`;
-    # the writer records each module's score in the verification record and drops the commit
-    # (the step prints the score only in MU001; no MU001 means at or above mutation_min).
+    # the writer records each module's score in the verification record and drops the commit.
+    # The measurement runs on Linux (CI, a Linux cloud session, or WSL); a notice other than
+    # MU003 is not a score, and only a scored run with no MU001 is at or above mutation_min.
+    # The independent reviewer re-runs the per-module measurement on Linux and attaches its
+    # output (killed/total per module) to the pull request under "Review"; the work item does
+    # not merge without it (amendment B-601).
     files:
       - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
       - "packages/eng-harness/CHANGELOG.md"
@@ -379,8 +383,9 @@ local test shows that no allowlisted tool can run the SAFE designer, this task i
 `r1_modules`; `adapters/csi/_reconcile.py`, holding the SAFE reconcile rules, is added by plan 0002 T24, which also owns
 its tests. The guard `test_mutation_scope.py::test_spec_0008_section_9_modules_in_r1` holds the spec section 9 paths as
 a literal tuple and asserts that each matches a glob of `r1_modules`, read from `pyproject.toml` through `tomllib` (`**`
-crosses directories, as in the gate). The existing tests are strengthened until each module reaches `mutation_min`,
-measured per module as the task's front-matter comment states.
+crosses directories, as in the gate). Whichever of the five B-601 tasks lands first creates `test_mutation_scope.py`
+and its shared helper; the others add only their own test function (amendment B-601). The existing tests are strengthened
+until each module reaches `mutation_min`, measured per module as the task's front-matter comment states.
 
 ## 3. Dependencies
 

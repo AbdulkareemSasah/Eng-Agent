@@ -188,16 +188,19 @@ tasks:
     # products/_sap2000.py to r1_modules; adapters/csi/_reconcile.py, holding the add-frame
     # rule, is added by plan 0002 T24, which also owns its tests. It adds a contract guard that
     # the section 9 list is covered by a glob. products/_sap2000.py holds constants only (no
-    # function body). The gate's mutation step skips such a file with MU003 (eng-dev-gate spec
-    # AC53a), so it has no score and needs no exclusion. It stays in r1_modules because spec
+    # function body). The gate's mutation step skips such a file with MU003 (eng-dev-gate
+    # amendment B-026), so it has no score and needs no exclusion. It stays in r1_modules because spec
     # 0012 section 9 names it, so MU001 applies once a function body is added. No test is
     # strengthened for it. No exclusions, pragmas or lowered thresholds; no module may be
     # removed from r1_modules to pass MU001. No source module is listed.
     # The writer measures one module at a time: an unpushed scratch commit that adds a comment
     # line to that module only, then `uv run eng-gate mutation --package eng-harness --base HEAD~1`;
-    # the writer records each module's score in the verification record and drops the commit
-    # (the step prints the score only in MU001; no MU001 means at or above mutation_min); for
-    # products/_sap2000.py the record is MU003.
+    # the writer records each module's score in the verification record and drops the commit.
+    # The measurement runs on Linux (CI, a Linux cloud session, or WSL); a notice other than
+    # MU003 is not a score, and only a scored run with no MU001 is at or above mutation_min; for
+    # products/_sap2000.py the record is MU003. The independent reviewer re-runs the per-module
+    # measurement on Linux and attaches its output (killed/total per module) to the pull request
+    # under "Review"; the work item does not merge without it (amendment B-601).
     files:
       - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
       - "packages/eng-harness/CHANGELOG.md"
@@ -269,8 +272,10 @@ created that file, T7 creates it with the SAP2000 part only.
 `adapters/csi/_reconcile.py`, holding the add-frame rule, is added by plan 0002 T24, which also owns its tests. The
 guard `test_mutation_scope.py::test_spec_0012_section_9_modules_in_r1` holds the spec section 9 paths as a literal tuple
 and asserts that each matches a glob of `r1_modules`, read from `pyproject.toml` through `tomllib` (`**` crosses
-directories, as in the gate). `products/_sap2000.py` holds constants only, so the gate's mutation step skips it with
-MU003 and no test is strengthened for it (see the task's front-matter comment).
+directories, as in the gate). Whichever of the five B-601 tasks lands first creates `test_mutation_scope.py` and its
+shared helper; the others add only their own test function (amendment B-601). `products/_sap2000.py` holds constants
+only, so the gate's mutation step skips it with MU003 and no test is strengthened for it (see the task's front-matter
+comment).
 
 **Tables and loads (blocked, not in the front matter; takes the next free id when amended in).** Starts only after the
 owner has run L4 and committed recordings, and decided Q3 and Q5. Then: table entries `unknown` to `reference` or
