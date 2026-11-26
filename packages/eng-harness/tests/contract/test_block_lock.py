@@ -2,9 +2,12 @@
 
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 import eng_harness
 from eng_harness.block import LOCK_PATH, Registry, check_lock, discover, load_lock
@@ -26,6 +29,10 @@ def _load(path: Path, name: str) -> Any:
 
 
 def test_lock_matches_registry() -> None:
+    if "MUTANT_UNDER_TEST" in os.environ:
+        pytest.skip(
+            "mutants change the hashed source, so the lock cannot match the registry (B-527); expires 2026-12-31"
+        )
     assert Path(eng_harness.__file__).parent / "blocks.lock.json" == LOCK_PATH
     registry = discover()
     assert check_lock(registry, load_lock(LOCK_PATH)) == ()
