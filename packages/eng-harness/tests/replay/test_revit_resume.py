@@ -48,8 +48,7 @@ async def _run(
 ) -> tuple[RunStatus, list[str]]:
     workspace = Workspace(root=rig.root / "ws", classification=LocationClass.LOCAL)
     assert request.run_id is not None
-    run_dir = workspace.root / "runs" / request.run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
+    run_dir = workspace.root / "runs" / request.run_id  # created by the engine: a start refuses an existing folder
     ports = build_ports(
         config, workspace, rig.store, run_dir, rig.clock, rig.ids,
         files={"m": rig.original}, lock_dir=rig.root / "locks", launcher=fake.RecordingLauncher(),
@@ -106,8 +105,7 @@ async def _run(
     try:
         async with ports:
             if cut is not None:
-                await ports.host_port.working_copy("m", run_dir / "copies")
-                result = await engine.start(request)
+                result = await engine.start(request)  # the engine takes the working copy inside the run (spec 0001 4.7)
                 raise AssertionError(f"engine stopped before the cut at {cut}: {result}")
             result = await engine.resume(request.run_id)
     except BaseException:
@@ -145,11 +143,11 @@ def test_crash_matrix(tmp_path: Path, fault: str, applied: bool, cut: str, outco
     assert isinstance(header, ev.RunHeader)
     structure = rig.put_structure()
     duplicate: dict[str, Any] = {
-        "model": "m@copy",
+        "model": "m",
         "source_type_id": {"$ref": f"{structure}#/types/0/type_id"},
         "new_type_name": "Replay type",
     }
-    steps = [(_SET, rig.set_args("m@copy", structure, rig.put_sections())), (_DUPLICATE, duplicate)]
+    steps = [(_SET, rig.set_args("m", structure, rig.put_sections())), (_DUPLICATE, duplicate)]
     request = RunRequest(
         workflow="chain", input={}, basis_ref=header.basis_ref, mode=PermissionMode.APPROVE_EACH_WRITE,
         run_class=RunClass.TRIAL, run_id=f"run_{rig.ids.new_ulid()}",
