@@ -1,0 +1,342 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.5 (rules U1 to U10); synthetic data, no project value",
+  "method_ref": "§4.4.5 U6",
+  "synthetic": true,
+  "derivation": "t = compare.length_mm = 5 mm (confirmed, mm). U1: the pairs are (C1, u-k1) with section N30 (rectangular 300 x 300, index 0) and (C2, u-k2) with section N40 (rectangular 400 x 400, index 1); the targets are the section_b and section_h references to rows 0 and 1 respectively. U2: F1 section_b and section_h are both reference, so both pairs proceed. U3: the current type 11 has b_mm and h_mm 600.0, |600 - 300| = 300 > 5 for C1, and the current type 12 has b_mm and h_mm 700.0, |700 - 400| = 300 > 5 for C2, so neither is no_change. U4: for C1, type 11 is 300 outside and type 12 is 400 outside, so no type is within and the new type is named 'N30' after the section with from_unique_id 'u-k1'; for C2, type 11 is |600 - 400| = 200 outside and type 12 is |700 - 400| = 300 outside, so the new type is named 'N40' with from_unique_id 'u-k2'. The two (family, section) groups give two new types, each with its U1 role references; no type of either name is in the family. U5: both targets are square, so there is no orientation row. U6: changed holds frame C1 ({frame_id C1, from_section 'C25', to_section 'N30'}), so the u-k1 assignment carries changed_in_design and the u-k2 assignment carries preexisting; each new type lists the origin of its single pair. U7: expected.elements is [{unique_id u-k1, family F1, type_name 'N30'}, {unique_id u-k2, family F1, type_name 'N40'}] with the new-type identity; expected.types holds both new types with their U1 role references; no expected_instances. U8: all seven referenced records are complete, so complete is true. U9: new_types and expected.types are ordered by (family, ETABS section name) ((F1, N30) before (F1, N40)); assignments and expected.elements are ordered by unique_id (u-k1 before u-k2).",
+  "input": {
+    "map": {
+      "calc": {
+        "id": "harness.frame_element_map",
+        "version": 1,
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.frame_element_map",
+        "calc_version": "1",
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "pairs": [
+        {
+          "frame_id": "C1",
+          "unique_id": "u-k1",
+          "element_id": 101,
+          "type_id": 11,
+          "basis": "geometry",
+          "lower_distance_mm": 0.0,
+          "upper_distance_mm": 0.0
+        },
+        {
+          "frame_id": "C2",
+          "unique_id": "u-k2",
+          "element_id": 102,
+          "type_id": 12,
+          "basis": "geometry",
+          "lower_distance_mm": 0.0,
+          "upper_distance_mm": 0.0
+        }
+      ],
+      "ambiguous": [],
+      "unmatched_frames": [],
+      "unmatched_elements": [],
+      "conflicts": [],
+      "complete": true
+    },
+    "frames": {
+      "frames": [
+        {
+          "id": "C1",
+          "kind": "other",
+          "section": "N30",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "C2",
+          "kind": "other",
+          "section": "N40",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "N30",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 300,
+            "h_mm": 300
+          }
+        },
+        {
+          "name": "N40",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400,
+            "h_mm": 400
+          }
+        }
+      ],
+      "area_sections": []
+    },
+    "revit": {
+      "elements": [
+        {
+          "unique_id": "u-k1",
+          "element_id": 101,
+          "category": "column",
+          "family": "F1",
+          "type_id": 11,
+          "type_name": "Told1",
+          "level_id": 1,
+          "level_name": "L1",
+          "location_kind": "point",
+          "i": null,
+          "j": null,
+          "rotation_deg": 0,
+          "parameters": {}
+        },
+        {
+          "unique_id": "u-k2",
+          "element_id": 102,
+          "category": "column",
+          "family": "F1",
+          "type_id": 12,
+          "type_name": "Told2",
+          "level_id": 1,
+          "level_name": "L1",
+          "location_kind": "point",
+          "i": null,
+          "j": null,
+          "rotation_deg": 0,
+          "parameters": {}
+        }
+      ],
+      "types": [
+        {
+          "type_id": 11,
+          "family": "F1",
+          "name": "Told1",
+          "instance_ids": [
+            101
+          ],
+          "parameters": {
+            "section_b": {
+              "value": 600.0,
+              "unit": "mm"
+            },
+            "section_h": {
+              "value": 600.0,
+              "unit": "mm"
+            }
+          }
+        },
+        {
+          "type_id": 12,
+          "family": "F1",
+          "name": "Told2",
+          "instance_ids": [
+            102
+          ],
+          "parameters": {
+            "section_b": {
+              "value": 700.0,
+              "unit": "mm"
+            },
+            "section_h": {
+              "value": 700.0,
+              "unit": "mm"
+            }
+          }
+        }
+      ]
+    },
+    "role_statuses": {
+      "F1": {
+        "section_b": "reference",
+        "section_h": "reference"
+      }
+    },
+    "revit_placements": {
+      "frames": [
+        {
+          "id": "u-k1",
+          "kind": "column",
+          "section": "F1: Told1",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "u-k2",
+          "kind": "column",
+          "section": "F1: Told2",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "changed": [
+      {
+        "frame_id": "C1",
+        "from_section": "C25",
+        "to_section": "N30"
+      }
+    ],
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.length_mm": {
+          "value": 5,
+          "unit": "mm",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "map": "res_01KRC000000000000000000001",
+    "frames": "res_01KRC000000000000000000002",
+    "sections": "res_01KRC000000000000000000003",
+    "revit": "res_01KRC000000000000000000004",
+    "revit_placements": "res_01KRC000000000000000000005",
+    "changed": "res_01KRC000000000000000000006#/changed",
+    "basis": "res_01KRC000000000000000000007"
+  },
+  "expected": {
+    "new_types": [
+      {
+        "family": "F1",
+        "section": "N30",
+        "name": "N30",
+        "from_unique_id": "u-k1",
+        "origins": [
+          "changed_in_design"
+        ],
+        "roles": {
+          "section_b": "res_01KRC000000000000000000003#/frame_sections/0/shape/b_mm",
+          "section_h": "res_01KRC000000000000000000003#/frame_sections/0/shape/h_mm"
+        }
+      },
+      {
+        "family": "F1",
+        "section": "N40",
+        "name": "N40",
+        "from_unique_id": "u-k2",
+        "origins": [
+          "preexisting"
+        ],
+        "roles": {
+          "section_b": "res_01KRC000000000000000000003#/frame_sections/1/shape/b_mm",
+          "section_h": "res_01KRC000000000000000000003#/frame_sections/1/shape/h_mm"
+        }
+      }
+    ],
+    "assignments": [
+      {
+        "unique_id": "u-k1",
+        "element_id": "101",
+        "from_type_id": "11",
+        "type_id": null,
+        "new_type_name": "N30",
+        "origin": "changed_in_design"
+      },
+      {
+        "unique_id": "u-k2",
+        "element_id": "102",
+        "from_type_id": "12",
+        "type_id": null,
+        "new_type_name": "N40",
+        "origin": "preexisting"
+      }
+    ],
+    "no_change": [],
+    "not_updatable": [],
+    "orientation": [],
+    "expected": {
+      "elements": [
+        {
+          "unique_id": "u-k1",
+          "type_id": null,
+          "family": "F1",
+          "type_name": "N30"
+        },
+        {
+          "unique_id": "u-k2",
+          "type_id": null,
+          "family": "F1",
+          "type_name": "N40"
+        }
+      ],
+      "types": [
+        {
+          "family": "F1",
+          "name": "N30",
+          "roles": {
+            "section_b": "res_01KRC000000000000000000003#/frame_sections/0/shape/b_mm",
+            "section_h": "res_01KRC000000000000000000003#/frame_sections/0/shape/h_mm"
+          }
+        },
+        {
+          "family": "F1",
+          "name": "N40",
+          "roles": {
+            "section_b": "res_01KRC000000000000000000003#/frame_sections/1/shape/b_mm",
+            "section_h": "res_01KRC000000000000000000003#/frame_sections/1/shape/h_mm"
+          }
+        }
+      ]
+    },
+    "complete": true
+  }
+}

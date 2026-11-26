@@ -16,12 +16,12 @@
       "version": 1
     },
     {
-      "content_sha256": "d5a89a25e763b95e0f6003fdb3055856cb943906c3039dc58181fbee329b3be8",
+      "content_sha256": "7a7e4a9fcfd0f8bfb387cbbe2afbb0ac125385b1f24eff157b1337d855858485",
       "id": "harness.column_demands",
       "version": 1
     },
     {
-      "content_sha256": "75c303c229d886042f0210cb1efc10a5ba24b5ee7349624b3c8e26003c7ff3ff",
+      "content_sha256": "5b856b153e281ea66ed84e71add9f41a9d4ab3ce536b3f0002404fa552957b57",
       "id": "harness.column_review",
       "version": 1
     },
@@ -121,7 +121,7 @@
       "version": 1
     },
     {
-      "content_sha256": "fd070ff9ddcc5fa34b9f121b6d41b285b61d46a1bfb97b4d681c0e6857424c71",
+      "content_sha256": "756980b9c8e98425fb07c84bf80bd9182d57cae39cb257ce568028c3863cd205",
       "id": "harness.reactions_to_joint_loads",
       "version": 1
     },
@@ -131,7 +131,12 @@
       "version": 1
     },
     {
-      "content_sha256": "3eec287215bb2bb2bb5c8df6f201ab2507673557f3269cb5de50e12b28e72a3a",
+      "content_sha256": "4fccf0a7af5080ee5cf18106775026f5a6f95880da84212f1c895166d487fbb7",
+      "id": "harness.revit_column_update",
+      "version": 1
+    },
+    {
+      "content_sha256": "05ab7cb50825a3c5352e30802016281555762c63b9402ce5cb0bcb60305d9b11",
       "id": "harness.safe_equilibrium",
       "version": 1
     },
