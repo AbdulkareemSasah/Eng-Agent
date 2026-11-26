@@ -1,6 +1,6 @@
 {
- "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits; checkpoint B-487 of 2026-11-14 (build/v1 at beccdb9) renamed B-433, B-138 and B-229 to the split tasks I.T18a, S.T19a and P.T10a, added B-485, B-486, B-488, B-489, B-490 and B-491, and fixed the dependencies on S.T19 and P.T10. Entries of merged work items stay in the file. Checkpoint of 2026-11-16 (build/v1 at 4c4be4d) added B-518 to B-528 and B-534, applied the registry changes of amendments B-510, B-511, B-513 and B-533, and removed merged dependencies. Checkpoint of 2026-11-17 (build/v1 at d5ea640) added B-546 to B-554, set merged_pr on every merged entry, fixed B-138 (risk r1, r2, r3; waits only for S.T23) and removed merged dependencies. Resume update on 2026-11-17 at 2a2171ea: added B-560, corrected B-554 merged_pr #409 and branch_pushed, recorded resumed B-550/B-552 branch states and reviews, and added B-560 as B-551 dependency. Current integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412, B-560/#413 merged; B-550 adds one merged plan task, B-552 adds plan T40; cleared B-138 S.T23, B-551 DOC.B560 and B-553 DOC.B552 dependencies. Integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412 and B-560/#413 merged; fulfilled dependencies S.T23, DOC.B552 and DOC.B560 cleared. Current continuation checkpoint 2026-11-17: registered B-561/DOC.B561 for B-553 RF001 risk amendment; B-553 depended on DOC.B561 until B-561 merged as PR #414. Integrated B-551/#415 and B-553/#416 in the batch; cleared DOC.B561 from B-553 and recorded B-553 risk r2, r3, and cleared B-559 I.T9b after B-518/#378 merged. Owner-approved contract checkpoint 2026-11-17: registered DOC.B562 as the explicit conservative original-open capability and scope prerequisite of B-138; plan progress remains 232/354, registry has 184 entries. Owner pause checkpoint 2026-11-18 at integration head 686578fe: B-556/#417 and B-562/#418 merged; cleared W.T7b and DOC.B562. B-138 WIP pushed at 0a407606 with 3 of 3 sessions used; registered DOC.B563 as its only pending prerequisite. B-202 records both W.T17 and W.T16b. Plan progress 233/354; registry 185 entries. Checkpoint of 2026-11-18 (hand-over 2): merged_pr refreshed, B-564 to B-566 added, B-138 integration-only.",
- "count": 194,
+ "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits; checkpoint B-487 of 2026-11-14 (build/v1 at beccdb9) renamed B-433, B-138 and B-229 to the split tasks I.T18a, S.T19a and P.T10a, added B-485, B-486, B-488, B-489, B-490 and B-491, and fixed the dependencies on S.T19 and P.T10. Entries of merged work items stay in the file. Checkpoint of 2026-11-16 (build/v1 at 4c4be4d) added B-518 to B-528 and B-534, applied the registry changes of amendments B-510, B-511, B-513 and B-533, and removed merged dependencies. Checkpoint of 2026-11-17 (build/v1 at d5ea640) added B-546 to B-554, set merged_pr on every merged entry, fixed B-138 (risk r1, r2, r3; waits only for S.T23) and removed merged dependencies. Resume update on 2026-11-17 at 2a2171ea: added B-560, corrected B-554 merged_pr #409 and branch_pushed, recorded resumed B-550/B-552 branch states and reviews, and added B-560 as B-551 dependency. Current integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412, B-560/#413 merged; B-550 adds one merged plan task, B-552 adds plan T40; cleared B-138 S.T23, B-551 DOC.B560 and B-553 DOC.B552 dependencies. Integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412 and B-560/#413 merged; fulfilled dependencies S.T23, DOC.B552 and DOC.B560 cleared. Current continuation checkpoint 2026-11-17: registered B-561/DOC.B561 for B-553 RF001 risk amendment; B-553 depended on DOC.B561 until B-561 merged as PR #414. Integrated B-551/#415 and B-553/#416 in the batch; cleared DOC.B561 from B-553 and recorded B-553 risk r2, r3, and cleared B-559 I.T9b after B-518/#378 merged. Owner-approved contract checkpoint 2026-11-17: registered DOC.B562 as the explicit conservative original-open capability and scope prerequisite of B-138; plan progress remains 232/354, registry has 184 entries. Owner pause checkpoint 2026-11-18 at integration head 686578fe: B-556/#417 and B-562/#418 merged; cleared W.T7b and DOC.B562. B-138 WIP pushed at 0a407606 with 3 of 3 sessions used; registered DOC.B563 as its only pending prerequisite. B-202 records both W.T17 and W.T16b. Plan progress 233/354; registry 185 entries. Checkpoint of 2026-11-18 (hand-over 2): merged_pr refreshed, B-564 to B-566 added, B-138 integration-only. Session of 2026-11-26 (lead, desktop): merged B-600/#521, B-607/#524, B-601/#525, B-587/#526, B-597/#527, B-307/#528; registered B-587, B-597 (docs, merged), B-602 to B-606 (amendment B-601), B-607, B-608 and B-609 (H.T9a); B-308 now waits for H.T9a.",
+ "count": 204,
  "tasks": [
   {
    "id": "B-437",
@@ -2374,14 +2374,12 @@
    "branch": "feat/b239-harness-rt10-reconciliation-by-reading-for",
    "prTitle": "feat(eng-harness): reconciliation by reading for the Revit write tools (B-239)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "R.T9"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
-   "open_pr": null,
-   "branch_pushed": false
+   "open_pr": 523,
+   "branch_pushed": true
   },
   {
    "id": "B-240",
@@ -2411,15 +2409,12 @@
    "branch": "feat/b241-harness-rt12-calc-harness-frame-element",
    "prTitle": "feat(eng-harness): calc harness.frame_element_map and its kind, with golden cases (B-241)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "C.T12",
-    "R.T6"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
-   "open_pr": null,
-   "branch_pushed": false,
+   "open_pr": 522,
+   "branch_pushed": true,
    "lead_notes": [
     "BLOCKED on owner question OQ-Q104 (element ids source)"
    ]
@@ -2747,15 +2742,13 @@
    "branch": "feat/b307-harness-ht8-calculation-on-both-routes",
    "prTitle": "feat(eng-harness): calculation on both routes, host-verdict reads, reconciliation and the stub-refusal workflows (B-307)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "H.T5",
-    "H.T7"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 528
   },
   {
    "id": "B-308",
@@ -2768,7 +2761,7 @@
    "prTitle": "feat(eng-harness): end-to-end cycles, crash matrix, recorded-reply contract tests, doctor section and the IDEA local-testing steps (B-308)",
    "risk": "r1, r3",
    "pending_deps": [
-    "H.T8"
+    "H.T9a"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -3218,14 +3211,12 @@
    "branch": "feat/b527-harness-wt9b-workflow-part-2b-steps-16-and-17",
    "prTitle": "feat(eng-harness): workflow part 2b - steps 16 and 17 (promotion, sign-off), the cycle loop and registration (B-527)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "W.T9a"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "sonnet, medium",
    "verifier_lenses": [],
-   "open_pr": null,
-   "branch_pushed": false,
+   "open_pr": 529,
+   "branch_pushed": true,
    "lead_notes": [
     "BLOCKED on owner question OQ-Q101 (invariant-7 save order)"
    ]
@@ -3859,7 +3850,7 @@
    ],
    "open_pr": null,
    "branch_pushed": false,
-   "merged_pr": null,
+   "merged_pr": 521,
    "instructions": [
     "code follow-up of L-B282-1 / OQ-Q98, registered after documents amendment B-596 (#520) added plan 0013 T3b"
    ]
@@ -3883,9 +3874,219 @@
    ],
    "open_pr": null,
    "branch_pushed": false,
-   "merged_pr": null,
+   "merged_pr": 525,
    "instructions": [
     "owner decision D-46 (2026-11-20): code tasks B-602 onward are registered from the merged plan tasks"
+   ]
+  },
+  {
+   "id": "B-587",
+   "task": "DOC.B587",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": null,
+   "kind": "docs",
+   "title": "Specs 0001, 0007 and plan 0007 T9b: save before the approval preview (OQ-Q101)",
+   "branch": "docs/b587-edit-cycle-t9b-engine-save-order",
+   "prTitle": "docs(eng-harness): save before the approval preview where invariant 7 applies; plan 0007 T9b engine order (B-587)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "codex",
+   "reviewer": "sonnet or opus",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": true,
+   "merged_pr": 526,
+   "instructions": []
+  },
+  {
+   "id": "B-597",
+   "task": "DOC.B597",
+   "plan": "packages/eng-harness/docs/plans/0010-design-isolated-footing.md",
+   "planTask": null,
+   "kind": "docs",
+   "title": "Spec 0010 and plan 0010 T8: the footing block passes open footings only (OQ-Q93); Q23, Q24",
+   "branch": "docs/b597-footing-block-open-only",
+   "prTitle": "docs(eng-harness): the footing block passes open footings only; spec 0010 Q23 and Q24 (B-597)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "codex",
+   "reviewer": "sonnet or opus",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": true,
+   "merged_pr": 527,
+   "instructions": []
+  },
+  {
+   "id": "B-602",
+   "task": "S.T24",
+   "plan": "packages/eng-harness/docs/plans/0002-servers-and-adapters.md",
+   "planTask": "T24",
+   "kind": "impl",
+   "title": "Mutation scope: spec 0002 section 9 modules in r1_modules",
+   "branch": "test/b602-harness-st24-mutation-scope",
+   "prTitle": "test(eng-harness): spec 0002 section 9 modules in r1_modules at mutation_min (B-602)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "codex",
+   "reviewer": "sonnet or opus",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "merged_pr": null,
+   "instructions": [
+    "amendment B-601; reviewer re-runs the per-module measurement on Linux"
+   ]
+  },
+  {
+   "id": "B-603",
+   "task": "F.T10",
+   "plan": "packages/eng-harness/docs/plans/0008-safe-adapter.md",
+   "planTask": "T10",
+   "kind": "impl",
+   "title": "Mutation scope: spec 0008 section 9 modules in r1_modules",
+   "branch": "test/b603-harness-ft10-mutation-scope",
+   "prTitle": "test(eng-harness): spec 0008 section 9 modules in r1_modules at mutation_min (B-603)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [
+    "S.T24"
+   ],
+   "writer": "codex",
+   "reviewer": "sonnet or opus",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "merged_pr": null,
+   "instructions": [
+    "amendment B-601"
+   ]
+  },
+  {
+   "id": "B-604",
+   "task": "R.T16",
+   "plan": "packages/eng-harness/docs/plans/0011-revit-adapter.md",
+   "planTask": "T16",
+   "kind": "impl",
+   "title": "Mutation scope: spec 0011 section 9 modules in r1_modules",
+   "branch": "test/b604-harness-rt16-mutation-scope",
+   "prTitle": "test(eng-harness): spec 0011 section 9 modules in r1_modules at mutation_min (B-604)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [
+    "R.T10"
+   ],
+   "writer": "codex",
+   "reviewer": "sonnet or opus",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "merged_pr": null,
+   "instructions": [
+    "amendment B-601; after B-239"
+   ]
+  },
+  {
+   "id": "B-605",
+   "task": "A.T8",
+   "plan": "packages/eng-harness/docs/plans/0012-sap2000-adapter.md",
+   "planTask": "T8",
+   "kind": "impl",
+   "title": "Mutation scope: spec 0012 section 9 modules in r1_modules",
+   "branch": "test/b605-harness-at8-mutation-scope",
+   "prTitle": "test(eng-harness): spec 0012 section 9 modules in r1_modules at mutation_min (B-605)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [
+    "S.T24"
+   ],
+   "writer": "codex",
+   "reviewer": "sonnet or opus",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "merged_pr": null,
+   "instructions": [
+    "amendment B-601; products/_sap2000.py is MU003"
+   ]
+  },
+  {
+   "id": "B-606",
+   "task": "H.T10",
+   "plan": "packages/eng-harness/docs/plans/0014-idea-adapter.md",
+   "planTask": "T10",
+   "kind": "impl",
+   "title": "Mutation scope: spec 0014 section 9 modules in r1_modules",
+   "branch": "test/b606-harness-ht10-mutation-scope",
+   "prTitle": "test(eng-harness): spec 0014 section 9 modules in r1_modules at mutation_min (B-606)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "codex",
+   "reviewer": "sonnet or opus",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "merged_pr": null,
+   "instructions": [
+    "amendment B-601; after B-307 (merged)"
+   ]
+  },
+  {
+   "id": "B-607",
+   "task": "DOC.B607",
+   "plan": "packages/eng-harness/docs/plans/0011-revit-adapter.md",
+   "planTask": null,
+   "kind": "docs",
+   "title": "Plan 0011 T12 lists the verification records whose hash literal follows the lock",
+   "branch": "docs/b607-revit-t12-hash-literal-records",
+   "prTitle": "docs(eng-harness): Revit plan T12 lists the verification records whose hash literal follows the lock (B-607)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "codex",
+   "reviewer": "sonnet or opus",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": true,
+   "merged_pr": 524,
+   "instructions": []
+  },
+  {
+   "id": "B-608",
+   "task": "DOC.B608",
+   "plan": "packages/eng-harness/docs/plans/0014-idea-adapter.md",
+   "planTask": null,
+   "kind": "docs",
+   "title": "Plan 0014 T9a: IDEA tool port and build_ports dispatch; plan 0002 external amendment",
+   "branch": "docs/b608-idea-t9-toolport-wiring",
+   "prTitle": "docs(eng-harness): IDEA plan T9a builds the tool port and its build_ports dispatch (B-608)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "codex",
+   "reviewer": "sonnet or opus",
+   "verifier_lenses": [],
+   "open_pr": 530,
+   "branch_pushed": true,
+   "merged_pr": null,
+   "instructions": []
+  },
+  {
+   "id": "B-609",
+   "task": "H.T9a",
+   "plan": "packages/eng-harness/docs/plans/0014-idea-adapter.md",
+   "planTask": "T9a",
+   "kind": "impl",
+   "title": "IDEA tool port and build_ports dispatch",
+   "branch": "feat/b609-harness-ht9a-idea-tool-port",
+   "prTitle": "feat(eng-harness): IDEA tool port and its build_ports dispatch (B-609)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [
+    "DOC.B608"
+   ],
+   "writer": "codex",
+   "reviewer": "sonnet or opus",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "merged_pr": null,
+   "instructions": [
+    "registered by amendment B-608"
    ]
   }
  ]
