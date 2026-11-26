@@ -6,10 +6,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Self
 
-from eng_contract.envelope import Envelope
-from eng_contract.ids import Clock, IdSource
+from eng_contract.envelope import Envelope, HostInfo, LiteralInput, RefInput, SuccessEnvelope
+from eng_contract.ids import Clock, IdSource, ModelId, Timestamp
+from eng_contract.refs import parse_ref
 from eng_contract.store import ModelStateStore, ResultStore, Workspace
-from pydantic import JsonValue
+from pydantic import BaseModel, ConfigDict, JsonValue
 
 from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.adapters._allowlist import Allowlist, AllowlistError, load_allowlist
@@ -24,11 +25,13 @@ from eng_harness.adapters.csi._errors import CsiErrorMapper
 from eng_harness.adapters.csi._reconcile import CsiReconciler
 from eng_harness.adapters.csi._revisions import Revisions
 from eng_harness.adapters.csi._tools import CsiToolPort
+from eng_harness.adapters.revit._session_ops import RevitHostPort
+from eng_harness.adapters.revit._toolport import _WRITE_RESULT, RevitToolPort
 from eng_harness.basis import BasisInvalid, StoreBasisPort
 from eng_harness.ctx import Preview, PreviewItem
 from eng_harness.errors import JournalIntegrityError
 from eng_harness.journal import JournalReader
-from eng_harness.ports import HostPort, Reconciliation, ServerCheck, ToolInfo, ToolPort
+from eng_harness.ports import HostInstance, HostPort, Reconciliation, ServerCheck, ToolInfo, ToolPort
 from eng_harness.servers import ConfigError, ServerManager, ServersConfig, platform_inspector, platform_launcher
 from eng_harness.servers._guard import ProcessGuard
 from eng_harness.servers._hostlock import HostLocks, default_lock_dir
@@ -123,6 +126,107 @@ class _FrozenTolerance:
         if field is not None and isinstance(field.value, int | float) and not isinstance(field.value, bool):
             self._value = float(field.value)
         return self._value
+
+
+class _RevitBinding(BaseModel):
+    """Identity of a working document independently of the MCP role processes."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    document: Path
+    model_id: ModelId
+    instance: HostInstance
+
+
+class _RevitBindings(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    pipe_name: str
+    models: dict[str, _RevitBinding]
+
+
+class _RevitRunHostPort(RevitHostPort):
+    """Retain the run's Revit bindings across engine processes (spec 0011 AC22)."""
+
+    @property
+    def _binding_path(self) -> Path:
+        return self._run_dir / "adapter" / "revit-bindings.json"
+
+    def load_bindings(self) -> None:
+        path = self._binding_path
+        if not path.is_file():
+            return
+        bindings = _RevitBindings.model_validate_json(path.read_bytes())
+        if bindings.pipe_name != self._pipe_name:
+            return
+        for key, binding in bindings.models.items():
+            if self._files.get(key, binding.document) != binding.document:
+                continue
+            instance = binding.instance
+            self._files[key], self._models[key] = binding.document, binding.model_id
+            self._bound[key] = instance.instance_id
+            self._instances[instance.instance_id] = instance
+
+    async def working_copy(self, model_key: str, folder: Path) -> str:
+        key = await super().working_copy(model_key, folder)
+        bindings = _RevitBindings(
+            pipe_name=self._pipe_name,
+            models={
+                name: _RevitBinding(
+                    document=self._files[name], model_id=self._models[name], instance=self._instances[i]
+                )
+                for name, i in self._bound.items()
+            },
+        )
+        path = self._binding_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(".tmp")
+        with temporary.open("w", encoding="utf-8") as handle:
+            handle.write(bindings.model_dump_json())
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        return key
+
+
+class _RevitRunToolPort(RevitToolPort):
+    """Advance the model revision after a live or reconciled edit (spec 0011 AC22, AC29)."""
+
+    def _record_edit(self, before: HostInfo) -> HostInfo:
+        states = self._host.identity_store._states
+        current = states.get(before.model_id)
+        if current is None:
+            return before
+        if current.revision == before.model_revision:
+            current = states.increment(before.model_id, before.model_revision)
+        return before.model_copy(update={"model_revision": current.revision})
+
+    def _store_result(
+        self,
+        tool: str,
+        kind: str,
+        payload: dict[str, JsonValue],
+        host: HostInfo | None,
+        inputs: Mapping[str, RefInput | LiteralInput],
+        timing: tuple[Timestamp, int],
+        reply: Mapping[str, JsonValue] | None = None,
+        summary: dict[str, JsonValue] | None = None,
+    ) -> SuccessEnvelope:
+        if kind == _WRITE_RESULT and host is not None:
+            host = self._record_edit(host)
+        return super()._store_result(tool, kind, payload, host, inputs, timing, reply, summary)
+
+    async def reconcile(self, tool: str, args: Mapping[str, JsonValue], op_id: str) -> Reconciliation:
+        outcome = await super().reconcile(tool, args, op_id)
+        if outcome.outcome == "applied":
+            entry = self._revit_ledger.find(op_id)
+            if entry is not None and entry.pre_image_ref is not None:
+                result_id, _ = parse_ref(entry.pre_image_ref)
+                before = self._store.get(result_id).producer.host
+                if before is not None:
+                    # A crash after advancing the revision can replay the same durable pre-image.
+                    self._record_edit(before)
+        return outcome
 
 
 def _cli_port(
@@ -291,11 +395,9 @@ def build_ports(
         if section.pipe_name is None:
             raise ConfigError(f"servers.{name}.pipe_name", "pipe_name is required for Revit")
         from eng_harness.adapters.revit._checks import WrittenItems as _RevitWritten
-        from eng_harness.adapters.revit._session_ops import RevitHostPort
-        from eng_harness.adapters.revit._toolport import RevitToolPort
 
         revit_written, revit_tolerance = _RevitWritten(), _FrozenTolerance(run_dir, store)
-        revit_host = RevitHostPort(
+        revit_host = _RevitRunHostPort(
             identity=IdentityStore(workspace=workspace, states=states, ids=ids),
             sessions=servers,
             locks=locks,
@@ -311,7 +413,8 @@ def build_ports(
             written=revit_written,
             tolerance=revit_tolerance,
         )
-        revit_tool = RevitToolPort(
+        revit_host.load_bindings()
+        revit_tool = _RevitRunToolPort(
             config=config,
             allowlist=loaded[name],
             server=name,

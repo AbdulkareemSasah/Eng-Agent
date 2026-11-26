@@ -97,3 +97,21 @@ Plan 0012 (SAP2000 adapter; listed by T7, spec §12). Nothing here runs in CI. O
 54. L7. `csi_design_run` for steel and concrete and the shape of `csi_design_results` for steel and concrete columns (AC16, SP-3).
 55. L8. `csi_frame_details` and `csi_export_joint` on the COM path (the evidence is for bridge targets), `csi_add_frame_by_coord` naming, section requirement and units, `csi_set_point_load` semantics (AC11, SP-5).
 56. L9. Record mode on a SAP2000 copy: record-mode scenario, owner review and commit of recordings, and subsequent contract-test verification against the real server (AC19; amendment B-573).
+
+Plan 0011 (Revit adapter, T15, spec §12). The owner runs spike S-05 in an attended session on a copy of a structural model with columns, framing, levels and grids. CI uses synthetic Revit processes.
+
+1. **L1** Compare live `tools/list` for both roles with the pinned fingerprints. Check `catalog_version`, enabled toolsets, the Revit version, and whether the loaded add-in matches the hashed files.
+2. **L2** Check the field names, ID types and `_warning` in replies from every allowlisted read.
+3. **L3** Record when the destructive dialog appears, its text and 500-character summary, and what Yes, No and no answer do. Check which reads reply while it is open, what happens to queued calls, and the actual call deadline.
+4. **L4** Exercise a write Revit rejects. Check transaction status, undo entries, whether a batch rolls back in full, and any warning dialogs on commit.
+5. **L5** Break the pipe during a write. Compare the resulting state with §4.10 and the timeout text with §4.7. After an applied first attempt, check whether the resend reports a consumed token or only “NOT executed.”
+6. **L6** Check vertical and sloped column locations, base and top from the bounding box, the rotation parameter, and the level reported for a column spanning stories.
+7. **L7** Confirm the specification identifiers and raw values for the mapped parameter roles. Observe which double values each write tool converts.
+8. **L8** Change a structural column's type. Check whether `ElementId` and `UniqueId` survive and what happens to joined framing.
+9. **L9** Test active-document checks with two documents and a switch between calls. Test opening a copy, the refusal with unsaved changes, and the workshared-file case.
+10. **L10** Check hashing a file open in Revit, ID equality between the original and the copy, and what the harness records after an engineer saves.
+11. **L11** Make an engineer edit between two reads and check whether the fingerprint detects it.
+12. **L12** Verify the owner's column family parameter names, the shared GUID for `Sasaah_EtabsElementId`, and the material parameters.
+13. **L13** Verify pipe names and targeting with two Revit instances running.
+14. **L14** Run the mapping calc on a real ETABS and Revit pair. Check the confirmed offset, tolerance, and ambiguous pairs.
+15. **L15** Run record mode on a copy and have the owner review all recordings before committing them.
