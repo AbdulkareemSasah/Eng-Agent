@@ -236,6 +236,7 @@ tasks:
     # Amendment (B-418, documents only): T9 adds the structural-codes-sbc304-2018 workspace dependency and the SBC
     # allowlist ids (moved from T2); uv.lock, _calc/_code_packs.py and test_code_pack_route.py added
     # Amendment (B-417, documents only): starts after plan 0007 T9b, which creates the shipped-workflow registry in workflows/__init__.py and makes block.discover() read it; this task adds its blocks to that registry
+    # Amendment (B-597, documents only): step 13 (the schedule) waits for spec Q24.
     title: Workflow isolated_footing_design (definition, basis fields, steps 1 to 13, review, code packs)
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.isolated_footing (amendment B-356); structural-codes-sbc304-2018 dependency (B-418)
@@ -469,14 +470,15 @@ block passes the open footings only (spec §4.6, AC34): no closed footing is lai
 each keeps its last result in its closure, and no merged calc changes (T4, T4b, T5 and T6 stay as merged).
 `test_rounds_pass_open_footings_only` runs several footings of which some close while the others continue and checks,
 from the journal and the stored records, that every later layout, batch item, status row and resize row names an open
-footing only. How the block stores an open footings' record is spec Q23, which the lead settles before T8 continues;
+footing only. T8's tests also cover the empty open set and check that no calc runs on an empty record. How the block
+stores an open footings' record is spec Q23, which the lead settles before T8 continues;
 if the answer adds a calc or an engine call, a plan amendment lists its files and task.
 
 **T9 Workflow** (spec §4.2, §4.7, §4.8). Definition, input and output models, `basis_fields`, steps 1 to 13 and 15, the
 seismic refusal, the SAFE-source gap, the SBC run (with the `structural-codes-sbc304-2018` workspace dependency, its
 `uv.lock` entry and the SBC ids from `check_id_for` in the route's allowlist in `_calc/_code_packs.py`, with their
 allowlist cases in `tests/unit/calcs/test_code_pack_route.py`, moved here from T2 by amendment B-418),
-approvals per mode (step 13, the schedule, waits for spec Q24, amendment B-597), and registration in
+approvals per mode. Step 13, the schedule, waits for spec Q24 (amendment B-597). Registration is in
 `workflows/__init__.py`
 (the module through which the command line of plan 0006 finds workflows: plan 0006 T14 defines the `CliDeps`
 workflow-registry field, amendment B-412, and plan 0006 T18a binds its default to the registry that plan 0007 T9b
