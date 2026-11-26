@@ -90,8 +90,8 @@ def read_push_file(path: Path) -> PushConfig:
 
 
 def default_push_file() -> Path:
-    """The user-level push file (spec 0015 4.6): `%APPDATA%/eng-harness/tasklog-push.toml` on Windows, else
-    `$XDG_CONFIG_HOME/eng-harness/tasklog-push.toml` or `~/.config/eng-harness/tasklog-push.toml`."""
+    """The user-level push file (spec 0015 4.6): `eng-harness/tasklog-push.toml` in the APPDATA folder on Windows,
+    else `$XDG_CONFIG_HOME/eng-harness/tasklog-push.toml` or `~/.config/eng-harness/tasklog-push.toml`."""
     if os.name == "nt":
         root = os.getenv(_APPDATA_VARIABLE) or str(Path.home() / "AppData" / "Roaming")
     else:
