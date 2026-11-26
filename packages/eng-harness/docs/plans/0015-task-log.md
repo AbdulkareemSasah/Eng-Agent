@@ -9,7 +9,7 @@ tasks:
   - id: T1
     title: Record models, schema snapshot, import rule, risk entries
     files:
-      - "packages/eng-harness/pyproject.toml"  # public_modules entries eng_harness.tasklog and eng_harness.tasklog.privacy; r2_modules entries for _guard.py, _scope.py, _hook.py, _push.py
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry eng_harness.tasklog; r2_modules entries for _guard.py, _scope.py, _hook.py, _push.py (amendment B-628: the eng_harness.tasklog.privacy entry moves to T2, which creates that module)
       - "packages/eng-harness/.gate/risk-map.yml"  # the same four modules in the r2 entry
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/tasklog/__init__.py"
@@ -32,6 +32,7 @@ tasks:
   - id: T2
     title: Guard, policy protocol, full policy, sanitized stub
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry eng_harness.tasklog.privacy (amendment B-628: test_public_modules_import imports every entry, so it lands with the module)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/tasklog/_guard.py"
       - "packages/eng-harness/src/eng_harness/tasklog/privacy/__init__.py"
