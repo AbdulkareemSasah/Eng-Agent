@@ -392,7 +392,7 @@ tasks:
     # Amendment (B-417, documents only): registers the shipped workflow: workflows/__init__.py exports the blocks and block.discover() reads it lazily (spec 4.2), so blocks.lock.json gains the entries; about 15 lines, 380 to 395; tests/unit/test_block.py::test_main_writes_the_lock is isolated from the shipped blocks, about 3 lines, 395 to 400.
     # Amendment (B-511, documents only): split from the former T9 (see T9a); 230 is an estimate, to measure at write time.
     # Amendment (B-543, documents only): the v1 exit for a model locked after analysis (spec 4.5, AC15: about 10 lines) and the re-read before step 6 with its return to step 3 (spec 4.5.1, AC13 second clause: about 15) in _cycle.py; test_engineer_changes.py::test_edit_during_change_set_wait added; promote takes the key (plan 0001 T23). 230 to 255 (an estimate).
-    # Amendment (B-587, documents only): owner decision OQ-Q101 of 2026-11-20 (engine spec 4.6 invariant 7, 4.7, AC43; spec 4.5 steps 11 and 12, 4.7, AC23): in approve_each_write the invariant-7 p~pre.save runs after any working-copy swap and before the p~pre.approve preview, then the write, so test_approvals_per_mode[approve_each_write] passes. The three engine files and the engine test file below join, each limited to that order by its comment: an external amendment of plan 0001 files, recorded in that plan's section 3. tests_first unchanged: test_approvals_per_mode is listed already, and the engine test is not in this task's first test commit (TF008). About 20 engine lines: 255 to 275 (an estimate).
+    # Amendment (B-587, documents only): owner decision OQ-Q101 of 2026-11-20 (engine spec 4.6 invariant 7, 4.7, AC43; spec 4.5 steps 11 and 12, 4.7, AC23): in approve_each_write the invariant-7 p~pre.save keeps its place after any working-copy swap, the lease, literals, sibling admission and invariant-9 first-use binding and units read; only the p~pre.approve preview moves after that save, before the write, so test_approvals_per_mode[approve_each_write] passes. The three engine files and the engine test file below join, each limited to that order by its comment: an external amendment of plan 0001 files, recorded in that plan's section 3. tests_first unchanged: test_approvals_per_mode is listed already, and the engine test is not in this task's first test commit (TF008). About 20 engine lines: 255 to 275 (an estimate).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.model_edit_cycle (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -402,9 +402,9 @@ tasks:
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_cycle.py"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_finish.py"
       - "packages/eng-harness/src/eng_harness/blocks.lock.json"
-      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"  # only the order in _tool_json: the invariant-7 save runs after Modes.enter's working-copy swap and before its p~pre.approve preview (amendment B-587)
-      - "packages/eng-harness/src/eng_harness/engine/_modes.py"  # only Modes.enter: the invariant-7 save runs between the working-copy swap and the p~pre.approve preview; the copy, preview and approval rules are unchanged (amendment B-587)
-      - "packages/eng-harness/src/eng_harness/engine/_invariants.py"  # only Guard.prepare and Guard.save, so the save can run at that point; its path, arguments, role pre_analysis and model_saved are unchanged (amendment B-587)
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"  # only the order in _tool_json: after Modes.enter's copy/swap part, reorder the pre-steps as one block: lease, literals, touch, bind, prepare, then Modes.enter's preview part (amendment B-587)
+      - "packages/eng-harness/src/eng_harness/engine/_modes.py"  # only split Modes.enter into its copy/swap part and its preview part, called after Guard.prepare; the copy, preview and approval rules are unchanged (amendment B-587)
+      - "packages/eng-harness/src/eng_harness/engine/_invariants.py"  # only Guard.prepare and Guard.save; the save keeps its place after sibling admission and first-use binding and units, and its path, arguments, role pre_analysis and model_saved are unchanged (amendment B-587)
       - "packages/eng-harness/tests/workflow/edit_cycle/conftest.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_cycle.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py"
@@ -1006,10 +1006,12 @@ and monkeypatches `block.discover` there to return an empty `Registry`, keeping 
 are is checked by `test_block_lock.py` and `test_workflow_registered`).
 Amendment (B-587; engine spec §4.6 invariant 7, §4.7, AC43; spec §4.5 steps 11 and 12, §4.7, AC23; owner decision
 OQ-Q101 of 2026-11-20): in `approve_each_write` the engine inserted the `p~pre.approve` preview of steps 11 and 12
-before the invariant-7 `p~pre.save`, so the save changed the working copy and the write met `ApprovalVoid`. T9b
-reorders the engine: after any working-copy swap, the save runs, then the preview, then the write. It edits
-`engine/_ctx_impl.py`, `engine/_modes.py` and `engine/_invariants.py` for that order only (the limit of each is its
-comment in the front matter), and `tests/workflow/test_invariants.py::test_save_before_analysis` gains an
+before the invariant-7 `p~pre.save`, so the save changed the working copy and the write met `ApprovalVoid`. T9b keeps
+the save after any working-copy swap, the lease, literals, sibling admission and invariant-9 first-use binding and
+units read; it splits `Modes.enter` into copy/swap and preview parts and moves only the preview after `Guard.prepare`,
+before the write. It
+edits `engine/_ctx_impl.py`, `engine/_modes.py` and `engine/_invariants.py` for that order only (the limit of each is
+its comment in the front matter), and `tests/workflow/test_invariants.py::test_save_before_analysis` gains an
 `approve_each_write` case that checks the save is journaled before the preview; `test_approvals_per_mode` then passes in
 every mode. Engine plan 0001 records this external amendment in its section 3.
 Amendment (B-544; spec §4.5 steps 13 and 14, §4.6, AC41, AC42): T9a's step 13 parallel also calls

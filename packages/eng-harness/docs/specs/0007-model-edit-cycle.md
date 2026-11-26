@@ -247,7 +247,8 @@ defines its method; values are synthetic and say so.
   `tests/workflow/edit_cycle/test_promotion.py::test_sign_off_exception_items`.
 - AC23. Given the same scripted cycle in each permission mode, then the approvals journaled match the table of §4.7,
   and each analysis or design preview follows its invariant-7 `p~pre.save` (owner decision OQ-Q101 of 2026-11-20;
-  amendment B-587). Test: `tests/workflow/edit_cycle/test_modes.py::test_approvals_per_mode`.
+  amendment B-587). Tests: `tests/workflow/edit_cycle/test_modes.py::test_approvals_per_mode`; engine AC43's
+  `tests/workflow/test_invariants.py::test_save_before_analysis` checks the order.
 - AC24. Given the change-set data request, then it carries `x-eng-input: data`; an answer that fails `ChangeSetDraft`
   is refused and presented again (engine AC61); an answer whose check is `FAIL` is asked again in the next attempt
   with the check result as evidence; exhausting `attempts.change_set` escalates. Test:

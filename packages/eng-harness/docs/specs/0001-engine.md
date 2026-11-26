@@ -96,7 +96,8 @@ changed the bound model and the write met `ApprovalVoid` (§4.9). The owner sett
 of 2026-11-20): after any working-copy swap, the invariant-7 save runs, then the `p~pre.approve` preview, then the
 write (§4.6 invariant 7, §4.7 `approve_each_write`, AC43), so the engineer approves exactly what will be written. It
 amends AC43 and adds no criterion; the engine change is built by plan 0007 T9b, an external amendment of this plan's
-files recorded in plan 0001 section 3.
+files recorded in plan 0001 section 3. A journal recorded under the old order (approval preview before the save)
+diverges on resume because §4.4 and AC47 replay the inserted `~pre` steps; no such journal exists in bootstrap mode.
 
 ## 1. Problem
 
@@ -1076,7 +1077,7 @@ turns an invariant off (AC37); in every case the block's call raises before any 
 | 4 Decisions cannot produce numbers (P10) | `_decide`: options must be a `StrEnum` subclass or a sequence of `Ref`; the answer must be a member value or an index into the sequence; the block receives the member or the `Ref` | `BlockRuleViolation` (options), `DecisionInvalid` (answer) | AC40 |
 | 5 Never assume inputs (P8) | `_hostsafety`, in `start`: `DesignBasis.missing(workflow.required_basis)` (contract §4.10.2) must be empty | `RunRefused` (`BASIS_INCOMPLETE`, fields listed); no run folder | AC41 |
 | 6 Honest outcomes (P9) | `_hostsafety`: `TIMEOUT_UNKNOWN_OUTCOME` or `HOST_WEDGED` sets "reconciliation pending" on the host; every later step on that host waits until §4.5.3 has run; other hosts continue | `NeedsReconciliation` when unresolved | AC33, AC42 |
-| 7 Save before analysis | `_invariants`: before a tool with `ToolInfo.action` `analysis` or `design`, after any working-copy swap and before that step's `p~pre.approve` preview, the step `p~pre.save.<model>` calls `HostPort.save` and journals `model_saved` (role `pre_analysis`); the order is save, then the preview, then the write (amendment B-587, owner decision OQ-Q101 of 2026-11-20) | `StepError` of the save | AC43, AC47 |
+| 7 Save before analysis | `_invariants`: before a tool with `ToolInfo.action` `analysis` or `design`, after any working-copy swap, the lease, sibling admission and the invariant-9 first-use binding and units read, the step `p~pre.save.<model>` calls `HostPort.save` and journals `model_saved` (role `pre_analysis`); the save keeps that place and only the step's `p~pre.approve` preview moves after it, before the write (amendment B-587, owner decision OQ-Q101 of 2026-11-20) | `StepError` of the save | AC43, AC47 |
 | 8 Server builds | `_hostsafety`, in `start` before `run_started`, and at each resume as step 4 of §4.5.1 (before any lease, reconciliation or host-state read): `HostPort.preflight(workflow.min_server_builds)`; any `ServerCheck.ok` false stops the run before any write | `RunRefused` (`SERVER_CHECK_FAILED`) | AC44 |
 | 9 Host units | `_hostsafety`, `HostPort.read_units(model_key, instance_id)` against the model's bound instance (§4.8 "Instance binding"): (a) before the first step of the run addressed to a model, as `p~pre.units.<model_key>` (replayed), right after its `first_use` binding; (b) at each resume, for every model key the journal addressed, as `@resume<n>.units.<model_key>`, before reconciliation (§4.5.1 step 6), where a model not loaded is not a mismatch but goes to the host-state check (§4.5.4) and units are read again after a `restore`; (c) before the next step on a host when, within this engine process, `HostPort.session_epoch(host)` changed or the engine observed a timeout, `TIMEOUT_UNKNOWN_OUTCOME` or `HOST_WEDGED` on that host, as `p~host.units.<model_key>`. The epoch is compared only within one engine process, so it needs no journal baseline; a new process always reads units by (b). A mismatch stops the run before any reconciliation, until the units are restored | `ContractError` `PRECONDITION_FAILED` (`units_verified`), run escalated `units_mismatch` | AC45, AC47 |
 | 10 One driver per host instance | `_hostsafety`: `HostPort.acquire(host_key)` before the first step on a host, and at each resume before reconciliation (§4.5.1 step 5). After every live step on a host, `HostPort.started_instances(host_key)` lists the instances this engine's servers started; each one not journaled yet is appended as `host_started` (FULL) before the next step. Run end is only after `run_completed` or `run_failed` is appended (never a pause, an escalation, a divergence or a refusal); then `HostPort.close_started(host_key, instances)` receives the instances read from the journal's `host_started` events, so a resumed engine closes what an earlier process started; spec 0002 closes an instance only if its process id and start time still match. A resume of a terminal run repeats `close_started` (idempotent) | `ContractError` `HOST_LOCKED` | AC46 |
@@ -1163,9 +1164,9 @@ again.
   sibling conflicts, reconciliation and retries.
 - **`approve_each_write`.** Before each write, the inserted step `p~pre.approve` presents `ToolPort.preview(tool,
   args)` as a `CHANGE_SET` approval; a rejection raises `ApprovalRejected` (a `StepError`) and the write is not called.
-  Where invariant 7 applies, its `p~pre.save` runs first (after any working-copy swap): the preview follows the save,
-  so the engineer approves what will be written and the save does not void the approval (amendment B-587, owner
-  decision OQ-Q101 of 2026-11-20).
+  Where invariant 7 applies, its `p~pre.save` keeps its place after any working-copy swap, the lease, sibling admission
+  and the invariant-9 first-use binding and units read; only the preview moves after the save, so the engineer approves
+  what will be written and the save does not void the approval (amendment B-587, owner decision OQ-Q101 of 2026-11-20).
   An answer that rejects any item of an inserted approval is a rejection: the write is one step (amendment B-499).
   Exception (amendment B-415, spec 0007 Q3): a tool step with action `save` whose `ToolInfo.saves_new_file(args)` is
   true and whose `ToolInfo.overwrites_original(args)` is false gets no `p~pre.approve` preview: it changes no model
