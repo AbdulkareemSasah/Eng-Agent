@@ -331,6 +331,7 @@ tasks:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/__init__.py"
+      - "packages/eng-harness/src/eng_harness/adapters/revit/_toolport.py"  # amendment B-629 (spec Q12): write-result type_id entries accepted when stale
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/tests/replay/test_revit_resume.py"
       - "packages/eng-harness/tests/workflow/adapters/test_revit_map_stale.py"
