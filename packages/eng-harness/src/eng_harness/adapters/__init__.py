@@ -172,22 +172,32 @@ def build_ports(
     command-line tool adapter beside the CSI tools (AC43); unsupported server adapters/configurations and a
     command-line tool the adapter has no argument model for raise ConfigError rather than silently losing a capability.
     """
+    from dataclasses import replace as _replace
+
+    from eng_harness.adapters.revit import revit_allowlist
+
     loaders = {"sasaah-csi-mcp": csi_allowlist, **(allowlists or {})}
     loaded: dict[str, Allowlist] = {}
     for name, section in config.servers.items():
+        if section.adapter == "sasaah-revit-mcp":
+            loaded[name] = revit_allowlist()
+            continue
         if section.adapter not in loaders:
             raise ConfigError(f"servers.{name}.adapter", "this adapter is not implemented")
         loaded[name] = loaders[section.adapter](section.route).for_product(section.product)  # spec 0008 4.1
     if len(config.servers) != 1:
         raise ConfigError("servers", "CSI port wiring requires one server section")
     name, section = next(iter(config.servers.items()))
-    if section.adapter != "sasaah-csi-mcp":
+    if section.adapter not in ("sasaah-csi-mcp", "sasaah-revit-mcp"):
         raise ConfigError(f"servers.{name}.adapter", "this adapter is not implemented")
+    is_revit = section.adapter == "sasaah-revit-mcp"
     product = section.product  # the server's product profile (spec 0002 4.6, spec 0008 4.1)
-    program = config.host_program(product)
+    program = None if is_revit else config.host_program(product)
     inspector = inspector if inspector is not None else platform_inspector()
     launcher = launcher if launcher is not None else platform_launcher(inspector)
     cli = _cli_port(config, workspace, run_dir, clock, ids, launcher, inspector)
+    if is_revit and cli is not None:
+        raise ConfigError("cli_tools", "Revit port wiring does not serve command-line tools")
     engine = inspector.identity(os.getpid())
     if engine is None:
         raise ConfigError("servers", "the engine process identity cannot be read")
@@ -197,14 +207,33 @@ def build_ports(
         engine=engine,
         clock=clock,
     )
-    guard = ProcessGuard(inspector, run_dir, host_exes=program.executables)
-    servers = ServerManager(
-        config,
-        run_dir,
-        launcher=launcher,
-        helpers=guard,
-        check={key: allowlist.build_expectation() for key, allowlist in loaded.items()},
-    )
+    guard = ProcessGuard(inspector, run_dir, host_exes=() if program is None else program.executables)
+    if is_revit:
+        _destructive = frozenset(
+            {
+                "revit_set_type_parameter_values",
+                "revit_set_element_parameter_values",
+                "revit_set_parameter_value_by_guid",
+                "revit_change_element_type",
+            }
+        )
+        _revit_check = {}
+        for _role in ("read", "write"):
+            _base = revit_allowlist(role=_role).build_expectation()
+            _revit_check[f"{name}/{_role}"] = _replace(
+                _base,
+                status_tool="revit_connection_status",
+                destructive_tools=_destructive if _role == "write" else frozenset(),
+            )
+        servers = ServerManager(config, run_dir, launcher=launcher, helpers=guard, check=_revit_check)
+    else:
+        servers = ServerManager(
+            config,
+            run_dir,
+            launcher=launcher,
+            helpers=guard,
+            check={key: allowlist.build_expectation() for key, allowlist in loaded.items()},
+        )
     pin = section.build
     check = (checks or {}).get(name) or ServerCheck(
         server=name,
@@ -215,8 +244,50 @@ def build_ports(
         ok=False,
         reason="unchecked",
     )
-    written, tolerance = WrittenItems(), _FrozenTolerance(run_dir, store)
     states = ModelStateStore(workspace, clock)
+    if is_revit:
+        # Revit dispatch, after the IDEA dispatch (amendment B-611); B-617 references and Q10/Q11 evidence.
+        if section.pipe_name is None:
+            raise ConfigError(f"servers.{name}.pipe_name", "pipe_name is required for Revit")
+        from eng_harness.adapters.revit._checks import WrittenItems as _RevitWritten
+        from eng_harness.adapters.revit._session_ops import RevitHostPort
+        from eng_harness.adapters.revit._toolport import RevitToolPort
+
+        revit_written, revit_tolerance = _RevitWritten(), _FrozenTolerance(run_dir, store)
+        revit_host = RevitHostPort(
+            identity=IdentityStore(workspace=workspace, states=states, ids=ids),
+            sessions=servers,
+            locks=locks,
+            clock=clock,
+            ids=ids,
+            run_dir=run_dir,
+            files=files or {},
+            pipe_name=section.pipe_name,
+            server=name,
+            host_key=section.host_key,
+            store=store,
+            check=check,
+            written=revit_written,
+            tolerance=revit_tolerance,
+        )
+        revit_tool = RevitToolPort(
+            config=config,
+            allowlist=loaded[name],
+            server=name,
+            caller=servers,
+            host=revit_host,
+            store=store,
+            run_dir=run_dir,
+            clock=clock,
+            ids=ids,
+            check=check,
+            written=revit_written,
+            tolerance=revit_tolerance,
+        )
+        return AdapterPorts(revit_tool, revit_host, servers)
+    if program is None:
+        raise ConfigError("host_programs", "CSI port wiring requires a host program")
+    written, tolerance = WrittenItems(), _FrozenTolerance(run_dir, store)
     host = AdapterHostPort(
         identity=IdentityStore(workspace=workspace, states=states, ids=ids),
         states=states,
