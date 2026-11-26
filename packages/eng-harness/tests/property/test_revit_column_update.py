@@ -1,4 +1,8 @@
-"""`harness.revit_column_update` is invariant under the U10 input permutations (plan 0013 T7; spec 0013 AC11)."""
+"""`harness.revit_column_update` is invariant under the U10 input permutations (plan 0013 T7; spec 0013 AC11).
+
+The generator covers rectangular and circular sections, every role status (`reference`, `candidate`,
+`unmapped`) and pairs whose elements share one Revit type.
+"""
 
 import copy
 from typing import Any, cast
@@ -53,6 +57,10 @@ BASIS = {
 SHA = "c" * 64
 DIMS = [(300, 300), (400, 400), (500, 500), (400, 600), (300, 500), (600, 400)]
 FAR = [(700, 700), (800, 800), (700, 800), (800, 700)]
+DIAMETERS = [400, 500, 600]
+FAR_D = [700, 800]
+STATUSES = ["reference", "candidate", "unmapped"]
+STYLES = ["rect-near", "rect-far", "circ-near", "circ-far"]
 ROTATIONS = [0, 90, 180, 270]
 ROLE_FIELD = {"section_b": "b_mm", "section_h": "h_mm", "section_D": "D_mm"}
 
@@ -79,27 +87,52 @@ def _revit_inputs(draw: st.DrawFn) -> dict[str, Any]:
     frame_ids = [f"C{i + 1}" for i in range(n)]
     unique_ids = draw(st.permutations([f"u-{i + 1}" for i in range(n)]))
     n_sections = draw(st.integers(1, n))
-    dims = draw(st.lists(st.sampled_from(DIMS), min_size=n_sections, max_size=n_sections, unique=True))
-    sections = [
-        {"name": f"S{i + 1}", "material": "C30", "shape": {"type": "rectangular", "b_mm": b, "h_mm": h}}
-        for i, (b, h) in enumerate(dims)
-    ]
+    sections: list[dict[str, Any]] = []
+    for i in range(n_sections):
+        if draw(st.booleans()):
+            b, h = draw(st.sampled_from(DIMS))
+            shape: dict[str, Any] = {"type": "rectangular", "b_mm": b, "h_mm": h}
+        else:
+            shape = {"type": "circular", "D_mm": draw(st.sampled_from(DIAMETERS))}
+        sections.append({"name": f"S{i + 1}", "material": "C30", "shape": shape})
     names = [row["name"] for row in sections]
     pair_sections = [draw(st.sampled_from(names)) for _ in range(n)]
-    pair_families = [draw(st.sampled_from(["F1", "F2"])) for _ in range(n)]
-    target_dims = {row["name"]: (row["shape"]["b_mm"], row["shape"]["h_mm"]) for row in sections}
+    targets: dict[str, dict[str, Any]] = {row["name"]: row["shape"] for row in sections}
+    n_types = draw(st.integers(1, n))
+    type_of_pair = [draw(st.sampled_from(range(n_types))) for _ in range(n)]
+    if n >= 2:
+        type_of_pair[1] = type_of_pair[0]  # two elements sharing a type
+    force_reference = draw(st.booleans())
+    type_families = [draw(st.sampled_from(["F1", "F2"])) for _ in range(n_types)]
+    type_styles = [draw(st.sampled_from(STYLES)) for _ in range(n_types)]
+
+    def _type_params(kind: int) -> dict[str, Any]:
+        user = next(i for i, u in enumerate(type_of_pair) if u == kind)
+        target = targets[pair_sections[user]]
+        style = type_styles[kind]
+        if style.startswith("rect"):
+            if style == "rect-near" and target["type"] == "rectangular":
+                b_mm, h_mm = target["b_mm"], target["h_mm"]
+            else:
+                b_mm, h_mm = draw(st.sampled_from(FAR))
+            return {
+                "section_b": {"value": float(b_mm), "unit": "mm"},
+                "section_h": {"value": float(h_mm), "unit": "mm"},
+            }
+        d_mm = target["D_mm"] if style == "circ-near" and target["type"] == "circular" else draw(st.sampled_from(FAR_D))
+        return {"section_D": {"value": float(d_mm), "unit": "mm"}}
+
     elements: list[dict[str, Any]] = []
-    types: list[dict[str, Any]] = []
     for i in range(n):
-        b_mm, h_mm = target_dims[pair_sections[i]] if draw(st.booleans()) else draw(st.sampled_from(FAR))
+        kind = type_of_pair[i]
         elements.append(
             {
                 "unique_id": unique_ids[i],
                 "element_id": 101 + i,
                 "category": "column",
-                "family": pair_families[i],
-                "type_id": 11 + i,
-                "type_name": f"T{i + 1}",
+                "family": type_families[kind],
+                "type_id": 11 + kind,
+                "type_name": f"T{kind + 1}",
                 "level_id": 1,
                 "level_name": "L1",
                 "location_kind": "point",
@@ -109,19 +142,20 @@ def _revit_inputs(draw: st.DrawFn) -> dict[str, Any]:
                 "parameters": {},
             }
         )
-        types.append(
-            {
-                "type_id": 11 + i,
-                "family": pair_families[i],
-                "name": f"T{i + 1}",
-                "instance_ids": [101 + i],
-                "parameters": {
-                    "section_b": {"value": float(b_mm), "unit": "mm"},
-                    "section_h": {"value": float(h_mm), "unit": "mm"},
-                },
-            }
-        )
     elements.sort(key=lambda row: row["unique_id"])
+    instances: dict[int, list[int]] = {}
+    for i, kind in enumerate(type_of_pair):
+        instances.setdefault(kind, []).append(101 + i)
+    types = [
+        {
+            "type_id": 11 + kind,
+            "family": type_families[kind],
+            "name": f"T{kind + 1}",
+            "instance_ids": sorted(instances[kind]),
+            "parameters": _type_params(kind),
+        }
+        for kind in sorted(instances)
+    ]
     return {
         "map": _calc_header("harness.frame_element_map")
         | {
@@ -130,7 +164,7 @@ def _revit_inputs(draw: st.DrawFn) -> dict[str, Any]:
                     "frame_id": frame_ids[i],
                     "unique_id": unique_ids[i],
                     "element_id": 101 + i,
-                    "type_id": 11 + i,
+                    "type_id": 11 + type_of_pair[i],
                     "basis": "geometry",
                     "lower_distance_mm": 0.0,
                     "upper_distance_mm": 0.0,
@@ -159,13 +193,19 @@ def _revit_inputs(draw: st.DrawFn) -> dict[str, Any]:
         },
         "sections": {"frame_sections": sections, "area_sections": []},
         "revit": {"elements": elements, "types": types},
-        "role_statuses": {family: {"section_b": "reference", "section_h": "reference"} for family in ("F1", "F2")},
+        "role_statuses": {
+            family: {
+                role: "reference" if force_reference else draw(st.sampled_from(STATUSES))
+                for role in ("section_b", "section_h", "section_D")
+            }
+            for family in ("F1", "F2")
+        },
         "revit_placements": {
             "frames": [
                 {
                     "id": unique_ids[i],
                     "kind": "column",
-                    "section": f"{pair_families[i]}: T{i + 1}",
+                    "section": f"{type_families[type_of_pair[i]]}: T{type_of_pair[i] + 1}",
                     "i": {"x_mm": 6000 * i, "y_mm": 0, "z_mm": 0},
                     "j": {"x_mm": 6000 * i, "y_mm": 0, "z_mm": 3000},
                     "story": "L1",
