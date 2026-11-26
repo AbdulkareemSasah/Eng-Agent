@@ -1,6 +1,7 @@
 """Spec 0014 AC21 and spec 0002 §4.8: IDEA's recorded adapter contract and fake fidelity."""
 
 import hashlib
+import importlib.util
 import json
 import sys
 from argparse import Namespace
@@ -49,7 +50,15 @@ def _record_synthetic(root: Path, route: str) -> Path:
     )
     with pytest.MonkeyPatch.context() as patch:
         patch.syspath_prepend(str(_PACKAGE))
-        from acceptance.scripts.record_idea import _record
+        # Loaded by path: the acceptance scripts are not part of the eng-harness distribution.
+        spec = importlib.util.spec_from_file_location(
+            "record_idea", _PACKAGE / "acceptance" / "scripts" / "record_idea.py"
+        )
+        assert spec is not None
+        assert spec.loader is not None
+        recorder = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(recorder)
+        _record = recorder._record
 
     control = root / "control.json"
     server = _idea_config(root, control, route=route).servers["idea"]
@@ -79,7 +88,8 @@ def _record_synthetic(root: Path, route: str) -> Path:
     )
     run = root / "run"
     run.mkdir()
-    return anyio.run(_record, server, route, args, run)
+    recorded: Path = anyio.run(_record, server, route, args, run)
+    return recorded
 
 
 @pytest.fixture(scope="module", params=_recording_params())
