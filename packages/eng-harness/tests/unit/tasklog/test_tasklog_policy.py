@@ -3,10 +3,10 @@
 from dataclasses import dataclass
 
 import pytest
-from eng_harness.tasklog.privacy import POLICIES, policy_for
 
 from eng_harness.errors import HarnessCode, NotImplementedGap
 from eng_harness.servers import ConfigError
+from eng_harness.tasklog.privacy import POLICIES, policy_for
 
 
 @dataclass(frozen=True)

@@ -7,11 +7,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from eng_harness.tasklog._guard import GuardRefusal, guard_record
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from pydantic import TypeAdapter
 
+from eng_harness.tasklog._guard import GuardRefusal, guard_record
 from eng_harness.tasklog._records import OwnerWords, Redaction, RunFact, TaskRecord
 
 _VECTORS_PATH = Path(__file__).resolve().parents[1] / "data" / "tasklog" / "secret_vectors.json"

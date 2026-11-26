@@ -10,9 +10,9 @@ from typing import Any
 
 import pytest
 from eng_contract.canonical import canonical_json
-from eng_harness.tasklog._guard import GuardRefusal, guard_record
 from pydantic import TypeAdapter
 
+from eng_harness.tasklog._guard import GuardRefusal, guard_record
 from eng_harness.tasklog._records import OwnerWords, Redaction, TaskRecord
 
 _TESTS = Path(__file__).resolve().parents[2]  # packages/eng-harness/tests
