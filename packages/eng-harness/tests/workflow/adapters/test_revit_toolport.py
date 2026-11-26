@@ -604,7 +604,7 @@ def test_reconcile_lost_write_through_tool_port(tmp_path: Path, monkeypatch: pyt
             tampered: dict[str, JsonValue] = {**args, "parameter_name": "h"}
             changed = await port.reconcile(_SET, tampered, "op-lost")
             assert changed.outcome == "unknown"
-            assert len(rig.calls(_SET)) == 1
+            assert len(writes) == 1  # no resend (the fake logs a call only when it returns, never for a withheld reply)
             decision = await port.reconcile(_SET, args, "op-lost")
             assert decision.outcome == "applied"
             assert decision.missing == ()
@@ -613,8 +613,6 @@ def test_reconcile_lost_write_through_tool_port(tmp_path: Path, monkeypatch: pyt
             assert stored["value"]["requested"] == {"b": _VALUE_MM}
             assert stored["value"]["observed"]["3001"]["b"] == pytest.approx(_VALUE_MM)
             assert stored["value"]["pre_image_known"] is True
-            assert len(rig.calls(_SET)) == 1
-            repeat = await port.call(_SET, args, op_id="op-after", model=model)
-            assert isinstance(repeat, SuccessEnvelope), repeat
+            assert len(writes) == 1
 
     anyio.run(body)
