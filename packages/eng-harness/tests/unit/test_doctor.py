@@ -2,12 +2,15 @@
 
 import hashlib
 import json
+import re
 import sys
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+import pytest
 from eng_contract.store import FakeLocationProbe, LocationClass
+from fakes.sasaah_idea.server import DEFAULT_INSTALLED, DEFAULT_SERVICE, SCRIPT_TOOL, TOOLS
 
 from eng_harness.adapters import Allowlist
 from eng_harness.servers import ServersConfig
@@ -624,3 +627,44 @@ def test_revit_checks(tmp_path: Path) -> None:
     code, bad_addin = _run(doctor, config, deps, json_output=False, show_paths=False)
     assert code == 1
     assert "fail | add-in hashes revit |" in bad_addin
+
+
+@pytest.mark.parametrize(("route", "requirement"), [("native", "hidden calculator"), ("rest", "service")])
+def test_idea_section(tmp_path: Path, route: str, requirement: str) -> None:
+    """Spec 0014 AC22: the public doctor reports IDEA build, status, route and shared read timeout."""
+    import eng_harness.doctor as doctor
+    from eng_harness.adapters.idea import idea_allowlist
+
+    allow = idea_allowlist(route)
+    exe = tmp_path / "sasaah-idea-mcp"
+    exe.write_bytes(b"synthetic IDEA server")
+    sha = _sha(exe)
+    config = tmp_path / "harness.toml"
+    service_url = 'service_url = "http://127.0.0.1:9/"\n' if route == "rest" else ""
+    config.write_text(
+        f"""[servers.idea]
+adapter = "sasaah-idea-mcp"
+command = {json.dumps(str(exe))}
+args = ["--disable-script"]
+route = "{route}"
+audit_log = false
+host_key = "idea"
+client_grace_s = 2
+{service_url}build = {{ sasaah_commit = "{allow.sasaah_commit}", exe_sha256 = "{sha}" }}
+[servers.idea.roles.main]
+classes = ["session", "call", "long"]
+call_timeout_s = 90
+""",
+        encoding="utf-8",
+    )
+    status = {"installed": DEFAULT_INSTALLED, "service": DEFAULT_SERVICE, "read_only": False, "script_enabled": False}
+    schemas = {name: schema for name, schema in TOOLS.items() if name != SCRIPT_TOOL}
+    facts = {("idea", "main"): doctor.RoleFacts(schemas, status, None)}
+    deps = _deps(doctor, tmp_path, roles=_Roles(facts), allowlist_for=lambda adapter: allow)
+    _, report = _run(doctor, config, deps, json_output=False, show_paths=False)
+
+    rows = [line.lower() for line in report.splitlines()]
+    assert any(re.search(rf"\b{route}\b", row) and requirement in row for row in rows), report
+    for fact in (allow.sasaah_commit[:12], sha, "24.1", "reachable", "read_only", "script_enabled"):
+        assert fact.lower() in report.lower(), report
+    assert any(row.startswith("warn |") and "120" in row and "90" in row and "read" in row for row in rows), report
