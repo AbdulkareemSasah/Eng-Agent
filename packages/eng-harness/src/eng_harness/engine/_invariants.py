@@ -29,7 +29,7 @@ from eng_harness.engine._replay import Recorded
 from eng_harness.engine._steps import inserted_path
 from eng_harness.journal import EventType, JournalWriter
 from eng_harness.journal import _events as ev
-from eng_harness.ports import HostPort, ToolInfo
+from eng_harness.ports import HostPort, SavedModel, ToolInfo
 
 _Obj = dict[str, JsonValue]
 _KEY = re.compile(r"^[A-Za-z0-9_.:-]{1,200}$")  # spec 4.3.1 grammar of a path key
@@ -183,7 +183,7 @@ class Guard:
             resolve_ref(target, rule, self._store, self._revision.get)
 
     async def prepare(self, ctx: _Ctx, path: str, model: str | None, effect: str, action: str | None) -> None:
-        """The inserted steps before a tool: a check for a dirty read, then a save before analysis or design."""
+        """Check a dirty read, then save before an analysis or design tool's approval preview (invariant 7)."""
         if model and effect == "read" and dirty_flags().get(model):
             await self.check(ctx, path, "pre", model)
         if model and action in _ANALYSE:
@@ -229,11 +229,13 @@ class Guard:
         self._enforced(path, 1, model, "fail")
 
     async def save(self, ctx: _Ctx, base: str, model: str) -> None:
-        """Save `model` before analysis or design and journal `model_saved` with role `pre_analysis` (spec 4.6 #7)."""
+        """Save or replay `model`'s pre-analysis save and track its revision before preview refs are checked."""
         path = inserted_path(base, "pre", "save", path_key(model))
         args: _Obj = {"model": model, "role": "pre_analysis"}
         recorded = ctx._look(path, "read", "save", args)
-        if recorded is not None and ctx._replayed(recorded) is not None:
+        if recorded is not None and (done := ctx._replayed(recorded)) is not None:
+            saved = SavedModel.model_validate(self._store.payload(done.ref)["value"])
+            self._revision[saved.model_id] = saved.revision
             return
         began = ctx._begin(path, 1, "read", "save", args, effect="read", model_key=model)
         try:
@@ -246,6 +248,7 @@ class Guard:
         ctx._done(path, 1, began, done)
         saved_body = {"model_key": model, "role": "pre_analysis", **saved.model_dump(mode="json")}
         self._writer.append(EventType.MODEL_SAVED, saved_body, path=path)
+        self._revision[saved.model_id] = saved.revision
         self._enforced(path, 7, model, "pass")
 
     async def revised(

@@ -44,7 +44,7 @@ from eng_harness.ctx import (
 from eng_harness.engine import _approvals, _decide, _modes, _promote, _resources, _steps
 from eng_harness.engine._codec import decode, decode_summary
 from eng_harness.engine._guard import block_code, engine_work, enter_block_code
-from eng_harness.engine._invariants import SiblingBoard
+from eng_harness.engine._invariants import _ANALYSE, SiblingBoard
 from eng_harness.engine._replay import Recorded, ReplayIndex
 from eng_harness.journal import Event, EventType, JournalWriter
 from eng_harness.journal import _events as ev
@@ -232,14 +232,19 @@ class Ctx:
         prior = self._started.get(path)
         info = None if prior is not None else await self._tools.describe(name)
         journaled = None if prior is None else self._journaled(prior)
-        args, under = await self._modes.enter(
-            self, path, name, args, info, prior, journaled, under, item
-        )  # copy and approval (4.7)
+        args, original_key = await self._modes.enter(self, path, args, info, journaled)
+        action = prior.action if prior is not None else info.action if info is not None else None
+        model = prior.model_key if prior is not None else original_key
+        save_first = isinstance(model, str) and bool(model) and action in _ANALYSE
+        if not save_first:  # keep the preview's existing place for tools outside invariant 7
+            under = await self._modes.preview(self, path, name, args, info, prior, under, item, original_key)
         recorded = self._look(path, "tool", name, args)
         if prior is not None:  # a recorded step: replay its inserted steps, and do not call describe
             self._pending.replay(self, path, prior.model_key)
             await self._guard.touch(prior.model_key, prior.effect == "write")
             await self._guard.prepare(self, path, prior.model_key, prior.effect, prior.action)
+            if save_first:
+                under = await self._modes.preview(self, path, name, args, info, prior, under, item, original_key)
             if recorded is not None and (done := self._replayed(recorded)) is not None:
                 if prior.effect == "write":
                     if not prior.opens_model_without_writing:  # the recorded attempt's guarantee (B-562)
@@ -262,6 +267,8 @@ class Ctx:
                 self, path, key, info.host_key, info.action
             )
             await self._guard.prepare(self, path, key, info.effect, info.action)
+            if save_first:
+                under = await self._modes.preview(self, path, name, args, info, prior, under, item, original_key)
         await self._approvals.authorize(under, item, key, write=info.effect == "write")  # before any port call
         last = attempt + (self._settings.step_retry_limit if info.effect == "read" else 0)
         free = info.effect == "write" and info.action == "open" and info.opens_model_without_writing(args)

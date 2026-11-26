@@ -150,14 +150,9 @@ class Modes:
         }  # fmt: skip
 
     async def enter(
-        self, ctx: _Step, path: str, name: str, args: _Obj, info: ToolInfo | None, prior: ev.StepStarted | None,
-        journaled: _Obj | None, under: Approval | None, item: str | None,
-    ) -> tuple[_Obj, Approval | None]:  # fmt: skip
-        """The inserted steps before the tool step at `path`; the arguments and approval it runs with.
-
-        `info` is the tool of a live step; a recorded step (`prior` its latest start, `journaled` its arguments)
-        replays from the journal alone, and a write that ran under the inserted approval runs under it again.
-        """
+        self, ctx: _Step, path: str, args: _Obj, info: ToolInfo | None, journaled: _Obj | None
+    ) -> tuple[_Obj, JsonValue]:
+        """Take or replay a working copy and return the swapped arguments and original model key."""
         async with self._lock:
             param = info.model_param if info is not None else None
             key = args.get(param) if param is not None else None
@@ -166,24 +161,32 @@ class Modes:
                     self._handed.add(path)
             elif info is not None and self._copies_first(info, key):
                 await self._copy(ctx, path, str(key), info.host_key, "pre")
-            args = {k: self._swap(k, v, param, journaled) for k, v in args.items()}
+            return {k: self._swap(k, v, param, journaled) for k, v in args.items()}, key
+
+    async def preview(
+        self, ctx: _Step, path: str, name: str, args: _Obj, info: ToolInfo | None, prior: ev.StepStarted | None,
+        under: Approval | None, item: str | None, original_key: JsonValue,
+    ) -> Approval | None:  # fmt: skip
+        """Take or replay the inserted approval and return the approval the tool runs under."""
+        async with self._lock:
             apath = inserted_path(path, "pre", "approve")
             preview = self.approvals.stored(apath)
             if preview is None and info is not None and not self._covered(name, info, args, under, item):
                 await self._leases.acquire(info.host_key)
                 preview = await self._tools.preview(name, args)
             if preview is None:
-                return args, under
+                return under
             approval = await ctx._approved(apath, f"Apply {name}", preview, ApprovalKind.CHANGE_SET, engine=True)
             if not approval.approved or approval.rejected_items:
                 raise errors.ApprovalRejected(f"the approval of {name} was rejected", evidence=[approval.request_id])
             if prior is not None:  # the approval the step ran under at its last start, not the preview's models
-                return args, approval if prior.under == approval.request_id else under
+                return approval if prior.under == approval.request_id else under
             if under is not None:  # the approval it was given keeps its re-check and items (spec 4.7, EC3)
-                return args, under
+                return under
             bound = set(map(_approvals.model_key, preview.models))
-            named = {v for v in (key, args.get(param) if param else None) if isinstance(v, str)}
-            return args, approval if info is not None and info.effect == "write" and bound & named else under
+            param = info.model_param if info is not None else None
+            named = {v for v in (original_key, args.get(param) if param else None) if isinstance(v, str)}
+            return approval if info is not None and info.effect == "write" and bound & named else under
 
     async def opened(self, ctx: _Step, path: str, action: str | None, key: str | None, host_key: str | None) -> None:
         """After the tool step at `path` completed: with `copy_on_open`, the first open of a model takes its copy as
