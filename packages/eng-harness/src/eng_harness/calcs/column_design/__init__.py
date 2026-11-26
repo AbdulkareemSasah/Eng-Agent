@@ -9,6 +9,7 @@ from eng_harness.calcs.column_design.change_set import column_change_set
 from eng_harness.calcs.column_design.column_demands import column_demands
 from eng_harness.calcs.column_design.column_review import column_review
 from eng_harness.calcs.column_design.column_select import column_select
+from eng_harness.calcs.column_design.revit_readback import revit_column_readback
 from eng_harness.calcs.column_design.revit_update import revit_column_update
 from eng_harness.calcs.column_design.section_match import column_section_match
 from eng_harness.kinds.column_design import COLUMN_DESIGN_KINDS
@@ -20,6 +21,7 @@ COLUMN_DESIGN_CALCS: tuple[CalcDef, ...] = (
     column_section_match,
     column_change_set,
     revit_column_update,
+    revit_column_readback,
 )
 """The shipped column-workflow calcs, in registration order."""
 

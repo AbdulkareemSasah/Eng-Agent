@@ -29,6 +29,7 @@ from eng_harness.calcs.column_design.column_review import (
     column_review,
 )
 from eng_harness.calcs.column_design.column_select import BASIS_FIELDS, ColumnScope, SelectInput, column_select
+from eng_harness.calcs.column_design.revit_readback import revit_column_readback
 from eng_harness.calcs.column_design.revit_update import revit_column_update
 from eng_harness.calcs.column_design.section_match import column_section_match
 from eng_harness.kinds.column_design import ColumnReview, ColumnSelection
@@ -199,6 +200,7 @@ def test_registration_and_kinds() -> None:
         column_section_match,
         column_change_set,
         revit_column_update,
+        revit_column_readback,
     ) == COLUMN_DESIGN_CALCS
     assert set(COLUMN_DESIGN_KINDS) <= set(HARNESS_KINDS)
     assert BASIS_FIELDS == ("compare.length_mm",)
