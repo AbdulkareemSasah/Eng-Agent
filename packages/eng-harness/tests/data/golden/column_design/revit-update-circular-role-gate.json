@@ -1,0 +1,178 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.5 (rules U1 to U10); synthetic data, no project value",
+  "method_ref": "§4.4.5 U2",
+  "synthetic": true,
+  "derivation": "t = compare.length_mm = 5 mm (confirmed, mm). U1: the pair is (C1, u-c1); C1's ETABS section is P50 at frame_sections index 0, circular D 500, so its only target is section_D -> res_01KRC000000000000000000003#/frame_sections/0/shape/D_mm. U2: family FC has section_b and section_h reference but section_D candidate, so (C1, u-c1) is not_updatable SECTION_ROLES_UNMAPPED; the required role of a circular target is section_D, and the reference statuses of the rectangular roles do not unblock it. The block applies although the current type 31 has D_mm 500.0, |500 - 500| = 0 <= 5: the pair proceeds to U3 only if every required role is reference, so U2 runs before U3. U3 and U4 therefore produce no rows. U5: a circular target is not a non-square rectangular target, so there is no orientation row. U6: changed is empty, and blocked pairs carry no origin. U7: no assignments, so expected.elements is []; no new types, so expected.types is []. U8: all seven referenced records are complete, so complete is true. U9: not_updatable holds one row, so the ordering is trivial.",
+  "input": {
+    "map": {
+      "calc": {
+        "id": "harness.frame_element_map",
+        "version": 1,
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.frame_element_map",
+        "calc_version": "1",
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "pairs": [
+        {
+          "frame_id": "C1",
+          "unique_id": "u-c1",
+          "element_id": 101,
+          "type_id": 31,
+          "basis": "geometry",
+          "lower_distance_mm": 0.0,
+          "upper_distance_mm": 0.0
+        }
+      ],
+      "ambiguous": [],
+      "unmatched_frames": [],
+      "unmatched_elements": [],
+      "conflicts": [],
+      "complete": true
+    },
+    "frames": {
+      "frames": [
+        {
+          "id": "C1",
+          "kind": "other",
+          "section": "P50",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "P50",
+          "material": "C30",
+          "shape": {
+            "type": "circular",
+            "D_mm": 500
+          }
+        }
+      ],
+      "area_sections": []
+    },
+    "revit": {
+      "elements": [
+        {
+          "unique_id": "u-c1",
+          "element_id": 101,
+          "category": "column",
+          "family": "FC",
+          "type_id": 31,
+          "type_name": "Tcirc",
+          "level_id": 1,
+          "level_name": "L1",
+          "location_kind": "point",
+          "i": null,
+          "j": null,
+          "rotation_deg": 0,
+          "parameters": {}
+        }
+      ],
+      "types": [
+        {
+          "type_id": 31,
+          "family": "FC",
+          "name": "Tcirc",
+          "instance_ids": [
+            101
+          ],
+          "parameters": {
+            "section_D": {
+              "value": 500.0,
+              "unit": "mm"
+            }
+          }
+        }
+      ]
+    },
+    "role_statuses": {
+      "FC": {
+        "section_b": "reference",
+        "section_h": "reference",
+        "section_D": "candidate"
+      }
+    },
+    "revit_placements": {
+      "frames": [
+        {
+          "id": "u-c1",
+          "kind": "column",
+          "section": "FC: Tcirc",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "changed": [],
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.length_mm": {
+          "value": 5,
+          "unit": "mm",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "map": "res_01KRC000000000000000000001",
+    "frames": "res_01KRC000000000000000000002",
+    "sections": "res_01KRC000000000000000000003",
+    "revit": "res_01KRC000000000000000000004",
+    "revit_placements": "res_01KRC000000000000000000005",
+    "changed": "res_01KRC000000000000000000006#/changed",
+    "basis": "res_01KRC000000000000000000007"
+  },
+  "expected": {
+    "new_types": [],
+    "assignments": [],
+    "no_change": [],
+    "not_updatable": [
+      {
+        "frame_id": "C1",
+        "code": "SECTION_ROLES_UNMAPPED"
+      }
+    ],
+    "orientation": [],
+    "expected": {
+      "elements": [],
+      "types": []
+    },
+    "complete": true
+  }
+}

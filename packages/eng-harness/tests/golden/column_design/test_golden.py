@@ -29,6 +29,7 @@ from eng_harness.calcs.column_design.column_review import (
     column_review,
 )
 from eng_harness.calcs.column_design.column_select import BASIS_FIELDS, ColumnScope, SelectInput, column_select
+from eng_harness.calcs.column_design.revit_update import revit_column_update
 from eng_harness.calcs.column_design.section_match import column_section_match
 from eng_harness.kinds.column_design import ColumnReview, ColumnSelection
 from eng_harness.ports import RunClass
@@ -77,6 +78,18 @@ CALCS = {
             "longitudinal_reinforcement_limits": "verdicts.set/1",
             "items": "harness.column_check_items/1",
             "previous": "harness.column_review/1",
+            "basis": "basis.design_basis/1",
+        },
+    ),
+    "revit-update": (
+        "harness.revit_column_update",
+        {
+            "map": "harness.frame_element_map/1",
+            "frames": "model.frame_placements/1",
+            "sections": "model.sections/1",
+            "revit": "harness.revit_structure/1",
+            "revit_placements": "model.frame_placements/1",
+            "changed": "harness.column_design_record/1",
             "basis": "basis.design_basis/1",
         },
     ),
@@ -164,6 +177,7 @@ def test_registration_and_kinds() -> None:
         column_review,
         column_section_match,
         column_change_set,
+        revit_column_update,
     ) == COLUMN_DESIGN_CALCS
     assert set(COLUMN_DESIGN_KINDS) <= set(HARNESS_KINDS)
     assert BASIS_FIELDS == ("compare.length_mm",)
