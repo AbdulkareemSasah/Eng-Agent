@@ -7,6 +7,7 @@ contains every entry listed below; README documents every command with an exampl
 
 ## Unreleased
 
+- `ToolRunner`: one tool call is bounded at 7200 s, the `limits.mutation_run_seconds` bound, in place of 900 s, because the harness test step outgrew 900 s in CI; a hung tool is still an environment fault, exit 3 (plan task T42, B-620; amendment B-619, owner request of 2026-11-26).
 - `gate-check`: a changed path outside the task's globs that has a `tests/` directory segment, or is the `CHANGELOG.md` of a workspace member or of the plan's package folder, is a GC008 notice naming it a collateral edit; any other path outside the globs (also a `src/**/test_*.py` module) stays a GC008 error. `max_sessions` is an estimate that the gate never checks (B-566, plan task T41, AC10d, ADR-0036).
 - `gate-check`: GC009 always reports counted lines, the task estimate and largest files as a notice; `max_changed_lines` has no cap and `limits.max_task_lines` is removed (B-553, plan task T40, AC11, AC13).
 

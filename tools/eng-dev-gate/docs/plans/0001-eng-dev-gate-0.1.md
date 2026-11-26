@@ -730,6 +730,22 @@ tasks:
       - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_non_test_source_outside_globs_stays_the_only_gc008_error"
     covers: [AC10, AC10d]
     depends_on: [T14, T40]
+  - id: T42
+    title: "ToolRunner: the bound of one tool call is 7200 s, as limits.mutation_run_seconds"
+    # Amendment (B-619, documents only): owner request in the live session of 2026-11-26 ("remove this limit"): the
+    # harness test step now runs longer than the 900 s bound of one ToolRunner call in CI, so gate jobs end with exit 3
+    # on green code. The bound becomes 7200 s (the existing mutation bound, gate.yml limits.mutation_run_seconds), which
+    # still turns a hung tool into an environment fault (exit 3). Spec section 4.1 and AC53c follow.
+    files:
+      - "tools/eng-dev-gate/CHANGELOG.md"
+      - "tools/eng-dev-gate/src/eng_dev_gate/toolrun.py"  # only TOOL_TIMEOUT_SECONDS
+      - "tools/eng-dev-gate/tests/unit/test_toolrun.py"
+    max_changed_lines: 20
+    max_sessions: 1
+    tests_first:
+      - "tools/eng-dev-gate/tests/unit/test_toolrun.py::test_default_bound_is_the_mutation_bound"
+    covers: [AC53c]
+    depends_on: [T14]
 ---
 
 # Implementation plan: eng-dev-gate 0.1
