@@ -1190,6 +1190,8 @@ each module reaches `mutation_min`, measured per module as the task's front-matt
   Every later task whose tests run the real engine over `build_ports` (T19b, plan 0008 T1 and T3, plan 0012 T1) enters
   the returned `AdapterPorts` around `Engine.start` and `Engine.resume` in its tests, as T19a does (spec AC48). `eng-contract`
   0.1.0 merged. T15 waits for ADR-0031 and an `eng-contract` minor release.
+- Shared `adapters/__init__.py` order (B-608): plan 0014 T9a follows T19a and serializes with pending edits to
+  `build_ports` under the shared-file order in §1.
 - External amendment (B-581, from plan 0008 T3 / the B-212 writer): plan 0008 T3 amends
   `packages/eng-harness/src/eng_harness/adapters/_hostport.py` so `AdapterHostPort._record_save` skips the table read
   when `profile.tables` is empty (SAFE before plan 0008 T5), keeping the prior fingerprint; required for SAFE AC6
@@ -1236,6 +1238,10 @@ each module reaches `mutation_min`, measured per module as the task's front-matt
   SAP2000 AC11–AC13 and AC14–AC16 through the CSI tool port. Recorded in this plan's `csi/_tools.py` and
   `products/__init__.py` serialization above. Plan 0008 records the matching external amendment for `_tools.py` and
   `products/__init__.py`.
+- External amendment (B-608, from plan 0014 T9a): [plan 0014](0014-idea-adapter.md) T9a amends
+  `packages/eng-harness/src/eng_harness/adapters/__init__.py` only for the IDEA dispatch in `build_ports`, which
+  assembles the IDEA host and tool ports for the configured route (spec 0014 §4.10). Recorded in the shared
+  `adapters/__init__.py` order above.
 - First live run (amendment B-475, lead decision D-32: the edit cycle of spec 0007 on a copy of a real ETABS model
   comes first). T16, T17 and T19b are off its path, and so are plan 0008 T1 to T3; none is deleted or weakened. Each
   returns before the first task that depends on it: T16, then T19b, with the first workflow that names a command-line
