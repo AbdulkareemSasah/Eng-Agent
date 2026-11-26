@@ -75,7 +75,10 @@ def _select_rows[Row: DimRow | StatusRow | Subject](
     for footing_id in ids:
         if footing_id not in rows:
             raise ContractError(
-                ErrorCode.INVALID_ARGUMENT, "requested footing id is missing", field="ids", received=footing_id
+                ErrorCode.INVALID_ARGUMENT,
+                f"requested footing id {footing_id} is in neither input",
+                field="ids",
+                received=footing_id,
             )
 
     selected = sorted(set(ids))

@@ -53,5 +53,6 @@ def test_missing_id_refused(rows_call: tuple[HarnessCalcPort, dict[str, JsonValu
     out = port.run(CALC_ID, args | {"ids": ["J1", missing]})
     assert isinstance(out, FailureEnvelope), out
     assert (out.error.code, out.error.field) == (ErrorCode.INVALID_ARGUMENT, "ids"), out.error
-    assert missing in out.error.message or out.error.received == missing
+    assert missing in out.error.message
+    assert out.error.received == missing
     assert set(tmp_path.rglob("res_*.json")) == before
