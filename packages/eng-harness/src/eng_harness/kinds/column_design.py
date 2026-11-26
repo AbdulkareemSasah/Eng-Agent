@@ -246,10 +246,21 @@ class _Orient(_P):
 
 class _ExpectEl(_P):
     unique_id: Label
-    type_name: Label
+    type_id: Label | None = None
+    family: Label | None = None
+    type_name: Label | None = None
+
+    @model_validator(mode="after")
+    def _one_identity(self) -> Self:
+        reuse = self.type_id is not None and self.family is None and self.type_name is None
+        new = self.type_id is None and self.family is not None and self.type_name is not None
+        if not (reuse or new):
+            raise ValueError("give type_id, or family and type_name, not both and not neither")
+        return self
 
 
 class _ExpectType(_P):
+    family: Label
     name: Label
     roles: dict[str, RefString]
 
