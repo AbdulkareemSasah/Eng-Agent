@@ -17,7 +17,7 @@ from eng_contract.quantity import Quantity
 from eng_contract.refs import RefString
 from eng_contract.trace import Trace
 from eng_contract.verdicts import HOST_CHECK_ID, SubjectKind, VerdictStatus
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictBool, StringConstraints, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictBool, StrictInt, StringConstraints, model_validator
 
 from eng_harness.calc import CalcStatus
 
@@ -27,6 +27,7 @@ __all__ = [
     "CalcPayload",
     "DesignSummary",
     "ExpectedEffects",
+    "FrameElementMap",
     "ModelDiff",
     "ModelFingerprint",
     "PlacementComparison",
@@ -550,6 +551,69 @@ class PlacementComparison(CalcPayload):
         return self
 
 
+class FrameElementPair(_P):
+    """One matched frame↔element pair of `harness.frame_element_map/1` (spec 0011 §4.11)."""
+
+    frame_id: _Str
+    unique_id: _Str
+    element_id: StrictInt
+    type_id: StrictInt
+    basis: Literal["geometry", "both"]
+    lower_distance_mm: Annotated[float, Field(ge=0)]
+    upper_distance_mm: Annotated[float, Field(ge=0)]
+
+
+class FrameElementAmbiguous(_P):
+    """An id with several geometric candidates (spec 0011 §4.11 M3)."""
+
+    side: Literal["frame", "element"]
+    id: _Str
+    candidates: Annotated[list[_Str], Field(min_length=2)]
+
+
+class FrameElementUnmatchedFrame(_P):
+    """A frame with no geometric candidate (spec 0011 §4.11 M3)."""
+
+    frame_id: _Str
+
+
+class FrameElementUnmatchedElement(_P):
+    """An element with no geometric candidate (spec 0011 §4.11 M3)."""
+
+    unique_id: _Str
+
+
+class FrameElementConflict(_P):
+    """A link/geometry disagreement or a structure-join failure (spec 0011 §4.11)."""
+
+    frame_id: _Str
+    unique_id: _Str
+    geometric_unique_id: _Str | None
+
+
+class FrameElementMap(CalcPayload):
+    """`harness.frame_element_map/1` (spec 0011 §4.11)."""
+
+    pairs: list[FrameElementPair]
+    ambiguous: list[FrameElementAmbiguous]
+    unmatched_frames: list[FrameElementUnmatchedFrame]
+    unmatched_elements: list[FrameElementUnmatchedElement]
+    conflicts: list[FrameElementConflict]
+    complete: StrictBool
+
+    @model_validator(mode="after")
+    def _check(self) -> Self:
+        _ordered((row.frame_id for row in self.pairs), "pairs")
+        _ordered(((row.side, row.id) for row in self.ambiguous), "ambiguous")
+        _ordered((row.frame_id for row in self.unmatched_frames), "unmatched_frames")
+        _ordered((row.unique_id for row in self.unmatched_elements), "unmatched_elements")
+        _ordered(((row.frame_id, row.unique_id) for row in self.conflicts), "conflicts")
+        for row in self.ambiguous:
+            if row.candidates != sorted(set(row.candidates)):
+                raise ValueError("ambiguous candidates must be sorted and unique")
+        return self
+
+
 CALC_KINDS: dict[str, type[BaseModel]] = {
     "harness.model_fingerprint/1": ModelFingerprint,
     "harness.model_diff/1": ModelDiff,
@@ -558,5 +622,6 @@ CALC_KINDS: dict[str, type[BaseModel]] = {
     "harness.design_summary/1": DesignSummary,
     "harness.section_size/1": SectionSize,
     "harness.placement_comparison/1": PlacementComparison,
+    "harness.frame_element_map/1": FrameElementMap,
 }
 """The calc kinds by name, registered in `eng_harness._kinds`."""

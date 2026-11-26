@@ -1,0 +1,57 @@
+{
+  "ambiguous": [
+    {
+      "candidates": [
+        "U2",
+        "U3"
+      ],
+      "id": "F2",
+      "side": "frame"
+    }
+  ],
+  "calc": {
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "harness.frame_element_map",
+    "status": "draft",
+    "version": 1
+  },
+  "complete": true,
+  "conflicts": [
+    {
+      "frame_id": "F3",
+      "geometric_unique_id": "U4",
+      "unique_id": "U5"
+    }
+  ],
+  "draft": true,
+  "pairs": [
+    {
+      "basis": "geometry",
+      "element_id": 10,
+      "frame_id": "F1",
+      "lower_distance_mm": 0.0,
+      "type_id": 20,
+      "unique_id": "U1",
+      "upper_distance_mm": 0.0
+    }
+  ],
+  "trace": {
+    "calc_id": "harness.frame_element_map",
+    "calc_version": "1",
+    "constants": [],
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inputs": [],
+    "outputs": [],
+    "steps": []
+  },
+  "unmatched_elements": [
+    {
+      "unique_id": "U9"
+    }
+  ],
+  "unmatched_frames": [
+    {
+      "frame_id": "F9"
+    }
+  ]
+}

@@ -1,0 +1,174 @@
+{
+  "source": "eng-harness spec 0011 \u00a74.11 (M1, M2, M3, M5); mapping.offset_* confirmed; synthetic, no project value",
+  "method_ref": "\u00a74.11 M1",
+  "synthetic": true,
+  "derivation": "t = 5 mm, t\u00b2 = 25. Offsets ox=1000, oy=2000, oz=50 mm (confirmed). Frame F1 ends (0,0,0)-(0,0,3000) translate by M1 to (1000,2000,50)-(1000,2000,3050). Element U1 ends equal those translated ends. lower d\u00b2 = 0, upper d\u00b2 = 0 \u2192 matched. No link \u2192 basis = geometry. Structure U1 \u2192 element_id = 11, type_id = 21. Distances 0.0.",
+  "inputs": {
+    "input": {
+      "frames": {
+        "frames": [
+          {
+            "id": "F1",
+            "kind": "column",
+            "section": "C400",
+            "i": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          }
+        ]
+      },
+      "elements": {
+        "frames": [
+          {
+            "id": "U1",
+            "kind": "column",
+            "section": "Concrete Rectangular Column: 400 x 400",
+            "i": {
+              "x_mm": 1000.0,
+              "y_mm": 2000.0,
+              "z_mm": 50.0
+            },
+            "j": {
+              "x_mm": 1000.0,
+              "y_mm": 2000.0,
+              "z_mm": 3050.0
+            },
+            "rotation_deg": 0.0
+          }
+        ]
+      },
+      "structure": {
+        "elements": [
+          {
+            "unique_id": "U1",
+            "element_id": 11,
+            "category": "column",
+            "family": "Concrete Rectangular Column",
+            "type_id": 21,
+            "type_name": "400 x 400",
+            "level_id": 1,
+            "level_name": "L1",
+            "location_kind": "curve",
+            "i": {
+              "x_mm": 1000.0,
+              "y_mm": 2000.0,
+              "z_mm": 50.0
+            },
+            "j": {
+              "x_mm": 1000.0,
+              "y_mm": 2000.0,
+              "z_mm": 3050.0
+            },
+            "rotation_deg": 0.0,
+            "parameters": {}
+          }
+        ],
+        "types": []
+      },
+      "links": null,
+      "basis": {
+        "template": null,
+        "fields": {
+          "compare.length_mm": {
+            "value": 5.0,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "mapping.offset_x_mm": {
+            "value": 1000,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "mapping.offset_y_mm": {
+            "value": 2000,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "mapping.offset_z_mm": {
+            "value": 50,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          }
+        }
+      }
+    },
+    "meta": {
+      "refs": {
+        "frames": {
+          "result_id": "res_00000000000000000000000001",
+          "ref": "res_00000000000000000000000001",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "elements": {
+          "result_id": "res_00000000000000000000000002",
+          "ref": "res_00000000000000000000000002",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 4,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "structure": {
+          "result_id": "res_00000000000000000000000003",
+          "ref": "res_00000000000000000000000003",
+          "kind": "harness.revit_structure/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 5,
+          "parents": [],
+          "producer_tool": "revit"
+        },
+        "basis": {
+          "result_id": "res_00000000000000000000000009",
+          "ref": "res_00000000000000000000000009",
+          "kind": "basis.design_basis/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        }
+      }
+    }
+  },
+  "expected": {
+    "pairs": [
+      {
+        "frame_id": "F1",
+        "unique_id": "U1",
+        "element_id": 11,
+        "type_id": 21,
+        "basis": "geometry",
+        "lower_distance_mm": 0.0,
+        "upper_distance_mm": 0.0
+      }
+    ],
+    "ambiguous": [],
+    "unmatched_frames": [],
+    "unmatched_elements": [],
+    "conflicts": [],
+    "complete": true
+  }
+}
