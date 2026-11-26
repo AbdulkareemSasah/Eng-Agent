@@ -30,6 +30,7 @@ from workflow.adapters.test_idea_calculate import _DESIGN_CODE, _fault, _idea_co
 from workflow.adapters.test_idea_loads import _SYNTHETIC_MAP, _plan
 
 _SET = "idea_native_set_loads"
+_GET = "idea_native_get_loads"
 _CALC = "idea_calculate"
 _RUN_OUTPUT = RefRule(kinds=frozenset({"harness.run_output/1"}))
 
@@ -44,8 +45,10 @@ class _Rig:
         self.ids = SeededIdSource(b"idea-toolport", self.clock)
         workspace = Workspace(root=root / "ws", classification=LocationClass.LOCAL)
         self.store = ResultStore(workspace, HARNESS_KINDS.extend(IDEA_KINDS), self.ids, self.clock)
+        config = _idea_config(root, self.control, route=route)
+        self.service_url = config.servers["idea"].service_url
         self.ports = build_ports(
-            _idea_config(root, self.control, route=route),
+            config,
             workspace,
             self.store,
             self.run,
@@ -100,6 +103,26 @@ class _Rig:
     def ref_value(self, ref: str) -> Any:
         return resolve_ref(ref, _RUN_OUTPUT, self.store, lambda _: None).value
 
+    @property
+    def ledger(self) -> Path:
+        return self.run / "adapter" / "ops.jsonl"
+
+    def record_attempt(self, entry: dict[str, Any], op_id: str, **overrides: Any) -> None:
+        with self.ledger.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps({**entry, **overrides, "op_id": op_id}) + "\n")
+
+    def record_load_request(
+        self, entry: dict[str, Any], op_id: str, sent: dict[str, Any], **changes: JsonValue
+    ) -> None:
+        observed_ref = entry["pre_image_ref"]
+        original = self.store.get(observed_ref.removesuffix("#/value/observed"))
+        record = self.store.put(
+            "harness.run_output/1",
+            {"value": {"observed": self.ref_value(observed_ref), "sent": {**sent, **changes}}},
+            original.producer,
+        )
+        self.record_attempt(entry, op_id, pre_image_ref=f"{record.result_id}#/value/observed")
+
     def observe_write(
         self, monkeypatch: pytest.MonkeyPatch, tool: str, op_id: str, args: dict[str, JsonValue]
     ) -> list[tuple[dict[str, Any], dict[str, Any]]]:
@@ -114,8 +137,7 @@ class _Rig:
             effect: CallEffect,
         ) -> CallToolResult:
             if name == tool:
-                ledger = self.run / "adapter" / "ops.jsonl"
-                entries = [json.loads(line) for line in ledger.read_text(encoding="utf-8").splitlines()]
+                entries = [json.loads(line) for line in self.ledger.read_text(encoding="utf-8").splitlines()]
                 (entry,) = [item for item in entries if item["op_id"] == op_id]
                 assert entry["tool"] == tool
                 assert entry["args_sha256"] == payload_sha256(args)
@@ -301,12 +323,35 @@ def test_reconcile_lost_writes_through_port(
             _assert_lost(failed, "lost-loads")
             assert native.ports.host_port.session_epoch("idea") > before
             ((entry, wire),) = writes
+            assert entry["target"] == {
+                "route": "native",
+                "file": path.relative_to(native.run).as_posix(),
+                "service_url": native.service_url,
+            }
             pre_image_ref = entry["pre_image_ref"]
             sent = native.ref_value(pre_image_ref.removesuffix("/observed") + "/sent")
             assert wire["confirm"] is True
             assert wire["connection_id"] == "CON1"
             assert port.supports_reconcile(_SET)
-            decision = await port.reconcile(_SET, args, "lost-loads")
+            await _assert_native_reconcile_failures(native, args, entry, sent, path)
+
+            calls_at_read: list[bytes] = []
+            send = native.ports.servers.call
+
+            async def note_read(
+                server: str, role: str, tool: str, arguments: Mapping[str, Any], effect: CallEffect
+            ) -> CallToolResult:
+                reply = await send(server, role, tool, arguments, effect)
+                if tool == _GET:
+                    calls_at_read.append(native.control.read_bytes())
+                return reply
+
+            with monkeypatch.context() as patch:
+                patch.setattr(native.ports.servers, "call", note_read)
+                decision = await port.reconcile(_SET, args, "lost-loads")
+            # Reconciliation reads the file through the host. The control log stays unchanged after that read.
+            (calls_after_read,) = calls_at_read
+            assert native.control.read_bytes() == calls_after_read
             assert decision.outcome == "applied"
             observed = native.payload(decision.result, "harness.idea_loads/1")
             assert observed["effects"][0]["segments"][0]["N_kN"] == 25.001
@@ -326,14 +371,71 @@ def test_reconcile_lost_writes_through_port(
             _assert_lost(await port.call(_CALC, rest_args, op_id="lost-calc", model=model), "lost-calc")
             ((rest_entry, wire),) = writes
             assert rest_entry["target"] != entry["target"]
+            assert rest_entry["target"] == {
+                "route": "rest",
+                "file": path.relative_to(rest.run).as_posix(),
+                "service_url": rest.service_url,
+            }
             assert wire == {"connection_ids": [1], "confirm": True}
             assert port.supports_reconcile(_CALC)
             calls_before = rest.control.read_bytes()
+            malformed = await port.reconcile(_CALC, {"connection_ids": "x"}, "lost-calc")
+            assert malformed.outcome == "unknown"
+            assert malformed.result is None
             assert (await port.reconcile(_CALC, rest_args, "lost-calc")).outcome == "unknown"
             assert rest.control.read_bytes() == calls_before
             assert len(writes) == 1
 
     anyio.run(body)
+
+
+async def _assert_native_reconcile_failures(
+    rig: _Rig, args: dict[str, JsonValue], entry: dict[str, Any], sent: dict[str, Any], source: Path
+) -> None:
+    port = rig.ports.tool_port
+    rig.record_load_request(entry, "tampered", sent, confirm=False)
+    rig.record_load_request(entry, "outside", sent, out_path="../outside.ideaCon")
+    rig.record_load_request(entry, "not-applied", sent, out_path="never-written.ideaCon")
+    malformed = {**args, "effects": "invalid"}
+    rig.record_attempt(entry, "bad-plan", args_sha256=payload_sha256(malformed))
+
+    calls_before = rig.control.read_bytes()
+    for op_id, request in (
+        ("lost-loads", {**args, "connection": "different"}),
+        ("missing", args),
+        ("tampered", args),
+        ("outside", args),
+        ("bad-plan", malformed),
+    ):
+        decision = await port.reconcile(_SET, request, op_id)
+        assert decision.outcome == "unknown", op_id
+        assert decision.result is None
+        assert rig.control.read_bytes() == calls_before
+
+    original = source.read_bytes()
+    source.write_bytes(original + b"\n")
+    try:
+        drifted = await port.reconcile(_SET, args, "lost-loads")
+        assert drifted.outcome == "unknown"
+        (evidence,) = drifted.evidence
+        assert rig.ref_value(evidence.ref) == {"read_failed": ErrorCode.PRECONDITION_FAILED.value}
+        assert rig.control.read_bytes() == calls_before
+    finally:
+        source.write_bytes(original)
+
+    absent = await port.reconcile(_SET, args, "not-applied")
+    assert absent.outcome == "not_applied"
+    assert absent.result is None
+    assert rig.control.read_bytes() == calls_before
+    observed = rig.payload(await port.read_back(_SET, args), "harness.idea_loads/1")
+    assert observed == rig.ref_value(entry["pre_image_ref"])
+
+    _fault(rig.control, "license_refused", tool=_GET)
+    failed = await port.reconcile(_SET, args, "lost-loads")
+    assert failed.outcome == "unknown"
+    assert failed.result is None
+    (evidence,) = failed.evidence
+    assert rig.ref_value(evidence.ref) == {"read_failed": ErrorCode.HOST_NOT_CONNECTED.value}
 
 
 def _assert_lost(envelope: Envelope, op_id: str) -> None:

@@ -390,8 +390,9 @@ class IdeaToolPort(AdapterToolPort):
             or opened.get("live_project") is not True
             or opened.get("service_reachable") is not True
         ):
-            self._record(_CLOSE, {}, self._ids.new_ulid(), path)
-            await self._send_write(_CLOSE, {}, op_id)
+            close_op = self._ids.new_ulid()
+            self._record(_CLOSE, {}, close_op, path)
+            await self._send_write(_CLOSE, {}, close_op)
             self._rest_model = None
             raise ContractError(ErrorCode.HOST_NOT_CONNECTED, "IDEA did not open a live REST project")
         self._rest_model = model
@@ -675,13 +676,15 @@ class IdeaToolPort(AdapterToolPort):
         if tool == _CALC:
             # T8's REST rule returns unknown without asking the host for stale or abandoned checks.
             call_args = {key: value for key, value in args.items() if key != "model"}
-            lost = cast(LostWrite, _LostLoading(descriptor, _tools.CalculateArgs.model_validate(call_args)))
-            decision = await IdeaReconciler(tolerance_ratio=None).decide(lost, self._read)
+            try:
+                validated = _tools.CalculateArgs.model_validate(call_args)
+                lost = cast(LostWrite, _LostLoading(descriptor, validated))
+                decision = await IdeaReconciler(tolerance_ratio=None).decide(lost, self._read)
+            except ContractError, ValidationError:
+                decision = Decision(outcome="unknown", evidence={"reason": "no valid IDEA write evidence"})
         else:
             decision = Decision(outcome="unknown", evidence={"reason": "no valid IDEA write evidence"})
             if tool == _SET and (request := self._lost_loading(tool, args, op_id)) is not None:
-                plan = self._plan(args)
-                path, host = self._bound(plan.model)
                 observed: dict[str, Any] = {}
 
                 async def read(name: str, sent: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
@@ -691,6 +694,8 @@ class IdeaToolPort(AdapterToolPort):
                 # IdeaReconciler reads only descriptor and model. Its shared annotation also carries a CSI PID.
                 lost = cast(LostWrite, _LostLoading(descriptor, request))
                 try:
+                    plan = self._plan(args)
+                    path, host = self._bound(plan.model)
                     if request.connection_id == plan.connection and path in (
                         Path(request.path),
                         Path(request.out_path),
