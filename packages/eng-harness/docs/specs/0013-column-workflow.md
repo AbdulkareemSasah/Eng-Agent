@@ -376,18 +376,23 @@ changed frames of the design record, AC22), `basis` (`compare.length_mm`). Metho
 - U1 targets per pair from the frame's ETABS section: `rectangular` sets roles `section_b` and `section_h`,
   `circular` sets `section_D`; `other` is `not_updatable` `SHAPE_NOT_SUPPORTED`. Each target is the reference
   `<sections result>#/frame_sections/<i>/shape/<field>`.
-- U2 a required role whose status in `role_statuses` is `unmapped` for the element's family gives
-  `SECTION_ROLES_UNMAPPED`. An unread parameter value remains distinct from an unmapped role (Q15).
+- U2 (amendment B-614, owner answers of 2026-11-26) `role_statuses` maps each family to its roles, each with the RV
+  §4.8 validation status `reference`, `candidate` or `unmapped`. A missing required role is treated as `unmapped`.
+  A required role that is `unmapped` or `candidate` blocks the pair with `SECTION_ROLES_UNMAPPED`. The pair proceeds
+  only if every required role for the element's family is `reference`. An unread parameter value remains distinct
+  from an unmapped role (Q15).
 - U3 the element's current type with every role within `compare.length_mm` of its target is `no_change`.
 - U4 otherwise a type of the same family with every role within `compare.length_mm` is `assign` to it; several are
   `TYPE_AMBIGUOUS`; none gives one `new_type` per (family, ETABS section name), named after the ETABS section,
   duplicated from the current type of the first pair by `unique_id`; a type of that name already in the family is
-  `NAME_CONFLICT` (RV AC16). The new type's role sets carry the U1 references; its instances before the assignment
-  are none (RV AC15 `expected_instances: []`).
+  `NAME_CONFLICT` (RV AC16). The new type's role sets carry the U1 references. The plan carries no
+  `expected_instances` for a new type. R7 supplies it from the elements actually assigned before setting parameters
+  (RV AC15; amendment B-614, owner answers of 2026-11-26).
 - U5 both sides carry `rotation_deg` (`model.frame_placements/1` of ETABS and of Revit; RV §4.5 leaves an element
   with a null rotation out of that kind, so every paired element has one), but how the two conventions relate is
-  unverified until local test 6 (CW-G7). A non-square rectangular target carries the info issue
-  `ORIENTATION_UNVERIFIED`, shown in the R6 preview. In `orientation.rotations`, put
+  unverified until local test 6 (CW-G7). For a non-square rectangular target, the row in `orientation` is the
+  `ORIENTATION_UNVERIFIED` issue of severity `info` shown in the R6 preview
+  (amendment B-614, owner answers of 2026-11-26). In `orientation.rotations`, put
   `<ETABS placements>#/frames/<i>/rotation_deg` (row by `frame_id`) first, then
   `<Revit placements>#/frames/<j>/rotation_deg` (row by `unique_id`, RV §4.5), using the actual input row indices (Q16).
   No rotation is compared or written. Without a mapped `rotation` role no Revit element enters
@@ -483,8 +488,8 @@ engine checks.
 | R3 | `ctx.tool("revit_open_model", ...)` (the adapter's `working_copy`, RV AC23); the Revit state reader (RV §4.9) |
 | R4 | `ctx.calc("harness.frame_element_map", {"frames": <selected columns of this read>, ...})`; `ctx.decide("column_revit.map_result", ...)` |
 | R5 | `ctx.calc("harness.revit_column_update", ...)` with the design record's `changed` reference, the RV §4.8 validated `role_statuses` and the Revit `revit_placements` reference used by R4, as in §4.4.5 |
-| R6 | `ctx.approve(..., Preview(items=<map summary, one item per new type, role set and assignment, each with its origin and issues>, models=[etabs, revit]), kind=CHANGE_SET)` |
-| R7 | per accepted item in the order new types, role sets, assignments: `ctx.tool("revit_duplicate_family_type" | "revit_set_type_parameter_values" | "revit_change_element_type", args, under=approval, item=<id>)`, lengths as references (engine invariant 2); `approve_each_write` previews and the Revit dialog follow |
+| R6 | `ctx.approve(..., Preview(items=<map summary, one item per new type, role set and assignment, each with its origin and issues>, models=[etabs, revit]), kind=CHANGE_SET)`. Show each `orientation` row with code `ORIENTATION_UNVERIFIED` and severity `info` (amendment B-614, owner answers of 2026-11-26). |
+| R7 | For accepted items, duplicate new types, change element types, then set the new types' parameter values (amendment B-614, owner answers of 2026-11-26). Use `ctx.tool` with `revit_duplicate_family_type`, `revit_change_element_type` and `revit_set_type_parameter_values` in that order, each with `args`, `under=approval` and `item=<id>`. For each new type, set parameters only when elements have been assigned, with `expected_instances` equal to the elements actually assigned to it (RV AC15). Lengths are references (engine invariant 2). `approve_each_write` previews and the Revit dialog follow. |
 | R8 | Revit state read; `ctx.calc("harness.revit_column_readback", ...)`; `ctx.decide("column_revit.readback_result", ...)` |
 | R9 | `ctx.approve(..., kind=SIGN_OFF)`; no promotion (RV R-G1, R-G2) |
 
@@ -627,7 +632,7 @@ EC and engine amendments of §11 (Q3, Q4) are additive.
 | Q12 | `eng-harness` depending on the workspace packages `structural-codes` and `aci318-14` (§4.5): does an internal dependency need a package ADR (rule A10)? | Owner | Yes, one short package ADR, since the split into repositories (ADR-0028) turns it into a real dependency. The lead owns the ADR as a separate documents follow-up (plan §3, amendment B-578; lead decision D-19). |
 | Q13 | **[added]** A code-pack check's `CalcInfo.version` (§4.5): `CalcInfo.version` is an integer of at least 1 and a merged check has only its pack's string version | Owner, lead | Decided as spec 0010 Q20 (draft, B-442; owner queue): `CalcInfo.version` is the check's `CheckMeta.version` (structural-codes core plan T15) |
 | Q14 | **[added]** Whether the ACI 318-14 column demand fields (`MaxAxialInputs.Pu_kN`, `AxialFlexureInputs.Pu_kN`, `Mu_kNm`, `Mu_other_kNm`) should be `ref_capable` and `engineering_quantity` per CF §4.3 (`MaxAxialInputs.Pu_kN` and `AxialFlexureInputs.Mu_kNm` have neither flag; `AxialFlexureInputs.Pu_kN` and `Mu_other_kNm` have `ref_capable` only); non-blocking for v1 (amendment B-578) | Owner | v1 goes ahead with literal demands inside the referenced `harness.column_check_items/1` record; making them `ref_capable` and `engineering_quantity` later requires a structural-codes plan 0004 amendment paired with a follow-up code-pack route task (the kind stays unchanged) |
-| Q15 | How does U2 obtain the family role statuses that `harness.revit_structure/1` does not carry? | Lead, then owner | Decided (owner answer of 2026-11-26; amendment B-610): Pass the validated RV §4.8 family role statuses as an explicit input. An unread value stays distinct from an unmapped role. |
+| Q15 | How does U2 obtain the family role statuses that `harness.revit_structure/1` does not carry? | Lead, then owner | Decided (owner answer of 2026-11-26; amendment B-610): Pass the validated RV §4.8 family role statuses as an explicit input. An unread value stays distinct from an unmapped role. Clarifications (amendment B-614, owner answers of 2026-11-26): U2 keys statuses by family and then role, treats missing roles as `unmapped`, and requires `reference` for every required role. U4 and R7 derive the new type's `expected_instances` at write time from the elements assigned after duplication, before setting parameters. U5 and R6 treat each `orientation` row as the `ORIENTATION_UNVERIFIED` issue of severity `info`. |
 | Q16 | Which Revit input supplies U5's rotation reference, and in which order are the two references emitted? | Lead, then owner | Decided (owner answer of 2026-11-26; amendment B-610): Pass the Revit `model.frame_placements/1` read used by R4 into R5. In `orientation.rotations`, give the ETABS rotation reference by `frame_id` first and the Revit rotation reference by `unique_id` second. Permute the Revit `frames` in U10. |
 | Q17 | How do B1 and B2 identify types when families share a type name (U4, RV AC16)? | Lead, then owner | Decided (owner answer of 2026-11-26; amendment B-610): Use the existing type id for reuse and (family, name) for new types in the read-back expectations. |
 | C1 | Clause specs name `materials.concrete_fc` and `materials.rebar_fy`; spec 0004 AC21 requires a quantity field's unit to match its path suffix, and spec 0004 §4.2 shows paths such as `materials.concrete.<grade>.fc_MPa` (blocked by its Q1) | Owner | Done by amendment B-484 (owner decision OQ-Q44): Table A names `materials.concrete_fc_MPa` and `materials.rebar_fy_MPa` |

@@ -574,6 +574,7 @@ and structural-codes core plan T15 (`CheckMeta.version`, B-442, already merged).
 each assignment from the design record's changed frames. Amendment B-610 adds explicit validated `role_statuses`
 and `revit_placements` inputs, the U5 rotation reference order, the U10 Revit placements permutation, and the U7
 read-back identity fields in `harness.revit_column_update/1`.
+The T7 golden cases follow U2, U4 and U5 as clarified (amendment B-614, owner answers of 2026-11-26).
 
 **T8 `harness.revit_column_readback`** (spec §4.4.6). Type and value checks per planned element and type, unplanned
 type changes, missing elements, `not_read`, `stale_ok` on `before` only. B1 and B2 use the identity fields supplied by
