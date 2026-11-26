@@ -3,13 +3,17 @@
 import json
 import multiprocessing
 import os
+import traceback
 from contextlib import closing
 from pathlib import Path
 from typing import Any
+from unittest.mock import AsyncMock
 
 import anyio
 import pytest
+from eng_contract.envelope import FailureEnvelope
 from eng_contract.ids import SeededIdSource
+from eng_contract.refs import parse_ref
 from eng_contract.store import LocationClass, Workspace
 from eng_contract.units import convert
 from fakes.ports import FakeApprovalPort, FakeCalcPort, FakeInputPort
@@ -17,7 +21,8 @@ from workflow.adapters import _revit_edit_helpers as fake
 from workflow.adapters.test_revit_toolport import _DUPLICATE, _SET, _VALUE_MM, _Rig, _short_write_timeout
 from workflows.chain import Step, chain
 
-from eng_harness.adapters import build_ports
+from eng_harness.adapters import _RevitRunHostPort, _RevitRunToolPort, build_ports
+from eng_harness.adapters.revit._session_ops import RevitHostPort
 from eng_harness.basis import StoreBasisPort
 from eng_harness.block import Registry
 from eng_harness.engine import Engine, EnginePorts, EngineSettings, PermissionMode, RunRequest, RunStatus
@@ -27,6 +32,7 @@ from eng_harness.ports import ApprovalAnswer, ApprovalRequest, RunClass
 from eng_harness.servers import ServersConfig
 
 _CRASHED = 71
+_DETAIL_CHARS = 1500
 
 
 class _Approve(FakeApprovalPort):
@@ -50,7 +56,28 @@ async def _run(
     )  # fmt: skip
     send = ports.servers.call
     call = ports.tool_port.call
+    tool_port = ports.tool_port
+    host_port = ports.host_port
+    assert isinstance(tool_port, _RevitRunToolPort)
+    assert isinstance(host_port, _RevitRunHostPort)
+    reconcile = tool_port.reconcile
     inputs = FakeInputPort()
+
+    async def reconcile_and_check(tool: str, args: Any, op_id: str) -> Any:
+        entry = tool_port._revit_ledger.find(op_id)
+        assert entry is not None
+        assert entry.pre_image_ref is not None
+        record_id, _ = parse_ref(entry.pre_image_ref)
+        original = rig.store.get(record_id).producer.host
+        assert original is not None
+        before = host_port.revision(original.model_id)
+        result = await reconcile(tool, args, op_id)
+        after = host_port.revision(original.model_id)
+        if result.outcome == "applied":
+            assert after == original.model_revision + 1
+        else:
+            assert after == before == original.model_revision
+        return result
 
     async def dispatch(server: str, role: str, tool: str, *args: Any, **kwargs: Any) -> Any:
         if tool in {_SET, _DUPLICATE}:
@@ -66,20 +93,29 @@ async def _run(
             os._exit(_CRASHED)
         return result
 
-    ports.servers.call = dispatch  # type: ignore[method-assign]
-    ports.tool_port.call = call_then_cut  # type: ignore[method-assign]
+    patch = pytest.MonkeyPatch()
+    patch.setattr(ports.servers, "call", dispatch)
+    patch.setattr(ports.tool_port, "call", call_then_cut)
+    patch.setattr(tool_port, "reconcile", reconcile_and_check)
     engine = Engine(
         workspace, Registry([chain(steps)]),
         EnginePorts(ports.tool_port, ports.host_port, FakeCalcPort(RunClass.TRIAL, []),
                     StoreBasisPort(rig.store), _Approve(), inputs),
         rig.store, EngineSettings(), rig.clock, rig.ids,
     )  # fmt: skip
-    async with ports:
-        if cut is not None:
-            await ports.host_port.working_copy("m", run_dir / "copies")
-            result = await engine.start(request)
-            raise AssertionError(f"engine stopped before the cut at {cut}: {result}")
-        result = await engine.resume(request.run_id)
+    try:
+        async with ports:
+            if cut is not None:
+                await ports.host_port.working_copy("m", run_dir / "copies")
+                result = await engine.start(request)
+                raise AssertionError(f"engine stopped before the cut at {cut}: {result}")
+            result = await engine.resume(request.run_id)
+    except BaseException:
+        # The forked engine's failure reaches the parent's assertion message through this file.
+        (rig.root / "child-error.txt").write_text(traceback.format_exc(), encoding="utf-8")
+        raise
+    finally:
+        patch.undo()
     return result.status, [item.kind for item in inputs.presented]
 
 
@@ -124,7 +160,9 @@ def test_crash_matrix(tmp_path: Path, fault: str, applied: bool, cut: str, outco
     worker.start()
     try:
         worker.join(timeout=120)
-        assert worker.exitcode == _CRASHED, "engine did not reach the crash point"
+        failure = tmp_path / "child-error.txt"
+        detail = failure.read_text(encoding="utf-8")[-_DETAIL_CHARS:] if failure.is_file() else "no traceback"
+        assert worker.exitcode == _CRASHED, f"engine did not reach the crash point: {detail}"
     finally:
         if worker.is_alive():
             worker.kill()
@@ -175,3 +213,61 @@ def test_crash_matrix(tmp_path: Path, fault: str, applied: bool, cut: str, outco
             and isinstance(e.payload, (ev.StepCompleted, ev.StepReconciled))
             for e in events
         )
+
+
+def test_reconcile_applied_twice_advances_revision_once(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        rig = _Rig(
+            tmp_path, faults=[{"fault": "retry_token_consumed", "tool": _SET, "seconds": 20.0}], write_timeout_s=8
+        )
+        rig.freeze_basis()
+        tool = rig.ports.tool_port
+        host = rig.ports.host_port
+        assert isinstance(host, _RevitRunHostPort)
+        async with rig.ports:
+            key, document = await rig.working_copy()
+            original = host.identity_store.resolve(document)
+            args = rig.set_args(key, rig.put_structure(), rig.put_sections())
+            op_id = "lost-reply"
+            assert isinstance(await tool.call(_SET, args, op_id=op_id, model=key), FailureEnvelope)
+            for _ in range(2):
+                assert (await tool.reconcile(_SET, args, op_id)).outcome == "applied"
+                assert host.revision(original.model_id) == original.revision + 1
+            assert rig.calls(_SET) == []
+
+    anyio.run(exercise)
+
+
+def test_load_revit_bindings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def exercise() -> None:
+        rig = _Rig(tmp_path)
+        host = rig.ports.host_port
+        assert isinstance(host, _RevitRunHostPort)
+        path = host._binding_path
+        folder = rig.run / "copies"
+        document = folder / rig.original.name
+        key = "m@copy"
+        monkeypatch.setattr(RevitHostPort, "_open_model", AsyncMock(return_value={
+            "path": str(document), "is_workshared": False, "local_file_created": False,
+        }))  # fmt: skip
+        monkeypatch.setattr(RevitHostPort, "_document_loaded", AsyncMock(return_value=True))
+
+        assert not path.exists()
+        assert await host.locate(key) is None
+        assert await host.working_copy("m", folder) == key
+        instance = await host.locate(key)
+        assert instance is not None
+        restored = _Rig(tmp_path).ports.host_port
+        assert restored.model_files(key) == (document,)
+        assert await restored.locate(key) == instance
+
+        saved = json.loads(path.read_text(encoding="utf-8"))
+        path.write_text(json.dumps({**saved, "pipe_name": "different-pipe"}), encoding="utf-8")
+        assert await _Rig(tmp_path).ports.host_port.locate(key) is None
+        saved["models"][key]["document"] = str(folder / "missing.rvt")
+        path.write_text(json.dumps(saved), encoding="utf-8")
+        assert await _Rig(tmp_path).ports.host_port.locate(key) is None
+        path.write_text("{invalid", encoding="utf-8")
+        assert await _Rig(tmp_path).ports.host_port.locate(key) is None
+
+    anyio.run(exercise)

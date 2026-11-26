@@ -32,7 +32,13 @@ def test_map_stale_after_edit(tmp_path: Path) -> None:
         store = rig.store
         provenance = rig._provenance()
         fields: dict[str, JsonValue] = {
-            name: {"value": 0, "unit": "mm", "confirmed": True, "source": f"engineer:test@{rig.clock.now()}"}
+            name: {
+                "value": 0,
+                "unit": "mm",
+                "confirmed": True,
+                "source": f"engineer:test@{rig.clock.now()}",
+                "citation": None,
+            }
             for name in ("compare.length_mm", "mapping.offset_x_mm", "mapping.offset_y_mm", "mapping.offset_z_mm")
         }  # Exact coincidence of the synthetic placements, with aligned origins.
         basis = store.put("basis.design_basis/1", {"template": None, "fields": fields}, provenance)
@@ -63,6 +69,7 @@ def test_map_stale_after_edit(tmp_path: Path) -> None:
             await port.preview(_SET, args)
             edit = await port.call(_SET, args, op_id="edit", model=model)
             assert isinstance(edit, SuccessEnvelope), edit
+            assert binder.revision(binding.host.model_id) == binding.host.model_revision + 1
             workspace = Workspace(root=tmp_path / "ws", classification=LocationClass.LOCAL)
             engine = Engine(
                 workspace, Registry([chain([(_SET, args)])]),

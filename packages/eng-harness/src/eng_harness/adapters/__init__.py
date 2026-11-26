@@ -7,10 +7,11 @@ from pathlib import Path
 from typing import Any, Self
 
 from eng_contract.envelope import Envelope, HostInfo, LiteralInput, RefInput, SuccessEnvelope
+from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import Clock, IdSource, ModelId, Timestamp
 from eng_contract.refs import parse_ref
 from eng_contract.store import ModelStateStore, ResultStore, Workspace
-from pydantic import BaseModel, ConfigDict, JsonValue
+from pydantic import BaseModel, ConfigDict, JsonValue, ValidationError
 
 from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.adapters._allowlist import Allowlist, AllowlistError, load_allowlist
@@ -153,14 +154,14 @@ class _RevitRunHostPort(RevitHostPort):
         return self._run_dir / "adapter" / "revit-bindings.json"
 
     def load_bindings(self) -> None:
-        path = self._binding_path
-        if not path.is_file():
+        try:
+            bindings = _RevitBindings.model_validate_json(self._binding_path.read_bytes())
+        except ValidationError, OSError:
             return
-        bindings = _RevitBindings.model_validate_json(path.read_bytes())
         if bindings.pipe_name != self._pipe_name:
             return
         for key, binding in bindings.models.items():
-            if self._files.get(key, binding.document) != binding.document:
+            if not binding.document.is_file():
                 continue
             instance = binding.instance
             self._files[key], self._models[key] = binding.document, binding.model_id
@@ -169,6 +170,14 @@ class _RevitRunHostPort(RevitHostPort):
 
     async def working_copy(self, model_key: str, folder: Path) -> str:
         key = await super().working_copy(model_key, folder)
+        self._persist()
+        return key
+
+    def register_engineer_save(self, model_key: str, *, fingerprint: str) -> None:
+        super().register_engineer_save(model_key, fingerprint=fingerprint)
+        self._persist()
+
+    def _persist(self) -> None:
         bindings = _RevitBindings(
             pipe_name=self._pipe_name,
             models={
@@ -186,7 +195,12 @@ class _RevitRunHostPort(RevitHostPort):
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, path)
-        return key
+        if os.name == "posix":
+            directory = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory)
+            finally:
+                os.close(directory)
 
 
 class _RevitRunToolPort(RevitToolPort):
@@ -198,7 +212,14 @@ class _RevitRunToolPort(RevitToolPort):
         if current is None:
             return before
         if current.revision == before.model_revision:
-            current = states.increment(before.model_id, before.model_revision)
+            try:
+                current = states.increment(before.model_id, before.model_revision, fingerprint=current.fingerprint)
+            except ContractError as error:
+                if error.detail.code is not ErrorCode.CONFLICT:
+                    raise
+                current = states.get(before.model_id)
+                if current is None:
+                    return before
         return before.model_copy(update={"model_revision": current.revision})
 
     def _store_result(
@@ -218,7 +239,9 @@ class _RevitRunToolPort(RevitToolPort):
 
     async def reconcile(self, tool: str, args: Mapping[str, JsonValue], op_id: str) -> Reconciliation:
         outcome = await super().reconcile(tool, args, op_id)
-        if outcome.outcome == "applied":
+        if outcome.outcome != "applied":
+            return outcome
+        try:
             entry = self._revit_ledger.find(op_id)
             if entry is not None and entry.pre_image_ref is not None:
                 result_id, _ = parse_ref(entry.pre_image_ref)
@@ -226,6 +249,9 @@ class _RevitRunToolPort(RevitToolPort):
                 if before is not None:
                     # A crash after advancing the revision can replay the same durable pre-image.
                     self._record_edit(before)
+        except ContractError, KeyError, ValueError, OSError:
+            # Revision bookkeeping cannot overturn an observed write outcome.
+            return outcome
         return outcome
 
 
