@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- IDEA resume restores the saved working-file binding and hash before reconciliation (plan 0014 T9, B-308, Q14). Added the owner-only recording scenario and S-08 local acceptance steps.
 - IDEA native and REST tool-port assembly with reference-based load previews, durable file or project write targets, canonical read-back and lost-write reconciliation using the run's frozen design basis (plan 0014 T9a, B-609; spec 0014 §§4.7–4.10).
 - Revit reconciliation by reading for the write tools: `adapters/revit/_reconcile.py` `RevitReconciler` decides `applied` / `not_applied` / `partial` / `unknown` from complete host evidence only (failed, truncated, malformed or incomparable reads are `unknown`; a contract error from a host read propagates to the caller); setters decide per target; `change_element_type` keeps a per-element pre-image; `duplicate_family_type` scopes the family list, compares parameters with the source (AC21), and never treats an unreadable type as absent; the bound document is required (plan 0011 T10, B-239; spec 0011 AC20, AC21, §4.10).
 - Calc `harness.frame_element_map` v1 (draft): maps ETABS `model.frame_placements/1` frames to Revit placements by confirmed `mapping.offset_*` and inclusive `compare.length_mm` (exact Fraction d²), optional `etabs_link` hints (M4/M5), then joins `element_id`/`type_id` from `harness.revit_structure/1` by `unique_id` (OQ-Q104); golden cases `frame-element-map-*`, kind `harness.frame_element_map/1`, verification record (plan 0011 T12, B-241; spec 0011 AC27 to AC29, §4.11).

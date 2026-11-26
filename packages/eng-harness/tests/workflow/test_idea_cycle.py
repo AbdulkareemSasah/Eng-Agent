@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 from collections.abc import Mapping
 from contextlib import closing
 from pathlib import Path
@@ -16,6 +17,7 @@ from eng_contract.kinds.verdicts import VerdictSet
 from eng_contract.store import LocationClass, ResultStore, Workspace
 from fakes.ports import FakeApprovalPort, FakeCalcPort, FakeInputPort
 from fakes.sasaah_idea.test_server import make_ideacon
+from mcp.types import CallToolResult
 from pydantic import BaseModel, JsonValue
 from workflows.chain import ChainOutput
 
@@ -29,6 +31,7 @@ from eng_harness.journal import Event, JournalReader
 from eng_harness.journal import _events as ev
 from eng_harness.kinds.idea import IDEA_KINDS, IdeaLoads
 from eng_harness.ports import ApprovalAnswer, ApprovalRequest, RunClass, ServerCheck
+from eng_harness.servers import CallEffect
 from workflow.adapters.test_idea_calculate import _DESIGN_CODE, _idea_config
 from workflow.adapters.test_idea_loads import _SYNTHETIC_MAP, _TOLERANCE, _plan
 
@@ -90,7 +93,13 @@ class IdeaCycle:
             tool="test/idea-cycle", tool_version="1", inputs={}, started_at=self.clock.now(), duration_ms=0
         )
         fields = {
-            name: {"value": value, "unit": unit, "source": f"engineer:test@{self.clock.now()}", "confirmed": True}
+            name: {
+                "value": value,
+                "unit": unit,
+                "source": f"engineer:test@{self.clock.now()}",
+                "confirmed": True,
+                "citation": None,
+            }
             for name, value, unit in (
                 ("connection.design_code", _DESIGN_CODE, None),
                 ("checks.readback_relative_tolerance_ratio", _TOLERANCE, "1"),
@@ -165,6 +174,33 @@ class IdeaCycle:
 
     def calls(self) -> list[str]:
         return [entry["tool"] for entry in json.loads(self.control.read_text(encoding="utf-8"))["calls"]]
+
+
+CUT_EXIT = 23
+
+
+def crash_worker(root: Path, route: str, run_id: str, cut: str) -> None:
+    """Spawn from an importable package under pytest importlib collection."""
+    rig = IdeaCycle(root, route, run_id)
+
+    async def run() -> None:
+        async with rig.ports() as ports:
+            send = ports.servers.call
+
+            async def cut_after_apply(
+                server: str, role: str, tool: str, args: Mapping[str, Any], effect: CallEffect
+            ) -> CallToolResult:
+                reply = await send(server, role, tool, args, effect)
+                if tool == cut and not reply.is_error:
+                    os._exit(CUT_EXIT)  # Host applied the write, but the adapter has not consumed the reply.
+                return reply
+
+            with patch.object(ports.servers, "call", cut_after_apply):
+                outcome = await rig.start(ports)
+            raise AssertionError(f"engine never reached {cut}: {outcome}")
+
+    with patch.object(_loads, "load_shipped_map", lambda: _loads.load_map_file(_SYNTHETIC_MAP)):
+        anyio.run(run)
 
 
 def _assert_cycle(rig: IdeaCycle) -> None:

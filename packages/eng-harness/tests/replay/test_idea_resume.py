@@ -2,59 +2,29 @@
 
 import hashlib
 import multiprocessing
-import os
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 from unittest.mock import patch
 
 import anyio
 import pytest
 from fakes.ports import FakeInputPort
-from mcp.types import CallToolResult
 from workflow.adapters.test_idea_loads import _SYNTHETIC_MAP
-from workflow.test_idea_cycle import GET_LOADS, MODEL, REST_CALC, SET_LOADS, IdeaCycle
+from workflow.test_idea_cycle import CUT_EXIT, GET_LOADS, MODEL, REST_CALC, SET_LOADS, IdeaCycle, crash_worker
 
 from eng_harness.adapters.idea import _loads
 from eng_harness.engine import RunStatus
 from eng_harness.journal import _events as ev
-from eng_harness.servers import CallEffect
-
-_CUT_EXIT = 23
-
-
-def _crash_worker(root: Path, route: str, run_id: str, cut: str) -> None:
-    rig = IdeaCycle(root, route, run_id)
-
-    async def run() -> None:
-        async with rig.ports() as ports:
-            send = ports.servers.call
-
-            async def cut_after_apply(
-                server: str, role: str, tool: str, args: Mapping[str, Any], effect: CallEffect
-            ) -> CallToolResult:
-                reply = await send(server, role, tool, args, effect)
-                if tool == cut and not reply.is_error:
-                    os._exit(_CUT_EXIT)  # Host applied the write, but the adapter has not consumed the reply.
-                return reply
-
-            with patch.object(ports.servers, "call", cut_after_apply):
-                outcome = await rig.start(ports)
-            raise AssertionError(f"engine never reached {cut}: {outcome}")
-
-    with patch.object(_loads, "load_shipped_map", lambda: _loads.load_map_file(_SYNTHETIC_MAP)):
-        anyio.run(run)
 
 
 @pytest.mark.parametrize(("route", "cut"), [("native", SET_LOADS), ("rest", REST_CALC)])
 def test_crash_matrix(tmp_path: Path, route: str, cut: str) -> None:
     rig = IdeaCycle(tmp_path, route)
     original = rig.original.read_bytes()
-    worker = multiprocessing.get_context("spawn").Process(target=_crash_worker, args=(tmp_path, route, rig.run_id, cut))
+    worker = multiprocessing.get_context("spawn").Process(target=crash_worker, args=(tmp_path, route, rig.run_id, cut))
     worker.start()
     try:
         worker.join(timeout=120)
-        assert worker.exitcode == _CUT_EXIT
+        assert worker.exitcode == CUT_EXIT
     finally:
         if worker.is_alive():
             worker.kill()

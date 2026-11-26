@@ -112,6 +112,17 @@ def test_adapter_on_recordings(recordings: list[RecordedHost], tmp_path: Path) -
 
 
 def _connection_seed(host: RecordedHost) -> dict[str, list[dict[str, Any]]]:
+    # REST does not expose loading. Seed only observed case names so the fake can return
+    # a case reference for a loaded connection while still calculating its own checks.
+    case_names: dict[int, str] = {}
+    for exchange in host.calls:
+        if exchange.tool != "idea_calculate" or not exchange.result or exchange.result.get("isError"):
+            continue
+        for connection in _body(exchange.result).get("connections", []):
+            for check in connection.get("checks", []):
+                if isinstance(name := check.get("load_case_id"), str):
+                    case_names.setdefault(connection["connection_id"], name)
+
     seeds: dict[str, list[dict[str, Any]]] = {}
     for exchange in host.calls:
         path = exchange.arguments.get("path")
@@ -119,7 +130,15 @@ def _connection_seed(host: RecordedHost) -> dict[str, list[dict[str, Any]]]:
             continue
         body = _body(exchange.result)
         if exchange.tool == "idea_open_project" and body["connections"]:
-            seeds.setdefault(path, [{"id": c["id"], "name": c["name"], "loads": []} for c in body["connections"]])
+            connections = [
+                {
+                    "id": c["id"],
+                    "name": c["name"],
+                    "loads": [{"name": case_names[c["id"]]}] if c["id"] in case_names else [],
+                }
+                for c in body["connections"]
+            ]
+            seeds.setdefault(path, connections)
         elif exchange.tool == "idea_native_get_loads" and "loads" in body:
             seeds.setdefault(path, [{"id": body["connection_id"], "name": body["connection"], "loads": body["loads"]}])
     return seeds
