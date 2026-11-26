@@ -1,6 +1,7 @@
 """`harness.frame_element_map` is invariant under input permutations (plan 0011 T12; spec 0011 AC28)."""
 
 import copy
+from fractions import Fraction
 from typing import Any, cast
 
 from eng_contract.canonical import payload_sha256
@@ -9,6 +10,7 @@ from hypothesis import strategies as st
 
 from eng_harness.calc import CalcInput, CalcStatus, InputMeta, RefMeta, TraceBuilder
 from eng_harness.calcs import REGISTRY
+from eng_harness.calcs.frame_element_map import _squared
 from eng_harness.kinds.calcs import CalcMeta
 
 CALC_ID = "harness.frame_element_map"
@@ -182,3 +184,14 @@ def test_permutation_invariant(fields: dict[str, Any], data: st.DataObject) -> N
         items = list(mixed["links"].items())
         mixed["links"] = dict(data.draw(st.permutations(items)))
     assert _run(mixed) == _run(fields)
+
+
+@settings(derandomize=True, max_examples=40, deadline=None)
+@given(st.fractions(min_value=-100, max_value=100), st.fractions(min_value=-100, max_value=100))
+def test_squared_distance_is_exact(scale: Fraction, origin: Fraction) -> None:
+    # A scaled 3-4-5 triangle in x/y, with an equal 5-unit separation in z, has d² = 50 * scale².
+    a = (origin, origin, origin)
+    b = (origin + 3 * scale, origin - 4 * scale, origin + 5 * scale)
+    distance_sq = _squared(a, b)
+    assert isinstance(distance_sq, Fraction)
+    assert distance_sq == 50 * scale**2

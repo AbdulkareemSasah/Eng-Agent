@@ -1,12 +1,19 @@
 """Calc `harness.frame_element_map` basis refusals (plan 0011 T12; spec 0011 AC29, §4.11)."""
 
+from pathlib import Path
 from typing import Any
 
 import pytest
-from eng_contract.errors import ContractError, ErrorCode
+from eng_contract.envelope import Provenance
+from eng_contract.errors import ContractError, ErrorCode, ErrorDetail
+from eng_contract.ids import FixedClock, SeededIdSource
+from eng_contract.params import InputPolicy, validate_input
+from eng_contract.store import LocationClass, ResultStore, Workspace
 
+from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.calc import CalcInput, InputMeta, TraceBuilder
 from eng_harness.calcs import REGISTRY
+from eng_harness.calcs.frame_element_map import FrameElementMapInput
 
 CALC_ID = "harness.frame_element_map"
 LENGTH = "compare.length_mm"
@@ -213,3 +220,147 @@ def test_basis_non_numeric_refused() -> None:
         detail = _refusal({**fields, "basis": not_number}, refs).detail
         assert detail.code == ErrorCode.INVALID_ARGUMENT
         assert detail.message.startswith(f"basis field {path} must be a number")
+
+
+@pytest.mark.parametrize("path", [LENGTH, *OFFSETS])
+@pytest.mark.parametrize("defect", ["missing", "unconfirmed", "non-numeric"])
+def test_basis_refusal_detail(path: str, defect: str) -> None:
+    fields = _fields()
+    basis_fields = fields["basis"]["fields"]
+    if defect == "missing":
+        del basis_fields[path]
+        reason = "is missing (no default)"
+    elif defect == "unconfirmed":
+        basis_fields[path]["confirmed"] = False
+        reason = "is not confirmed"
+    else:
+        basis_fields[path]["value"] = "five"
+        reason = "must be a number >= 0" if path == LENGTH else "must be a number"
+
+    assert _refusal(fields, _refs()).detail == ErrorDetail(
+        code=ErrorCode.INVALID_ARGUMENT,
+        message=f"basis field {path} {reason}",
+        field=f"basis.fields.{path}",
+        hint=f"set and confirm {path} in the design basis",
+        retryable=False,
+    )
+
+
+@pytest.mark.parametrize("path", [LENGTH, *OFFSETS])
+def test_calc_refuses_wrong_basis_unit(path: str) -> None:
+    inp = FrameElementMapInput.model_validate(_fields())
+    # DesignBasis validation rejects the unit first. Copy the validated models to exercise the calc's own guard.
+    basis_fields = inp.basis.fields.copy()
+    basis_fields[path] = basis_fields[path].model_copy(update={"unit": "m"})
+    basis = inp.basis.model_copy(update={"fields": basis_fields})
+    meta = InputMeta.model_validate({"refs": _refs()})
+    with pytest.raises(ContractError) as caught:
+        REGISTRY[CALC_ID](inp.model_copy(update={"basis": basis}), meta, TraceBuilder())
+    assert caught.value.detail == ErrorDetail(
+        code=ErrorCode.INVALID_ARGUMENT,
+        message=f"basis field {path} must be in mm, not m",
+        field=f"basis.fields.{path}",
+        hint=f"set and confirm {path} in the design basis",
+        retryable=False,
+    )
+
+
+def test_negative_length_refusal_detail() -> None:
+    fields = {**_fields(), "basis": _basis(length=-0.5)}
+    assert _refusal(fields, _refs()).detail == ErrorDetail(
+        code=ErrorCode.OUT_OF_RANGE,
+        message="basis field compare.length_mm must be a number >= 0",
+        field="basis.fields.compare.length_mm",
+        expected={"min": 0, "unit": "mm"},
+        received=-0.5,
+        hint="set and confirm compare.length_mm in the design basis",
+        retryable=False,
+    )
+
+
+@pytest.mark.parametrize(
+    ("name", "message"),
+    [
+        ("frames", "a placement must be a record reference"),
+        ("elements", "a placement must be a record reference"),
+        ("structure", "a placement must be a record reference"),
+        ("basis", "the basis must be a record reference"),
+    ],
+)
+def test_missing_reference_detail(name: str, message: str) -> None:
+    refs = _refs()
+    del refs[name]
+    assert _refusal(_fields(), refs).detail == ErrorDetail(
+        code=ErrorCode.INVALID_ARGUMENT,
+        message=message,
+        field=name,
+        retryable=False,
+    )
+
+
+@pytest.mark.parametrize(
+    ("name", "wrong_name", "expected_kind", "actual_kind"),
+    [
+        ("frames", "basis", FP, "basis.design_basis/1"),
+        ("elements", "basis", FP, "basis.design_basis/1"),
+        ("structure", "frames", RS, FP),
+        ("basis", "frames", "basis.design_basis/1", FP),
+    ],
+)
+def test_wrong_reference_kind_detail(
+    tmp_path: Path, name: str, wrong_name: str, expected_kind: str, actual_kind: str
+) -> None:
+    clock = FixedClock(1, 1)
+    store = ResultStore(
+        Workspace(root=tmp_path, classification=LocationClass.LOCAL),
+        HARNESS_KINDS,
+        SeededIdSource(b"frame-element-map", clock),
+        clock,
+    )
+    producer = Provenance(tool="harness", tool_version="test", inputs={}, started_at=clock.now(), duration_ms=0)
+    fields = _fields()
+    refs = {key: store.put(ref["kind"], fields[key], producer).result_id for key, ref in _refs().items()}
+    refs[name] = refs[wrong_name]
+    with pytest.raises(ContractError) as caught:
+        validate_input(
+            _input_type(),
+            {key: {"$ref": result_id} for key, result_id in refs.items()},
+            source=store,
+            current_revision=lambda _: None,
+            policy=InputPolicy(require_refs=True),
+        )
+    assert caught.value.detail == ErrorDetail(
+        code=ErrorCode.REF_KIND_MISMATCH,
+        message=f"result kind {actual_kind} is not accepted",
+        field=name,
+        expected={"kinds": [expected_kind]},
+        received=actual_kind,
+        retryable=False,
+    )
+
+
+@pytest.mark.parametrize("limit", [0.0, 5.0])
+def test_match_at_inclusive_length_limit(limit: float) -> None:
+    # Coincident ends at zero, and a synthetic 3-4-5 triangle at the positive limit.
+    x, y = (0.0, 0.0) if limit == 0.0 else (3.0, 4.0)
+    element = {**_frame("U1"), "i": _point(x, y, 0.0), "j": _point(x, y, 3000.0)}
+    fields = {**_fields(), "elements": {"frames": [element]}, "basis": _basis(length=limit)}
+    pairs = _run(fields, _refs())["pairs"]
+    assert [(p["frame_id"], p["unique_id"], p["lower_distance_mm"], p["upper_distance_mm"]) for p in pairs] == [
+        ("F1", "U1", limit, limit)
+    ]
+
+
+def test_trace_records_basis_values_units_and_pointers() -> None:
+    fields = {**_fields(), "basis": _basis(offsets=(-1.5, 0.0, 2.5))}
+    refs = _refs()
+    trace = TraceBuilder()
+    definition = REGISTRY[CALC_ID]
+    definition(_input_type().model_validate(fields), InputMeta.model_validate({"refs": refs}), trace)
+    inputs = trace.build(definition, REGISTRY.content_hash(CALC_ID)).inputs
+    basis_id = refs["basis"]["result_id"]
+    entries = {entry.name: (entry.value, entry.unit, entry.ref) for entry in inputs}
+    assert entries["compare_length_mm"] == (5.0, "mm", f"{basis_id}#/fields/compare.length_mm")
+    assert entries["mapping_offset_x_mm"] == (-1.5, "mm", f"{basis_id}#/fields/mapping.offset_x_mm")
+    assert entries["mapping_offset_y_mm"] == (0.0, "mm", f"{basis_id}#/fields/mapping.offset_y_mm")
+    assert entries["mapping_offset_z_mm"] == (2.5, "mm", f"{basis_id}#/fields/mapping.offset_z_mm")
