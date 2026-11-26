@@ -38,7 +38,9 @@
     "elements": [
       {
         "unique_id": "u1",
-        "type_name": "C50"
+        "type_id": "t1",
+        "family": null,
+        "type_name": null
       }
     ],
     "types": []

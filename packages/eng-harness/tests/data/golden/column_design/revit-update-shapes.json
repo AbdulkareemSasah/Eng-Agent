@@ -1,0 +1,301 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.5 (rules U1 to U10); synthetic data, no project value",
+  "method_ref": "§4.4.5 U1",
+  "synthetic": true,
+  "derivation": "t = compare.length_mm = 5 mm (confirmed, mm). U1: the pair (C1, u-c1) has ETABS section P50 at frame_sections index 0, circular D 500, so its target is section_D -> res_01KRC000000000000000000003#/frame_sections/0/shape/D_mm; the pair (C2, u-c2) has section SD1 of shape other, so it is not_updatable SHAPE_NOT_SUPPORTED. The FS roles are both reference, so the shape alone blocks (C2, u-c2): U1 runs before U2. U2: FC section_D is reference, so (C1, u-c1) proceeds. U3: the current type 31 (Tcirc) has D_mm 600.0, |600 - 500| = 100 > 5, so it is not no_change. U4: type 31 is the only type of family FC and is outside, so no type is within; one new type named 'P50' after the section, from_unique_id 'u-c1', with the U1 role set {section_D}; no type of that name is in the family. The assignment is {unique_id u-c1, element_id '101', from_type_id '31', new_type_name 'P50'}. U5: a circular target is not a non-square rectangular target, and the other-shape pair has no target, so there is no orientation row. U6: changed is empty, so the origin is preexisting, and the new type lists ['preexisting']. U7: expected.elements is [{unique_id u-c1, family FC, type_name 'P50'}] with the new-type identity (type_id null); expected.types is [{family FC, name 'P50'}] with the U1 role reference; no expected_instances for the new type. U8: all seven referenced records are complete, so complete is true. U9: not_updatable is ordered by frame_id (one row); assignments and expected.elements are ordered by unique_id (one row).",
+  "input": {
+    "map": {
+      "calc": {
+        "id": "harness.frame_element_map",
+        "version": 1,
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.frame_element_map",
+        "calc_version": "1",
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "pairs": [
+        {
+          "frame_id": "C1",
+          "unique_id": "u-c1",
+          "element_id": 101,
+          "type_id": 31,
+          "basis": "geometry",
+          "lower_distance_mm": 0.0,
+          "upper_distance_mm": 0.0
+        },
+        {
+          "frame_id": "C2",
+          "unique_id": "u-c2",
+          "element_id": 102,
+          "type_id": 41,
+          "basis": "geometry",
+          "lower_distance_mm": 0.0,
+          "upper_distance_mm": 0.0
+        }
+      ],
+      "ambiguous": [],
+      "unmatched_frames": [],
+      "unmatched_elements": [],
+      "conflicts": [],
+      "complete": true
+    },
+    "frames": {
+      "frames": [
+        {
+          "id": "C1",
+          "kind": "other",
+          "section": "P50",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "C2",
+          "kind": "other",
+          "section": "SD1",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "P50",
+          "material": "C30",
+          "shape": {
+            "type": "circular",
+            "D_mm": 500
+          }
+        },
+        {
+          "name": "SD1",
+          "material": "S355",
+          "shape": {
+            "type": "other",
+            "host_shape": "WeakAxis"
+          }
+        }
+      ],
+      "area_sections": []
+    },
+    "revit": {
+      "elements": [
+        {
+          "unique_id": "u-c1",
+          "element_id": 101,
+          "category": "column",
+          "family": "FC",
+          "type_id": 31,
+          "type_name": "Tcirc",
+          "level_id": 1,
+          "level_name": "L1",
+          "location_kind": "point",
+          "i": null,
+          "j": null,
+          "rotation_deg": 0,
+          "parameters": {}
+        },
+        {
+          "unique_id": "u-c2",
+          "element_id": 102,
+          "category": "column",
+          "family": "FS",
+          "type_id": 41,
+          "type_name": "Tsteel",
+          "level_id": 1,
+          "level_name": "L1",
+          "location_kind": "point",
+          "i": null,
+          "j": null,
+          "rotation_deg": 0,
+          "parameters": {}
+        }
+      ],
+      "types": [
+        {
+          "type_id": 31,
+          "family": "FC",
+          "name": "Tcirc",
+          "instance_ids": [
+            101
+          ],
+          "parameters": {
+            "section_D": {
+              "value": 600.0,
+              "unit": "mm"
+            }
+          }
+        },
+        {
+          "type_id": 41,
+          "family": "FS",
+          "name": "Tsteel",
+          "instance_ids": [
+            102
+          ],
+          "parameters": {
+            "section_b": {
+              "value": 400.0,
+              "unit": "mm"
+            },
+            "section_h": {
+              "value": 400.0,
+              "unit": "mm"
+            }
+          }
+        }
+      ]
+    },
+    "role_statuses": {
+      "FC": {
+        "section_D": "reference"
+      },
+      "FS": {
+        "section_b": "reference",
+        "section_h": "reference"
+      }
+    },
+    "revit_placements": {
+      "frames": [
+        {
+          "id": "u-c1",
+          "kind": "column",
+          "section": "FC: Tcirc",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "u-c2",
+          "kind": "column",
+          "section": "FS: Tsteel",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "changed": [],
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.length_mm": {
+          "value": 5,
+          "unit": "mm",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "map": "res_01KRC000000000000000000001",
+    "frames": "res_01KRC000000000000000000002",
+    "sections": "res_01KRC000000000000000000003",
+    "revit": "res_01KRC000000000000000000004",
+    "revit_placements": "res_01KRC000000000000000000005",
+    "changed": "res_01KRC000000000000000000006#/changed",
+    "basis": "res_01KRC000000000000000000007"
+  },
+  "expected": {
+    "new_types": [
+      {
+        "family": "FC",
+        "section": "P50",
+        "name": "P50",
+        "from_unique_id": "u-c1",
+        "origins": [
+          "preexisting"
+        ],
+        "roles": {
+          "section_D": "res_01KRC000000000000000000003#/frame_sections/0/shape/D_mm"
+        }
+      }
+    ],
+    "assignments": [
+      {
+        "unique_id": "u-c1",
+        "element_id": "101",
+        "from_type_id": "31",
+        "type_id": null,
+        "new_type_name": "P50",
+        "origin": "preexisting"
+      }
+    ],
+    "no_change": [],
+    "not_updatable": [
+      {
+        "frame_id": "C2",
+        "code": "SHAPE_NOT_SUPPORTED"
+      }
+    ],
+    "orientation": [],
+    "expected": {
+      "elements": [
+        {
+          "unique_id": "u-c1",
+          "type_id": null,
+          "family": "FC",
+          "type_name": "P50"
+        }
+      ],
+      "types": [
+        {
+          "family": "FC",
+          "name": "P50",
+          "roles": {
+            "section_D": "res_01KRC000000000000000000003#/frame_sections/0/shape/D_mm"
+          }
+        }
+      ]
+    },
+    "complete": true
+  }
+}
