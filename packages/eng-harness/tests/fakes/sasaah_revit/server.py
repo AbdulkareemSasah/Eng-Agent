@@ -452,7 +452,7 @@ def _family_types(args: dict[str, Any]) -> dict[str, Any]:
     rows = [
         row
         for row in STATE.model["types"]
-        if (family_id is None or row.get("family_id") == family_id)
+        if (family_id is None or str(row.get("family_id")) == str(family_id))
         and (family_name is None or row.get("family") == family_name)
     ]
     start = int(args.get("start_index") or 0)
