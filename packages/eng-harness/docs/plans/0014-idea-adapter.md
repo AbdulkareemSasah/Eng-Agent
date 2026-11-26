@@ -215,15 +215,17 @@ tasks:
     # See plan 0002 §3, External amendment (B-608), for the shared factory scope and order.
     # Estimate: 250 for the port (55 setup and model binding, 15 describe, 85 call and write settlement,
     # 40 preview, 25 read_back, 10 supports_reconcile, 20 reconcile); 35 for build_ports dispatch;
-    # 45 to wire the reconciler and three calculation/check-result functions; 145 for the fake-host tests;
-    # 5 for CHANGELOG.md. Total: 480 changed lines.
+    # 45 to wire the reconciler and three calculation/check-result functions; 55 for the IDEA ledger (Q13);
+    # 160 for the fake-host tests (including 15 for route targets and durable write evidence); 5 for CHANGELOG.md.
+    # Total: 550 changed lines.
     title: IDEA tool port and build_ports dispatch
     files:
       - "packages/eng-harness/src/eng_harness/adapters/idea/_toolport.py"
+      - "packages/eng-harness/src/eng_harness/adapters/idea/_ledger.py"  # only IDEA write targets and durable pre-send records (amendment B-612, Q13)
       - "packages/eng-harness/src/eng_harness/adapters/__init__.py"  # only the IDEA dispatch in build_ports (amendment B-608)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/tests/workflow/adapters/test_idea_toolport.py"
-    max_changed_lines: 480
+    max_changed_lines: 550
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/workflow/adapters/test_idea_toolport.py::test_build_ports_dispatches_idea_by_route"
@@ -238,13 +240,14 @@ tasks:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.doctor (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/doctor/_idea.py"
+      - "packages/eng-harness/src/eng_harness/adapters/idea/_session_ops.py"  # only persistence and restoration of IDEA bindings and file hashes (amendment B-612, Q14)
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/acceptance/scripts/record_idea.py"
       - "packages/eng-harness/tests/unit/test_doctor.py"
       - "packages/eng-harness/tests/workflow/test_idea_cycle.py"
       - "packages/eng-harness/tests/replay/test_idea_resume.py"
       - "packages/eng-harness/tests/contract/test_idea_recordings.py"
-    max_changed_lines: 300
+    max_changed_lines: 370  # original 300, plus 50 for binding persistence and restoration and 20 for fresh-assembly crash coverage (Q14)
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/workflow/test_idea_cycle.py::test_native_cycle_steps"
@@ -354,11 +357,9 @@ Wire T8's `calculate_native`, `calculate_rest` and `get_check_results` and test 
 verdicts through `call`. Wire `IdeaReconciler` for `supports_reconcile` and `reconcile`; test the native load-write
 outcome from the file and its read-back and the lost REST calculation's `unknown` outcome without a re-run (§4.8).
 
-**Amendment (B-612).** Start with route dispatch and `describe`, load-plan validation, preview references and the
-synthetic map fixture, canonical read-back on a bound test file, and frozen-basis tests for the read paths (§4.7,
-§4.10). The native load write and its lost-reply test, and the REST calculation write and its lost-reply workflow
-test, wait for the write target and ledger decision (spec Q13). The standalone REST `unknown` decision can be tested
-without sending a write. The fresh-engine resume coverage for these bindings waits for Q14 in T9.
+**Amendment (B-612).** Test load-plan validation, preview references with the synthetic map fixture, canonical
+read-back and frozen-basis wiring (§4.7, §4.10). Implement the IDEA-specific dispatch and durable ledger targets
+decided in Q13, and cover the native load and REST calculation write and lost-reply paths through the assembled port.
 
 **T9 End to end** (AC20 to AC22). Both cycles, the crash matrix at every write step, recorded-reply contract tests
 (skipped with a reason until the owner commits IDEA recordings), the doctor section, the S-08 steps (spec §12 L1 to L11)
@@ -366,6 +367,10 @@ in `docs/local-testing.md` and a record script under `acceptance/scripts/`. If a
 `docs/local-testing.md`, T9 creates it with the IDEA part only.
 
 **Amendment (B-608).** T9 depends on T9a. Both cycles and the crash matrix use the IDEA ports assembled by `build_ports`.
+
+**Amendment (B-612, Q14).** Persist and restore the last journaled IDEA model binding and file hash before model
+lookup and reconciliation. In `test_crash_matrix`, resume with a fresh `build_ports` assembly over the same run and
+verify that the binding is restored and a cut-off write already applied by the host is reconciled without a duplicate write.
 
 **T10 Mutation scope** (amendment B-601, decision D-46; spec §9). Adds `adapters/idea/_errors.py` to `r1_modules`
 (`_stub.py`, `_verdicts.py` and `_loads.py` are already listed; `_reconcile.py` is T8's). The guard
