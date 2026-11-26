@@ -3,10 +3,10 @@
 Purpose: `guard_record` scans the free-text fields of a task record with the gate's secret rule names and
 patterns (copied from the gate's secrets rules, which the harness must never import, spec 0015 §2); owner `text`
 and harness-derived text are withheld with a `<withheld:rule:fp12>` marker and a `Redaction` entry, while agent
-`*_en` fields are refused with `GuardRefusal`, which names the field and the rule but never the text.
+`*_en` fields are refused with `GuardRefusalError`, which names the field and the rule but never the text.
 Units: `start` and `end` are offsets in the original text; the marker carries the first 12 hex digits of the
 span's SHA-256.
-Errors: `GuardRefusal` for a hit in an agent field.
+Errors: `GuardRefusalError` for a hit in an agent field.
 """
 
 import hashlib
@@ -31,7 +31,7 @@ from eng_harness.tasklog._records import (
     WithheldAfter,
 )
 
-__all__ = ["GuardRefusal", "guard_record"]
+__all__ = ["GuardRefusalError", "guard_record"]
 
 FINGERPRINT_DIGITS = 12
 """Hex digits of the span SHA-256 in the marker (spec 0015 4.4; the gate's 12-digit fingerprint)."""
@@ -62,7 +62,7 @@ _RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
 """The gate's secret rule names and patterns, copied (the harness never imports eng-dev-gate, spec 0015 §2, §4.4)."""
 
 
-class GuardRefusal(Exception):  # noqa: N818  # B-625: the T2 tests pin the name GuardRefusal
+class GuardRefusalError(Exception):
     """A secret in an agent field; names the field and the rule, never the text (spec 0015 §4.4, §6)."""
 
     def __init__(self, field: str, rule: str) -> None:
@@ -147,18 +147,18 @@ def _detail_message(record: TaskRecord) -> str | None:
 
 
 def _guard_refuse(record: TaskRecord) -> TaskRecord:
-    """`record` unchanged when clean, else `GuardRefusal` naming the first dirty field and rule."""
+    """`record` unchanged when clean, else `GuardRefusalError` naming the first dirty field and rule."""
     for name, text in _texts(record):
         if text is None:
             continue
         hit = _first_hit(text)
         if hit is not None:
-            raise GuardRefusal(name, hit)
+            raise GuardRefusalError(name, hit)
     message = _detail_message(record)
     if message is not None:
         hit = _first_hit(message)
         if hit is not None:
-            raise GuardRefusal(_DETAIL_FIELD, hit)
+            raise GuardRefusalError(_DETAIL_FIELD, hit)
     return record
 
 
@@ -199,7 +199,7 @@ def guard_record(record: TaskRecord) -> TaskRecord:
 
     Owner `text` and every free-text field of a harness record (`by == "harness"`) has its secret spans
     replaced by `<withheld:rule:fp12>` markers with one `Redaction` per span; a hit in any other free-text
-    field raises `GuardRefusal` naming the field and the rule, never the text.
+    field raises `GuardRefusalError` naming the field and the rule, never the text.
     """
     if isinstance(record, OwnerWords):
         return _guard_owner_words(record)
