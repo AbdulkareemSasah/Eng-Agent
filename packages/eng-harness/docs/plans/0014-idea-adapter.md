@@ -354,6 +354,12 @@ Wire T8's `calculate_native`, `calculate_rest` and `get_check_results` and test 
 verdicts through `call`. Wire `IdeaReconciler` for `supports_reconcile` and `reconcile`; test the native load-write
 outcome from the file and its read-back and the lost REST calculation's `unknown` outcome without a re-run (§4.8).
 
+**Amendment (B-612).** Start with route dispatch and `describe`, load-plan validation, preview references and the
+synthetic map fixture, canonical read-back on a bound test file, and frozen-basis tests for the read paths (§4.7,
+§4.10). The native load write and its lost-reply test, and the REST calculation write and its lost-reply workflow
+test, wait for the write target and ledger decision (spec Q13). The standalone REST `unknown` decision can be tested
+without sending a write. The fresh-engine resume coverage for these bindings waits for Q14 in T9.
+
 **T9 End to end** (AC20 to AC22). Both cycles, the crash matrix at every write step, recorded-reply contract tests
 (skipped with a reason until the owner commits IDEA recordings), the doctor section, the S-08 steps (spec §12 L1 to L11)
 in `docs/local-testing.md` and a record script under `acceptance/scripts/`. If another plan's task has not created
