@@ -77,6 +77,7 @@ ALLOWED_MODULES = (
     "eng_harness.kinds.column_design",
     "eng_harness.kinds.edit_cycle",
     "eng_harness.kinds.csi",
+    "eng_harness.kinds.revit",
     "eng_harness.workflows.model_edit_cycle._change_set",
 )
 ALLOWED_NAMES = {

@@ -1,6 +1,6 @@
 # HANDOFF: resume point of the v1 build
 
-> **Current resume point (2026-11-25, second pause): [docs/build/resume/PAUSE-2026-11-25b.md](docs/build/resume/PAUSE-2026-11-25b.md).** Earlier:
+> **Current resume point (2026-11-26): [docs/build/resume/PAUSE-2026-11-26.md](docs/build/resume/PAUSE-2026-11-26.md).** (The second pause of 2026-11-25 named PAUSE-2026-11-25b.md, which was never pushed.) Earlier:
 
 > **Current resume point (2026-11-25): [docs/build/resume/PAUSE-2026-11-25.md](docs/build/resume/PAUSE-2026-11-25.md).** The owner moved the writing to a cloud session; that file holds the state (306 of 360 plan tasks merged), every branch in flight with its head and next step, and the resume prompt. It supersedes the pause notes below.
 

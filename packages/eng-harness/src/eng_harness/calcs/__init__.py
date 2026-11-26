@@ -7,6 +7,7 @@ from eng_harness.calcs.column_design import COLUMN_DESIGN_CALCS, COLUMN_DESIGN_K
 from eng_harness.calcs.design_summary import design_summary
 from eng_harness.calcs.edit_cycle import EDIT_CYCLE_CALCS, EDIT_CYCLE_KINDS
 from eng_harness.calcs.footing import FOOTING_CALCS, FOOTING_KINDS
+from eng_harness.calcs.frame_element_map import frame_element_map
 from eng_harness.calcs.model_diff import model_diff
 from eng_harness.calcs.model_fingerprint import StateMatch, model_fingerprint, same_state
 from eng_harness.calcs.placement_compare import placement_compare
@@ -23,6 +24,7 @@ REGISTRY = CalcRegistry(
         design_summary,
         section_round,
         placement_compare,
+        frame_element_map,
         *FOOTING_CALCS,
         *EDIT_CYCLE_CALCS,
         *COLUMN_DESIGN_CALCS,

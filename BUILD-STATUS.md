@@ -664,8 +664,11 @@ Approvals and answers only the owner can give. Each item has the lead's recommen
 option and continued.
 
 New on 2026-11-25 (second pause): spec 0010 Q23 (how block code stores an open-footings record: a copy calc or an
-engine call; blocks B-399) and Q24 (footing_schedule and footings closed in an earlier round; affects T9, B-599). Details
-in [docs/build/resume/PAUSE-2026-11-25b.md](docs/build/resume/PAUSE-2026-11-25b.md) section 3.
+engine call; blocks B-399) and Q24 (footing_schedule and footings closed in an earlier round; affects T9, B-599). The
+pause file named then (PAUSE-2026-11-25b.md) was never pushed; the questions are stated in spec 0010 (rows Q23, Q24,
+reworded by B-597, #527) and in [docs/build/resume/PAUSE-2026-11-26.md](docs/build/resume/PAUSE-2026-11-26.md).
+
+New on 2026-11-26: OQ-Q105 and OQ-Q106 below; the Revit `_errors.py` gap OQ-G15 (6.3).
 
 ### 6.1 Approvals
 
@@ -698,6 +701,7 @@ in [docs/build/resume/PAUSE-2026-11-25b.md](docs/build/resume/PAUSE-2026-11-25b.
 
 | Id | Gap | Recommendation |
 |---|---|---|
+| OQ-G15 | `adapters/revit/_errors.py` maps the `duplicate_family_type` reply `invalid_request` "already exists" to INVALID_ARGUMENT, against spec 0011 section 4.7 (found by the B-239 review; outside T10 files; the AC21 test tolerates it) | A documents amendment giving the mapping a plan task, then a small code work item |
 | OQ-G1 | CSI `Ton` unit systems: metric tonne-force or short ton-force? Until confirmed, `eng-contract` refuses them (contract G-1) | Confirm from the CSI API documentation or a local check |
 | OQ-G2 | CSI mass and time units are not mapped in `eng-contract` 0.1 (G-2) | Map when an adapter needs masses |
 | OQ-G3 | Sign and axis convention of `forces.member_end/1` (G-3) | CSI local axes 1-2-3 (`host_local/1`), confirmed at the first local run |
@@ -717,6 +721,8 @@ in [docs/build/resume/PAUSE-2026-11-25b.md](docs/build/resume/PAUSE-2026-11-25b.
 
 | Id | Question | Lead's recommendation and what the build did |
 |---|---|---|
+| OQ-Q106 | **ANSWERED by the owner on 2026-11-25 (live session): yes.** Spec 0011 section 4.10: after a lost `revit_open_model` reply with `activate=false`, the active document is unchanged by a background open, so "the path is another document" proves nothing. | B-239 decides `unknown` (not `not_applied`) for `activate=false`. Follow-up: a documents amendment so the section 4.10 table says so. |
+| OQ-Q105 | Spec 0014 AC14 says a reply with no calculated connection gives PRECONDITION_FAILED (`analysis_current`); B-307 returns ERROR verdicts when the uncalculated connections carry host `errors`. Which reading? | Recommendation: keep the ERROR verdicts (they keep the host text, AC12, and never give a passing set) and amend AC14 to say so. B-307 merged (#528) with this behaviour. |
 | OQ-Q104 | **ANSWERED by the owner on 2026-11-20: option (a), a second input harness.revit_structure/1** as the source of element_id and type_id; a documents amendment of spec 0011 section 4.11 and plan 0011 T12 (with the ambiguous and conflict row schemas) comes first, then B-241. **BLOCKING B-241 (plan 0011 T12, calc harness.frame_element_map) and G.T7/G.T8 after it.** Spec 0011 section 4.11 requires element_id and type_id on each map pair, but the only listed inputs are model.frame_placements/1 (plus optional links and basis), whose Frame has neither field; those ids exist only on harness.revit_structure/1. The ambiguous and conflict row schemas are also underspecified | Options (writer note .lead/reports/b241-writer.md): (a) add a harness.revit_structure/1 input; (b) retype elements to harness.revit_structure/1; (c) drop element_id/type_id from pairs. Lead leaning: (a). No code written yet |
 | OQ-Q103 | **ANSWERED by the owner on 2026-11-20: all four shipped readings are confirmed** (COMBO_CONFLICT; empty loads and combinations_to_add on a soft outcome; the equilibrium union with a missing side counted as 0; DOUBLE_MATCH as INVALID_ARGUMENT); review again after the first live run if needed. Footing reaction calcs (B-401, spec 0010 section 4.9), shipped readings: (1) the combo-conflict reason code COMBO_CONFLICT (the spec names no reason); (2) on a soft outcome (UNMATCHED, PATTERN_MISSING, COMBO_CONFLICT) loads and combinations_to_add are empty; (3) safe_equilibrium compares the union of applied-load and base-reaction patterns, a missing side counted as 0; (4) two or more matches give INVALID_ARGUMENT with hint DOUBLE_MATCH | Confirm each reading or amend section 4.9; the build follows the shipped readings |
 | OQ-Q102 | **ANSWERED by the owner on 2026-11-20: keep them unknown.** B-248 stays blocked until the owner provides an L4 recording or the SAP2000 table names; it does not block the first live run. SAP2000 host table names: spec 0012 L4 names frame, joint and area loads, restraints and pattern and combination definition tables but gives no SAP2000 host table names (only Analysis Messages), and section 4.4 forbids taking keys from ETABS or SAFE | B-248 keeps them unknown; provide an L4 recording or the names |
