@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+
 from eng_harness.tasklog._pushconf import PushFileError, read_push_file
 
 
