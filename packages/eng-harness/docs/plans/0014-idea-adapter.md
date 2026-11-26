@@ -190,7 +190,7 @@ tasks:
   - id: T8
     title: Calculation on both routes, host-verdict reads, reconciliation and the stub-refusal workflows
     files:
-      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.idea (amendment B-356)
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.idea (amendment B-356); r1_modules entries for adapters/idea/_reconcile.py and adapters/idea/_calculate.py (amendment B-601)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/idea/_calculate.py"
       - "packages/eng-harness/src/eng_harness/adapters/idea/_reconcile.py"
@@ -233,6 +233,38 @@ tasks:
       - "packages/eng-harness/tests/unit/test_doctor.py::test_idea_section"
     covers: [AC20, AC21, AC22]
     depends_on: [T8]
+  - id: T10
+    title: "Mutation scope: the section 9 modules in r1_modules"
+    # Amendment (B-601, owner decision D-46, 2026-11-20): CI mutates only modules listed in
+    # [tool.eng-gate] r1_modules; spec 0014 section 9 names adapters/idea/_errors.py that is
+    # merged but absent from that list (_stub.py, _verdicts.py and _loads.py are already in
+    # r1_modules; _reconcile.py and _calculate.py are added by B-307 T8). This task adds that path to r1_modules,
+    # adds a contract guard that the section 9 list is covered by a glob, and strengthens the
+    # existing unit tests until the module reaches mutation_min (80 %) with real tests. No
+    # exclusions, pragmas or lowered thresholds; no module may be removed from r1_modules to
+    # pass MU001. No source module is listed: the work strengthens tests only. If the module
+    # cannot reach 80 % without a source change, the implementing writer reports
+    # NEEDS_PLAN_AMENDMENT. The blocked typed-loads work sketched in section 2 stays out of the
+    # front matter and takes the next free id when it is amended in.
+    # The writer measures one module at a time: an unpushed scratch commit that adds a comment
+    # line to that module only, then `uv run eng-gate mutation --package eng-harness --base HEAD~1`;
+    # the writer records each module's score in the verification record and drops the commit.
+    # The measurement runs on Linux (CI, a Linux cloud session, or WSL); a notice other than
+    # MU003 is not a score, and only a scored run with no MU001 is at or above mutation_min.
+    # The independent reviewer re-runs the per-module measurement on Linux and attaches its
+    # output (killed/total per module) to the pull request under "Review"; the work item does
+    # not merge without it (amendment B-601).
+    files:
+      - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py"  # shared by the five B-601 tasks; this task adds test_spec_0014_section_9_modules_in_r1
+      - "packages/eng-harness/tests/unit/adapters/test_idea_errors.py"  # adapters/idea/_errors.py
+    max_changed_lines: 40
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py::test_spec_0014_section_9_modules_in_r1"
+    covers: []  # section 9 mutation scope is not an AC; this plan's covers style lists ACs only
+    depends_on: [T4, T8]  # T4 _errors.py; T8 (B-307) also edits r1_modules for _reconcile.py and _calculate.py
 ---
 
 # Implementation plan: the `sasaah-idea-mcp` adapter
@@ -297,10 +329,19 @@ pre-flight and the stub refusal, host verdicts out, reconciliation of `idea_nati
 in `docs/local-testing.md` and a record script under `acceptance/scripts/`. If another plan's task has not created
 `docs/local-testing.md`, T9 creates it with the IDEA part only.
 
-**T10 Typed loads on the REST route (blocked, not in the front matter).** Starts only after the owner has run L4 and
-decided Q1 and, in the Sasaah repository, a typed tool that sends loads to the REST service exists (project lane,
-ADR-0026). Then: the tool's allowlist entry, its unit header, its read-back, and the replacement of the IG-1 and IG-3
-gap tests for that tool (a spec change, not a test changed to pass). Its own plan amendment lists files and budget.
+**T10 Mutation scope** (amendment B-601, decision D-46; spec §9). Adds `adapters/idea/_errors.py` to `r1_modules`
+(`_stub.py`, `_verdicts.py` and `_loads.py` are already listed; `_reconcile.py` is T8's). The guard
+`test_mutation_scope.py::test_spec_0014_section_9_modules_in_r1` holds the spec section 9 paths as a literal tuple and
+asserts that each matches a glob of `r1_modules`, read from `pyproject.toml` through `tomllib` (`**` crosses
+directories, as in the gate). Whichever of the five B-601 tasks lands first creates `test_mutation_scope.py` and its
+shared helper; the others add only their own test function (amendment B-601). The existing unit tests are strengthened
+until the module reaches `mutation_min`, measured as the task's front-matter comment states.
+
+**Typed loads on the REST route (blocked, not in the front matter; takes the next free id when amended in).** Starts
+only after the owner has run L4 and decided Q1 and, in the Sasaah repository, a typed tool that sends loads to the REST
+service exists (project lane, ADR-0026). Then: the tool's allowlist entry, its unit header, its read-back, and the
+replacement of the IG-1 and IG-3 gap tests for that tool (a spec change, not a test changed to pass). Its own plan
+amendment lists files and budget.
 
 ## 3. Dependencies
 
