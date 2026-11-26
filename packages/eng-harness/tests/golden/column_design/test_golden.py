@@ -80,6 +80,18 @@ CALCS = {
             "basis": "basis.design_basis/1",
         },
     ),
+    "revit-update": (
+        "harness.revit_column_update",
+        {
+            "map": "harness.frame_element_map/1",
+            "frames": "model.frame_placements/1",
+            "sections": "model.sections/1",
+            "revit": "harness.revit_structure/1",
+            "revit_placements": "model.frame_placements/1",
+            "changed": "harness.column_design_record/1",
+            "basis": "basis.design_basis/1",
+        },
+    ),
 }
 """Per file prefix: the calc id and the record kind of each referenced input field."""
 FILES = golden_files()
