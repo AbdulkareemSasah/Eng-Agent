@@ -65,7 +65,7 @@ def test_worktree_refusals(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case
         if rule is None:
             assert validation.check_log_worktree(repo, worktree, INTEGRATION_BRANCH) is None
         else:
-            with pytest.raises(validation.WorktreeRefused) as refused:
+            with pytest.raises(validation.WorktreeRefusedError) as refused:
                 validation.check_log_worktree(repo, worktree, INTEGRATION_BRANCH)
             assert refused.value.rule == rule
     finally:
