@@ -139,8 +139,9 @@ the real ports of this adapter against the synthetic fake.
   produced for them; a column without a readable rotation, or a section whose roles are not all mapped, is left out of
   the neutral kind and listed as an `info` issue (`ROTATION_UNAVAILABLE`, `SECTION_ROLES_UNMAPPED`), and stays in
   `harness.revit_structure/1`. Test: `tests/workflow/adapters/test_revit_state.py::test_neutral_kinds_complete_rows_only`.
-- AC12. Given a write to elements, when called, then the adapter first reads `get_element_details` for the same ids in
-  the same epoch and compares each `uniqueId` with the reference; a mismatch is `CONFLICT` and nothing is sent. Test:
+- AC12. Given a write to elements, when called, then the adapter reads `get_element_details` in the same epoch for
+  the `element_id` from each resolved target row (§4.8). For each id it compares the returned `uniqueId` with that
+  row's `unique_id`. A missing or mismatched identity is `CONFLICT` and no write is sent. Test:
   `tests/workflow/adapters/test_revit_identity_check.py::test_unique_id_verified_before_write`.
 - AC13. Given a write or a model read after the working copy is bound, then `revit_get_model_metadata` is read first and
   its path must be the bound working copy; if another document is active the call fails `PRECONDITION_FAILED`
@@ -442,6 +443,27 @@ The column workflow writes type or parameter changes only. Targets are always re
 rows or `harness.frame_element_map/1` pairs); quantities (`b_mm`, `h_mm`, `D_mm`, any length) are engineering quantities and
 must be references (engine invariant 2).
 
+**Caller arguments (amendment B-617).** Follow [0002 §4.5.1–2](0002-servers-and-adapters.md#452-arguments-from-neutral-kinds-and-references),
+CSI's `adapters/csi/_edits.py` (`DefineWallSectionArgs.thickness_mm`) and [0014 §4.7](0014-idea-adapter.md#47-loads-by-reference-the-plan-the-map-the-builder)
+(amendment B-612). Revit ToolPort caller models carry `$ref` objects in the argument fields below. The merged
+`adapters/revit/_tools.py` models and builders supply the internal host argument types and encoding.
+
+- `element_ids` is a list of references, one per element. Each selects the whole `#/pairs/<index>` row of
+  `harness.frame_element_map/1` or `#/elements/<index>` row of `harness.revit_structure/1`. Keep that row's
+  `element_id` and `unique_id` together through AC12 and read-back. The builder sends `element_id` as the host id.
+- `source_type_id` for duplication and `type_id` for assignment each take one reference. `type_ids` for a type
+  parameter write takes a list of one such reference. A type reference selects `#/types/<index>/type_id` in
+  `harness.revit_structure/1` or, for a newly duplicated type, `#/targets/<index>/type_id` in the stored
+  `harness.revit_write_result/1` of that duplication. `expected_instances` is a required, non-empty list of element
+  ids for the AC15 exact-set check. For a new type, [spec 0013 step R7](0013-column-workflow.md#46-steps-as-ctx-calls)
+  duplicates the type, assigns the elements, then sets its values with the ids actually assigned (B-614, Q11).
+- A length setter takes a reference in `value_mm` to a stored length field, for example
+  `#/frame_sections/<index>/shape/b_mm` in a `model.sections/1` result ([0013 §4.4.5](0013-column-workflow.md#445-harnessrevit_column_update-v1)).
+  Declare `value_mm` with `eng_param(unit="mm", ref_capable=True, engineering_quantity=True)` and apply §5's
+  bounds. The port requires it for a length and refuses `value` in that case. The builder encodes the resolved
+  number using the existing length mapping and sets the wire `valueType` and `unit` as specified for the tool.
+  Supported non-length setters use `value` with their explicit `value_type`.
+
 | Edit kind | Tool and mapping | Status |
 |---|---|---|
 | Create a column type | `duplicate_family_type(source_type_id, new_type_name)`, **no** overrides (`ApplyTypeParameterOverride` reports a failed override as a warning and still commits, `A/Families/FamilyHelpers.cs:295`); the new name is checked against the last read | implemented |
@@ -498,8 +520,9 @@ accept) after the `unique_id` check of AC12.
 The risk is concrete: after a pipe error the client resends the call once with a new id (S-12 §6, `S/BridgeClient.cs:71-93`),
 the bridge cannot recognize it, and the add-in journal that would show two calls is unreachable (R-G10). The adapter
 therefore never treats a failed write as not applied unless the text is one that a resend cannot produce (§4.7: the
-dialog "declined by the user" answer, before any write was sent), never retries one, and decides from state. Ledger and pre-image as
-0002 §4.5.7; `reconcile` first reads `revit_get_model_metadata` (active document is the bound one, else `unknown`).
+dialog "declined by the user" answer, before any write was sent), never retries one, and decides from state. Use the
+recorded Revit ledger target and pre-image (§4.12). On that pipe, `reconcile` first reads `revit_get_model_metadata`
+and returns `unknown` if the active document differs from the recorded bound document.
 
 | Tool | `applied` | `not_applied` | `partial` / `unknown` |
 |---|---|---|---|
@@ -567,6 +590,27 @@ kept in the harness; nothing is written to Revit (Q5).
 | `model_files` | the model file only |
 | `started_instances`, `close_started` | empty; no-op |
 
+**Write tool port (amendment B-617).** `describe` advertises `model` as the model selector and `value_mm` as an
+engineering parameter on length-capable tools. `preview`, `call`, `read_back` and `reconcile` accept the same
+caller shape (§4.8). Validate and resolve against the run store before building host arguments. Follow CSI's
+`AdapterToolPort` and `validate_call` (`InputPolicy(require_refs=True)`) for scalar reference fields. The shared
+`eng_contract.params.validate_input` resolves whole fields. For the reference lists, the Revit port validates
+each entry with `eng_contract.refs.resolve_ref` and its kind and pointer rules. As in the engine's `Guard`, use
+tracked revisions for freshness. For map pairs also check the source revisions required by §4.11. Keep the
+caller references in provenance as in 0002 §4.5.3. Preview uses the validated arguments and pre-image and sends
+no write. The attended call uses the resolved arguments and runs AC12 and AC13 before dispatch.
+
+**Write dispatch and pre-send evidence (amendment B-617, Q10).** Revit dispatches through its configured pipe
+to the bound document. The durable Revit ledger target identifies both the pipe and that document. The shared
+PID-based `HostTarget` contract stays unchanged, following IDEA's adapter-specific targeting in 0014 §4.10
+(B-612, Q13). Follow 0002 §4.5.7 and 0014 §4.7 for the evidence. Before sending, persist
+`harness.run_output/1` with the observed pre-image in `value.observed` and the prepared host request as sent in
+`value.sent`. The write ledger ties that evidence to `op_id`, the tool and a hash of the caller arguments, with
+the pre-image reference pointing to `#/value/observed`. Reconciliation verifies the tool and caller argument hash,
+uses the recorded request, and recovers the original target identities from the stored rows for §4.10. As in
+CSI's `AdapterToolPort.reconcile`, those historical references are read without a freshness check. Missing or
+invalid evidence yields `unknown` without a write.
+
 **Consequence for the permission modes (R-G1, Q2).** `work_on_copy` inserts a save after every write and file-copy
 promotion needs the file saved and closed: neither is possible, so the mode raises `NotImplementedGap` at its first save.
 `approve_each_write` works (every change set is approved, then the person confirms in Revit, and Revit's Undo restores
@@ -590,7 +634,7 @@ titles, paths and user names.
 | Name | Type | Unit | Bounds | Ref-capable | Source |
 |---|---|---|---|---|---|
 | `b_mm`, `h_mm`, `D_mm` and any length written (role map) | float | mm | > 0 | yes, engineering quantity | code-pack result or change set |
-| `expected_instances` | list of element refs | | non-empty | no | the workflow, from `harness.revit_structure/1` |
+| `expected_instances` | list of element ids | | non-empty | no | the workflow (§4.8, Q11) |
 | `compare.length_mm` | float | mm | ≥ 0 | basis field | design basis (13 §2), no default |
 | `mapping.offset_x_mm`, `_y_mm`, `_z_mm` | float | mm | finite | basis field | design basis or engineer, confirmed |
 | `call_timeout_s`, `client_grace_s` | int | s | ≥ 1 | no | `harness.toml`, required |
@@ -676,6 +720,8 @@ engine spec 0001; plan T1 carries them.
 | Q7 | `compare.length_mm` as the single tolerance of the mapping | Owner | Reuse it; a separate `mapping.*` tolerance only if the owner wants two |
 | Q8 | `revit_batch_execute` and `revit_run_synapse_command` on the deny list (S-12 left them for the owner) | Owner | Deny: they forward other tools or commands |
 | Q9 | Revit version: specs 008 and 009 say 2026, 07 says "2025 and newer" | Owner | Pin 2026 in the allowlist header; widen only after a local test on another version (17) |
+| Q10 | How does T14b dispatch and ledger Revit writes when the shared `HostTarget` requires a PID? | Lead, then owner | Decided (owner answer of 2026-11-26; amendment B-617): Use Revit-specific dispatch and record the pipe and bound document as the durable ledger target (§4.12). Preserve the shared PID-based target contract, following IDEA B-612 Q13. |
+| Q11 | How does a new type get its values while meeting AC15 and the merged model's non-empty `expected_instances` requirement? | Lead, then owner | Decided (owner answer of 2026-11-26; amendment B-617): Keep the merged adapter's non-empty requirement and exact-set check. Per spec 0013 amendment B-614 (owner answer of 2026-11-26), R7 duplicates the type, changes the elements' type, then sets the type values with `expected_instances` equal to the elements actually assigned. |
 | R-G1 | No save tool (S12-G11): `HostPort.save` is `NotImplementedGap`; edits stay unsaved | Owner | Q2 |
 | R-G2 | No close or revert tool: the working copy stays open, `restore` unavailable, promotion by file copy impossible | Owner | Q2 |
 | R-G3 | No analytical-model tools and no `check_model` (S12-G11) | Owner | Not needed by the column workflow; `check_model` is the adapter's read-back and integrity set (§4.8) |

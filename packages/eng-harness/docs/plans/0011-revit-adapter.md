@@ -304,6 +304,7 @@ tasks:
   - id: T14b
     # Amendment (B-611, documents only): build the Revit tool port of spec §4.12 and dispatch to it from build_ports.
     # See plan 0002 §3, External amendment (B-611), for the shared factory scope and order.
+    # Amendment (B-617): caller references, Revit dispatch and pre-send evidence in spec §4.8 and §4.12 (Q10, Q11).
     # Estimate: 215 for the port (35 setup and describe, 90 call and attended write settlement,
     # 55 preview from arguments and pre-image, 35 read_back); 50 for binding(), revision() and check_model wiring;
     # 40 for build_ports dispatch; 30 for supports_reconcile and reconcile wiring; 120 for fake-host tests;
@@ -322,7 +323,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_revit_toolport.py::test_attended_write_preview_call_and_read_back"
       - "packages/eng-harness/tests/workflow/adapters/test_revit_toolport.py::test_check_model_and_read_units_through_host_port"
       - "packages/eng-harness/tests/workflow/adapters/test_revit_toolport.py::test_reconcile_lost_write_through_tool_port"
-    covers: [AC18, AC19, AC20]  # in part: port integration for attended writes, read-back, checks and reconciliation
+    covers: [AC12, AC18, AC19, AC20]  # in part: port integration for identity checks, attended writes, read-back and reconciliation
     depends_on: [T9, T10, T11]
   - id: T15
     title: Port wiring, crash matrix, stale-map test and the Revit local-testing document
@@ -489,6 +490,13 @@ with the Revit allowlist in `build_ports` (see plan 0002 §3). Wire T9's attende
 and T10's `RevitReconciler`. Use the returned ports to test the preview from arguments and pre-image, attended
 call and read-back, model checks and units, and reconciliation of a lost write via `supports_reconcile` and `reconcile`.
 T15 uses those ports for the crash matrix and stale-map test.
+
+**Amendment (B-617).** Test the reference caller shape (§4.8), scalar length validation and row selection,
+including AC12 using both ids from the selected row and refusing a mismatched `uniqueId` before a write. Assert
+the host argument mapping, the durable pipe and document target, and the §4.12 pre-send evidence in the
+attended and lost-write cases. Verify reconciliation uses the persisted request (Q10). For a new-type setter,
+test a non-empty `expected_instances` equal to the elements actually assigned, as required by spec 0013 R7
+(amendment B-614, Q11).
 
 **T15 Wiring and documents** (AC22, AC29). The crash matrix against real fake processes and the stale-map test use
 the Revit ports from T14b. T15 also adds the Revit section of `docs/local-testing.md` (spec §12, L1 to L15).
