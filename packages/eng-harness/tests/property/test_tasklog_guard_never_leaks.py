@@ -7,11 +7,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from eng_harness.tasklog._guard import GuardRefusal, guard_record
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from pydantic import TypeAdapter
 
+from eng_harness.tasklog._guard import GuardRefusalError, guard_record
 from eng_harness.tasklog._records import OwnerWords, Redaction, RunFact, TaskRecord
 
 _VECTORS_PATH = Path(__file__).resolve().parents[1] / "data" / "tasklog" / "secret_vectors.json"
@@ -247,7 +247,7 @@ def test_guard_never_leaks(case: tuple[str, str, str], data: st.DataObject, pad_
         assert kind == "agent"
         attr = field.split(":")[1]
         text = f"noted {pad_before} {secret} {pad_after} today"
-        with pytest.raises(GuardRefusal) as caught:
+        with pytest.raises(GuardRefusalError) as caught:
             guard_record(_agent_record(field, text))
         assert caught.value.field == attr
         assert caught.value.rule == rule

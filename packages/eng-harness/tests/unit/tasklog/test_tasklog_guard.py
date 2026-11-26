@@ -10,9 +10,9 @@ from typing import Any
 
 import pytest
 from eng_contract.canonical import canonical_json
-from eng_harness.tasklog._guard import GuardRefusal, guard_record
 from pydantic import TypeAdapter
 
+from eng_harness.tasklog._guard import GuardRefusalError, guard_record
 from eng_harness.tasklog._records import OwnerWords, Redaction, TaskRecord
 
 _TESTS = Path(__file__).resolve().parents[2]  # packages/eng-harness/tests
@@ -298,7 +298,7 @@ def test_agent_secret_refused_no_echo() -> None:
     """AC6: a secret in an agent *_en field is refused naming field and rule, never the text (spec 0015 §4.4)."""
     rule, secret = _vector("github-token")
     text = f"noted {secret} today for the record"
-    with pytest.raises(GuardRefusal) as caught:
+    with pytest.raises(GuardRefusalError) as caught:
         guard_record(_narration(text))
     assert caught.value.field == "text_en"
     assert caught.value.rule == rule
@@ -330,7 +330,7 @@ def test_guard_vectors_match_gate() -> None:
         assert guarded.redactions[0].rule == rule, vid
         assert sample not in guarded.text, vid
         agent_text = f"noted {sample} today"
-        with pytest.raises(GuardRefusal) as caught:
+        with pytest.raises(GuardRefusalError) as caught:
             guard_record(_narration(agent_text))
         assert caught.value.rule == rule, vid
         assert caught.value.field == "text_en", vid
