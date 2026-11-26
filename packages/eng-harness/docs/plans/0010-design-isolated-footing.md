@@ -199,9 +199,31 @@ tasks:
       - "packages/eng-harness/tests/rules/test_footing_rules.py::test_order"
     covers: [AC13, AC14]
     depends_on: [T1]
+  - id: T7b
+    title: Calc harness.footing_rows for stored footing rows (amendment B-613)
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs.footing.rows
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/calcs/footing/__init__.py"
+      - "packages/eng-harness/src/eng_harness/calcs/footing/rows.py"  # uses the three existing footing kinds
+      - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_rows.md"
+      - "packages/eng-harness/tests/unit/footing/test_calcs_registered.py"
+      - "packages/eng-harness/tests/unit/footing/test_rows.py"
+      - "packages/eng-harness/tests/golden/footing/test_rows.py"
+      - "packages/eng-harness/tests/data/golden/footing/rows-*.json"
+      - "packages/eng-harness/tests/property/test_footing_rows.py"
+    max_changed_lines: 210  # planning estimate using T4b's budget for a single footing calc
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/golden/footing/test_rows.py::test_golden_cases"
+      - "packages/eng-harness/tests/unit/footing/test_rows.py::test_mixed_kinds_refused"
+      - "packages/eng-harness/tests/unit/footing/test_rows.py::test_missing_id_reported"
+      - "packages/eng-harness/tests/property/test_footing_rows.py::test_copy_preserves_rows"
+    covers: [AC12, AC35]
+    depends_on: [T4, T5, T6]
   - id: T8
-    # Amendment (B-597, documents only; OQ-Q93): the block passes the open footings only (spec §4.6, AC34); no merged
-    # calc changes, so no calc file joins the list; the means of storing an open footings' record is spec Q23
+    # B-597 passes the open footings only (spec §4.6, AC34). B-613 adds the copy calc in T7b.
     title: Block design_isolated_footing (rounds, batched checks, decisions, engineer dimensions, resize)
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.isolated_footing (amendment B-356)
@@ -231,12 +253,12 @@ tasks:
       - "packages/eng-harness/tests/workflow/footing/test_decisions.py::test_no_provider"
       - "packages/eng-harness/tests/workflow/footing/test_decisions.py::test_one_screen_per_round"
     covers: [AC15, AC16, AC17, AC18, AC19, AC20, AC34]
-    depends_on: [T2, T4, T4b, T5, T6, T7]  # amendment (B-567): T4 split, plan size in T4, resize in T4b
+    depends_on: [T2, T4, T4b, T5, T6, T7, T7b]
   - id: T9
     # Amendment (B-418, documents only): T9 adds the structural-codes-sbc304-2018 workspace dependency and the SBC
     # allowlist ids (moved from T2); uv.lock, _calc/_code_packs.py and test_code_pack_route.py added
     # Amendment (B-417, documents only): starts after plan 0007 T9b, which creates the shipped-workflow registry in workflows/__init__.py and makes block.discover() read it; this task adds its blocks to that registry
-    # Amendment (B-597, documents only): step 13 (the schedule) waits for spec Q24.
+    # Amendment (B-613, documents only): step 13 uses the all-subject records assembled with T7b.
     title: Workflow isolated_footing_design (definition, basis fields, steps 1 to 13, review, code packs)
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.isolated_footing (amendment B-356); structural-codes-sbc304-2018 dependency (B-418)
@@ -265,9 +287,10 @@ tasks:
       - "packages/eng-harness/tests/workflow/footing/test_workflow.py::test_unknown_cases_asked_again"
       - "packages/eng-harness/tests/workflow/footing/test_workflow.py::test_seismic_refusal"
       - "packages/eng-harness/tests/workflow/footing/test_workflow.py::test_approvals_per_mode"
+      - "packages/eng-harness/tests/workflow/footing/test_workflow.py::test_schedule_includes_earlier_closures"
       - "packages/eng-harness/tests/workflow/footing/test_code_packs.py::test_sbc_all_need_engineer"
-    covers: [AC1, AC2, AC5, AC21, AC22, AC23, AC30]
-    depends_on: [T8]
+    covers: [AC1, AC2, AC5, AC21, AC22, AC23, AC29, AC30]
+    depends_on: [T8, T7b]
   - id: T10
     # Amendment (B-585, documents only): T10 registers its §4.9 result kind harness.reactions_to_joint_loads/1 in
     # kinds/footing.py (a T1 file: only that new kind, plus the contract test and fixture); kinds/footing.py is in
@@ -463,6 +486,14 @@ entries; the rules' review table goes to the owner (spec 0005 §4.4). T7 creates
 gate type-checks a package folder without one, and footing T9 creates or extends `workflows/__init__.py` (the module
 through which the command line of plan 0006 T14 finds workflows) and registers this workflow in it (amendment B-418).
 
+**T7b Footing rows** (spec §4.4.7, Q23, Q24). Register `harness.footing_rows` v1 as `draft`, using the existing
+`harness.footing_dims/1`, `harness.footing_design/1` and `harness.footing_status/1` kinds. Add its lock entry and
+verification record. Hand-derive synthetic golden outputs by identifying the source of each expected row and
+listing the unchanged rows in id order. Cover filtering, overlapping and disjoint inputs, all three kinds and
+chaining. Unit tests cover mixed-kind refusal, missing ids and CalcPort provenance and completeness. The property
+test checks that each selected row equals its chosen source row and the output ids are sorted and unique. Resolve
+spec Q26 and Q27 before implementation and amend task scope if the framework or kind files are needed.
+
 **T8 Block** (spec §4.6). The rounds loop with `ctx.attempts`, the six batched checks through the route of T2 with the
 ACI pack, `decide_many`, engineer dimensions, resize and closures. Tests drive the block through a test workflow in
 `tests/workflow/footing/conftest.py`. By the owner answer of 2026-11-20 (OQ-Q93, option (b); amendment B-597), the
@@ -470,15 +501,18 @@ block passes the open footings only (spec §4.6, AC34): no closed footing is lai
 each keeps its last result in its closure, and no merged calc changes (T4, T4b, T5 and T6 stay as merged).
 `test_rounds_pass_open_footings_only` runs several footings of which some close while the others continue and checks,
 from the journal and the stored records, that every later layout, batch item, status row and resize row names an open
-footing only. T8's tests also cover the empty open set and check that no calc runs on an empty record. How the block
-stores an open footings' record is spec Q23, which the lead settles before T8 continues;
-if the answer adds a calc or an engine call, a plan amendment lists its files and task.
+footing only. T8's tests also cover the empty open set and check that no round calc runs on an empty record. Use
+`harness.footing_rows` (T7b) for the stored open-footings inputs to layout, checks, status and resize. At exit, chain
+the same calc to assemble the all-subject design and status for step 13 from the last records, including closure
+references. The treatment of early closures with missing source rows depends on spec Q25.
 
 **T9 Workflow** (spec §4.2, §4.7, §4.8). Definition, input and output models, `basis_fields`, steps 1 to 13 and 15, the
 seismic refusal, the SAFE-source gap, the SBC run (with the `structural-codes-sbc304-2018` workspace dependency, its
 `uv.lock` entry and the SBC ids from `check_id_for` in the route's allowlist in `_calc/_code_packs.py`, with their
 allowlist cases in `tests/unit/calcs/test_code_pack_route.py`, moved here from T2 by amendment B-418),
-approvals per mode. Step 13, the schedule, waits for spec Q24 (amendment B-597). Registration is in
+approvals per mode. Step 13 passes T8's all-subject design and status assembled with `harness.footing_rows` (T7b)
+to `harness.footing_schedule`. Test that a subject closed in an earlier round appears in the schedule with its last
+stored design and status. Early closures missing either row are covered by spec Q25. Registration is in
 `workflows/__init__.py`
 (the module through which the command line of plan 0006 finds workflows: plan 0006 T14 defines the `CliDeps`
 workflow-registry field, amendment B-412, and plan 0006 T18a binds its default to the registry that plan 0007 T9b
@@ -520,6 +554,7 @@ determinism. The non-test lines are at most a test-support helper.
 | T3 to T6 (with T4b), T10 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader); plan 0004 T5 (`FieldSpec`) |
 | T3b | eng-contract T19 (suffixed basis paths, B-464; merged) |
 | T7 | plan 0005 T1 to T4, T7 |
+| T7b | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader); spec Q26 and Q27 |
 | T8 | plan 0001 T10, T14, T14b (ctx calls, decide, ask); plan 0005 T9 (`decide_many`); plan 0009 T5 is not needed (the fake provider is in plan 0005 T5); ACI T9 (registered pack) |
 | T9 | plan 0001 T16, T17; plan 0002 T11, T13, T19a (amendment B-475); plan 0004 T8 to T10; plan 0006 T10 (choice screens); plan 0007 T6 (`copy_on_open`, `basis_fields`); plan 0007 T9b (shipped-workflow registry in `workflows/__init__.py` and `block.discover()`, amendment B-417); SBC T1 (workspace member) and T3 (registration, `check_id_for`) |
 | T10 | plan 0008 T5 (`harness.joint_loads/1`, points); plan 0008 T7 (`harness.base_reactions/1`, amendment B-585) |
@@ -561,14 +596,15 @@ determinism. The non-test lines are at most a test-support helper.
   with SAFE 22 (L4); the program comparisons of the ACI plan (L5); the decision model after spike S-07 (L6); the footing
   benchmark for F6 and F7 (spec Q16).
 - Review: each pull request by a subagent that did not write it, with the correctness, Python, type-design,
-  silent-failure and test lenses; T3 to T7 and T10 also against the R1 rules (no literal, cited method, golden sources);
+  silent-failure and test lenses; T3 to T7b and T10 also against the R1 rules (no literal, cited method, golden sources);
   T2 and T11 also with the security lens (route refusal, allowlist). Second-family review and owner approvals are
   `awaiting owner`.
 
 ## 5. Rollback
 
 Each task is one squash-merged pull request into `build/v1`; a revert removes it and its dependants (T8 depends on T2,
-T4, T4b and T5 to T7; T4b on T4; T9 on T8; T11 on T9 and T10). Until T9 merges, nothing registers the workflow. Calcs, points, rules and blocks
+T4, T4b, T5, T6, T7 and T7b; T4b on T4; T9 on T8 and T7b; T11 on T9 and T10). Until T9 merges, nothing registers
+the workflow. Calcs, points, rules and blocks
 are versioned with lock files, so a fix after runs have been journaled is a new version; old journals keep replaying
 against the version they recorded or stop with `ReplayDivergence`, never silently. Reverting T2 removes the core and ACI
 `structural-codes` dependencies with it; reverting T9 removes the SBC one.

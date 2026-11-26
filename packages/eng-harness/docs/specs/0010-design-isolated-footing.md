@@ -38,7 +38,7 @@ room for both bottom layers is refused with `OUT_OF_RANGE`, field `dims` (§4.4.
 **Amendment B-597.** By the owner answer of 2026-11-20 (OQ-Q93, option (b)), the block passes the open footings only:
 each round the layout, the check batches, the status and the resize read a record that holds only the footings still
 open; a closed footing keeps its last result aside; no merged calc changes (§4.6, AC34, Q22). How block code stores
-that record is Q23; the schedule input that follows from it is Q24. No engineering number is added.
+that record and passes every subject to the schedule is decided by B-613 (Q23, Q24).
 
 ## 1. Problem
 
@@ -131,6 +131,10 @@ values are synthetic and say so. Synthetic basis templates follow spec 0004 §4.
 - AC12. Given the calc registry, then each calc of §4.4 has a method source naming its section here, verification
   `draft`, a verification record under `docs/verification/calcs/`, a lock entry, and only `Cited` constants. Test:
   `tests/unit/footing/test_calcs_registered.py::test_metadata_and_constants`.
+- AC35. Given two stored footing records of the same supported kind, the copy calc returns that kind with the
+  requested rows unchanged and sorted by id. An overlapping id uses the extra row, a missing id is reported as an
+  issue, and mixed kinds are refused (§4.4.7). Tests: `tests/golden/footing/test_rows.py::test_golden_cases`,
+  `tests/unit/footing/test_rows.py`, `tests/property/test_footing_rows.py::test_copy_preserves_rows`.
 
 ### 3.4 Decision point and rules (§4.5)
 
@@ -388,12 +392,32 @@ all six are `PASS`; `failing` when any is `FAIL`; else `needs_engineer`. `state`
 
 #### 4.4.6 `harness.footing_schedule` v1
 
-Input: `subjects`, the last `design`, the last `status` (Q24), closures (reasons), the decision references, `basis`
-(`foundation.min_clear_distance_mm`). Clearance per pair of footings, plans centred on their joints (the column is centred,
+Input: `subjects`, the block's all-subject `design` and `status` (§4.6, Q24), closures (reasons), the decision
+references, `basis` (`foundation.min_clear_distance_mm`). Clearance per pair of footings, plans centred on their joints (the column is centred,
 BP §2): `gx = |xi − xj| − (Lxi + Lxj)/2`, `gy` likewise; both negative is an overlap; one negative gives the other as the
 distance; both positive give `√(gx² + gy²)` (compared squared). A distance below `min_clear_distance_mm` marks both
 footings `NEEDS_ENGINEER` (`CLEARANCE`, the neighbour named). Output `harness.footing_schedule/1`: per footing the design,
 status, reasons, family statuses and ratios, verdict-set references, decision references, sources of each size.
+
+#### 4.4.7 `harness.footing_rows` v1 **[added]** (amendment B-613)
+
+Input: `base` and `extra`, two top-level references to whole stored records, resolved by the CalcPort. Both records
+must be of the same kind: `harness.footing_dims/1`, `harness.footing_design/1` or `harness.footing_status/1`.
+`ids` is the ordered list of footing ids to keep.
+
+- K1. Refuse inputs of different kinds. For each id in `ids`, copy its row unchanged from `extra` if present there,
+  otherwise from `base`. Report an issue naming each requested id found in neither input (Q27).
+- K2. Return only the selected `footings`, sorted and unique by id as required by all three kinds. The calc is pure,
+  uses no basis fields and performs no arithmetic on the rows.
+- K3. Trace the two input references and the row selection, citing this section. The CalcPort records the input
+  references and parent records and sets `tool: "harness"` provenance as for the sibling calcs (calcs §4.12).
+
+Output: a stored record of the same kind as the inputs, with fresh `calc`, `draft` and `trace` metadata. The three
+sibling kinds have no payload `complete` field, so the CalcPort marks a successful result complete by default.
+Q26 covers kind selection in the framework. Q27 covers issue reporting and completeness for missing rows.
+
+Verification: `draft`, with a verification record citing §4.4.7 and hand-derived golden cases for all three kinds.
+Cover filtering, overlap, disjoint inputs, chaining, ordering, missing ids and mixed-kind refusal (AC35).
 
 ### 4.5 Decision point and rules
 
@@ -420,33 +444,33 @@ labels and references to the schedule.
 ### 4.6 The block `design_isolated_footing`
 
 Input: `subjects`, `reactions`, `service_cases`, `factored_cases` (references), `check_ids` (base id to id). Output:
-`design` (the record of the last round that reached the layout), `status` (the record of the last round that reached
-the status), `closures` (each with the footing's last result, below), `decisions`, `verdict_sets`, `rounds`. `design`
-or `status` is null when no round reached that calc; for example, both are null when every footing closed at step 1 as
-`NEEDS_ENGINEER` (amendment B-597).
+`design` (`harness.footing_design/1`) and `status` (`harness.footing_status/1`) covering every subject for §4.8
+step 13 (Q24), `closures` (each with the footing's last result, below), `decisions`, `verdict_sets`, `rounds`.
+Q25 covers a subject that has no stored row of a kind required by step 13.
 
 1. `dims = ctx.calc("harness.footing_plan_size", ...)`. Footings with a `NEEDS_ENGINEER` status are closed; the others
    are the open footings. If no footing is open, the block does not enter the loop (`break` at its start) and runs no
-   further calc on an empty record.
+   further round calc on an empty record.
 2. `async for a in ctx.attempts(ctx.basis.count("attempts.footing_rounds"))`, over the open footings:
-   1. `ctx.calc("harness.footing_layout", ...)` on the open footings' record of `dims`; `WIDTH_TOO_SMALL` closes (its
-      numbers are informative only, §4.4.3 L1). If no footing remains open, `break`; no further calc runs on an empty
-      record.
-   2. Six `ctx.calc` batches, items per open footing: bearing per service case; one-way shear, punching, flexure per
-      factored case; minimum steel and development once. Inputs are references: reaction rows by pointer
+   1. Build the open footings' `dims` with `harness.footing_rows` and pass it to
+      `ctx.calc("harness.footing_layout", ...)`. `WIDTH_TOO_SMALL` closes (its numbers are informative only, §4.4.3 L1).
+      If no footing remains open, `break`; no further round calc runs on an empty record.
+   2. Build the still-open footings' `design` with `harness.footing_rows`. Run six `ctx.calc` batches, items per open
+      footing: bearing per service case; one-way shear, punching, flexure per factored case; minimum steel and
+      development once. Inputs are references: reaction rows by pointer
       (`/rows/<n>/FX_kN`, ...), basis fields (the ACI clause-spec paths, ACI plan Q2), design fields
       (`/footings/<i>/Lx_mm`, ...).
-   3. `ctx.calc("harness.footing_status", ...)` on the open footings' design: `passed` and `needs_engineer` footings
-      close. If no footing remains open, `break`; no further calc runs on an empty record.
+   3. `ctx.calc("harness.footing_status", ...)` on that same design record. `passed` and `needs_engineer` footings
+      close. If no footing remains open, `break`; no further round calc runs on an empty record.
    4. No failing footing: `break`. On `a.is_last`: failing footings close `ATTEMPTS_EXHAUSTED`, then `break` (Q1).
    5. `ctx.decide_many` with one request per failing footing (rules of §4.5).
    6. `ask_engineer`: `ctx.ask(FootingDimensions, title=...)` per such footing (`L` the square plan size, `h`, `s`,
       with units; no separate `Lx` and `Ly`, Q17);
       `combine_with_neighbor`: closes `COMBINE_REQUESTED`.
    7. `dims = ctx.calc("harness.footing_resize", ...)` once per engineer answer and once for the other actions
-      (§4.4.4), each call on a record of only the open footings that call acts on, with an action for each of them;
-      `LIMIT_REACHED` closes. If no footing is open before a resize call or after these closures, `break`; no further
-      calc runs on an empty record.
+      (§4.4.4), each call on a `dims` record built with `harness.footing_rows` for only the open footings that call
+      acts on, with an action for each of them. `LIMIT_REACHED` closes. If no footing is open before a resize call
+      or after these closures, `break`; no further round calc runs on an empty record.
 
 Open footings only (amendment B-597; owner answer of 2026-11-20, OQ-Q93, option (b)): the block passes the open
 footings only. Each round, the layout and the resize read a `harness.footing_dims/1`, and the check batches and the
@@ -455,8 +479,18 @@ record of that kind that holds it; a footing that closes at any step leaves ever
 checked, judged or resized again (so the numbers of a `WIDTH_TOO_SMALL` row never reach a check, §4.4.3 L1). A closed
 footing keeps its last result aside: its closure holds its status, its reason and the references of the last records
 that hold its row (`harness.footing_dims/1`, and `harness.footing_design/1` and `harness.footing_status/1` when it
-reached them). No merged calc changes: the calcs of §4.4 keep their versions, inputs and rules (Q22). How block code
-stores an open footings' record is Q23.
+reached them).
+
+Amendment B-613 (Q23, Q24): the block uses `ctx.calc("harness.footing_rows", ...)` (§4.4.7) to store these
+records. For a single source, pass its reference as both `base` and `extra`. For multiple sources of one kind,
+start with the oldest source as `base` and chain one call per extra source in record order. After the first call,
+use the previous result as `base`. Request only the wanted ids available so far. This selects each row from the
+latest source that holds it. In step 2.1 this also joins the open rows from the preceding round's separate resize results.
+
+At block exit, build the design and status separately with the same calc. Use the last records that hold each
+subject's row of that kind, using the closure references for closed footings and the latest records for any open
+footings. Pass both all-subject references to the schedule. The empty-open-set rule stops the round calcs. Final
+assembly uses stored rows from rounds and closures for step 13 (Q25 for rows that were never stored).
 
 The `for` over footings builds argument lists only; every engineering value is a calc output or a reference.
 
@@ -502,7 +536,8 @@ WS §4 as ctx calls: 1, 2 engine (build check, `copy_on_open`). 3 `ctx.tool("csi
 `csi_results_joint_reactions` (spec 0002 §4.6.1 step 13), then `harness.footing_subjects`. 6 `ctx.ask(FootingCases)`
 (`service_cases`, `factored_cases`: lists of case names) inside `ctx.attempts(ctx.basis.count("attempts.cases"))`, each
 name checked against the case names of the reaction rows (string equality, no engineering value). 7 to 12
-`ctx.block(design_isolated_footing, ...)`. 13 `harness.footing_schedule`. 14 `ctx.block(footing_safe_cross_check, ...)`
+`ctx.block(design_isolated_footing, ...)`. 13 `harness.footing_schedule` with the block's all-subject design and status
+references (§4.6). 14 `ctx.block(footing_safe_cross_check, ...)`
 when on. 15 `ctx.decide("footing_review", ...)`. 16 report and sign-off (spec 0006). A `.FDB` as `--input` is FG-2.
 
 ### 4.9 SAFE cross-check `footing_safe_cross_check`
@@ -577,7 +612,8 @@ WS §9; also: any value or default in code; host design results as verdicts; det
 | AC1, AC12, AC13, AC23 | Unit | `tests/unit/footing/` |
 | AC2, AC14 | Rules | `tests/rules/` |
 | AC3, AC4 | Unit (code-pack route) | `tests/unit/calcs/` |
-| AC6 to AC11, AC24, AC25 | Golden and property | `tests/golden/footing/`, `tests/property/` |
+| AC6 to AC11, AC24, AC25, AC35 | Golden and property | `tests/golden/footing/`, `tests/property/` |
+| AC35 | Unit | `tests/unit/footing/` |
 | AC5, AC15 to AC22, AC26, AC27, AC30, AC31, AC34 | Fake-host workflow | `tests/workflow/footing/` |
 | AC28, AC33 | Contract | `tests/contract/` |
 | AC29 | Golden HTML | `tests/unit/report/` |
@@ -614,8 +650,11 @@ code-pack route (additive to engine §4.8).
 | Q20 | **[added]** A code-pack check's `CalcInfo.version` (§4.3 step 1): engine §4.8 and `eng_harness.ports.CalcInfo` require an integer of at least 1 (also `ctx` `calc_version` and the journaled step version, engine AC13), but a merged check has no integer version: `CheckMeta` has none, and the only version is the pack's string `version`, which CF AC9 makes the trace's `calc_version` | Owner, lead | Decided (draft, B-442; owner queue): each check has an integer `version` in `CheckMeta` (default 1, raised when the check's behaviour changes; CF §4.2, structural-codes core plan T15), which the route passes as `CalcInfo.version`; the pack's string version stays in the trace (CF AC9) |
 | Q21 | Rule L1 of §4.4.3 (`⌊span/s⌋ + 1`) could give an actual spacing above the input `s`, contradicting AC8 (and `reinforcement.max_spacing_mm` when plan sizing initialises `s` from it); §4.4.3 was silent on a depth with no room for both layers and on the numbers of a `WIDTH_TOO_SMALL` row (OQ-Q60, OQ-Q63) | Owner | Decided (owner answer of 2026-11-18, OQ-Q60; amendment B-568): `WIDTH_TOO_SMALL` for a span of zero or less before computing actual spacing, and the ceiling `⌈span/s⌉ + 1` for a positive span so the actual spacing is at most the input `s`, which plan sizing initialises from `reinforcement.max_spacing_mm` (while rule R4 lets `engineer_set` keep and flag a value above that bound); a depth with no room for both layers is `OUT_OF_RANGE`, field `dims`; the numbers of a `WIDTH_TOO_SMALL` row are informative only and plan T8 never uses them (OQ-Q63); no engineering number is added |
 | Q22 | The block must close some footings while the others continue (§4.6, §4.4.2 P6), but `harness.footing_status` needs a verdict for every footing of the design it reads, `harness.footing_resize` never drops a row, and checking a `WIDTH_TOO_SMALL` row again breaks OQ-Q63 (OQ-Q93) | Owner | Decided (owner answer of 2026-11-20, OQ-Q93, option (b); amendment B-597): the block passes the open footings only; each round the layout, the check batches, the status and the resize read a record of the open footings only; a closed footing keeps its last result aside; no merged calc changes (§4.6, AC34) |
-| Q23 | **[added]** How block code stores an open footings' record (§4.6): the engine stores results only for tools, calcs and `ctx.ask` (engine §4.3.2), and a calc refuses a literal `dims` or `design` under `require_refs` (calcs §6), so no merged step stores a record with the closed rows left out | Lead, then owner | Open; settle before plan T8 continues (amendment B-597). Options: (i) a new calc, beside the merged ones, that copies named rows unchanged from two stored records of the same kind (a base record and one more record, as two top-level references), called once per extra source and chained so any number of records can be merged (no engineering value; a later amendment adds it to §4.4 and its files to plan T8); (ii) an engine call that stores a block-built record of a registered kind (an engine amendment) |
-| Q24 | **[added]** `harness.footing_schedule` (§4.4.6, merged) refuses a subject without a design row, so the block's `design` and `status`, which hold only the footings open in the last round (§4.6), cannot feed workflow step 13 (§4.8) once a footing closed in an earlier round | Lead, then owner | Open; settle before plan T9 (amendment B-597). The closures carry each closed footing's last records (§4.6) and no merged calc changes (OQ-Q93), so a design and a status that hold every subject need the means of Q23 |
+| Q23 | **[added]** How block code stores an open footings' record (§4.6): the engine stores results only for tools, calcs and `ctx.ask` (engine §4.3.2), and a calc refuses a literal `dims` or `design` under `require_refs` (calcs §6), so no merged step stores a record with the closed rows left out | Lead, then owner | Decided (owner answer of 2026-11-26; amendment B-613): option (i), `harness.footing_rows` (§4.4.7), copies named rows unchanged from two top-level references to same-kind records. Chain one call per extra source. Plan T7b adds the calc beside the merged calcs, which keep their versions, inputs and rules |
+| Q24 | **[added]** `harness.footing_schedule` (§4.4.6, merged) requires design and status rows for every subject. A record from the last round can omit footings that closed earlier (§4.6) | Lead, then owner | Decided (owner answer of 2026-11-26; amendment B-613): option (i) of Q23 also builds `harness.footing_design/1` and `harness.footing_status/1` records covering every subject for step 13, using each subject's last stored rows and the closure references (§4.6). Q25 covers rows never produced |
+| Q25 | A footing closed at plan sizing has neither a design nor a status row. A footing closed by `WIDTH_TOO_SMALL` has a design row but no status row. The copy calc cannot supply rows that were never stored, and the schedule requires both rows for every subject | Owner | Open. Settle how step 13 receives valid coverage for these early closures, including when every footing closes before layout or status. The empty-open-set rule still applies to the rounds |
+| Q26 | The registry and CalcPort declare and store one fixed `output_kind` per calc (calcs §4.2, §4.5, §4.12). `harness.footing_rows` needs to return the common input kind under one calc id | Lead, then owner | Open. Settle the output-kind mechanism and any framework amendment before T7b implementation |
+| Q27 | The three footing kinds have no issue or payload `complete` field. §4.4.7 requires an issue when neither input contains a requested id | Lead, then owner | Open. Settle how missing-id issues are exposed and whether the call returns an incomplete record or a failure before T7b implementation |
 | FG-1 | Plan shapes other than square | — | `NotImplementedGap` |
 | FG-2 | SAFE as the source of column loads: SAFE models carry no column frames (SAFE §4.4); loads would come from `harness.joint_loads/1` with a sign change | Owner | After SAFE L5 and L8, a calc from joint loads with the punching dimensions as column sizes |
 | FG-3 | Footings cannot be resized in SAFE (SAFE SG-4); the cross-check uses the prepared geometry | Owner | Sasaah typed `csi_resize_area_rect` (SAFE Q5) |
