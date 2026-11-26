@@ -2,7 +2,7 @@
 
 - Calc id: `harness.footing_rows_subjects`
 - Version: 1
-- Content hash: `e0bda228325de277c124b4aef755b0a8aaeefdd34b96c530e3c57189b7476699` (from `calcs.lock.json`)
+- Content hash: `33cbacc451ea811e6dfc87197d2f719d96e5287b272e7abb1f0593f1c89e92fd` (from `calcs.lock.json`)
 - Status: draft
 - Method source: eng-harness spec 0010 §4.4.7 K1 to K3 and AC35
 - Constants: cited calc version only. The method reads zero basis fields.
