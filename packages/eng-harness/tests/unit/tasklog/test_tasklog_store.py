@@ -9,12 +9,12 @@ from typing import Any
 
 import pytest
 from eng_contract.canonical import canonical_json, loads
-from eng_harness.tasklog._store import ClosedTaskError, TasklogFullError, append_record, append_triage
 from pydantic import TypeAdapter
 
 from eng_harness._runlock import RunLock, is_locked
 from eng_harness.errors import HarnessCode, RunLocked
 from eng_harness.tasklog._records import Narration, OwnerWords, TaskOpened, TaskRecord, TriageLine
+from eng_harness.tasklog._store import ClosedTaskError, TasklogFullError, append_record, append_triage
 
 _TASK_ID = "task_01KDVDNA00EEHMW00B9ZA4ZDSH"
 _NEED_ID = "need_01KDVDNA00EEHMW00B9ZA4ZDSH_1"
