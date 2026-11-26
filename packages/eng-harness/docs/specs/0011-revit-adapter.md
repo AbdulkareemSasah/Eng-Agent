@@ -596,7 +596,10 @@ caller shape (§4.8). Validate and resolve against the run store before building
 `AdapterToolPort` and `validate_call` (`InputPolicy(require_refs=True)`) for scalar reference fields. The shared
 `eng_contract.params.validate_input` resolves whole fields. For the reference lists, the Revit port validates
 each entry with `eng_contract.refs.resolve_ref` and its kind and pointer rules. As in the engine's `Guard`, use
-tracked revisions for freshness. For map pairs also check the source revisions required by §4.11. Keep the
+tracked revisions for freshness. For map pairs also check the source revisions required by §4.11. **[amendment
+B-629, Q12]** A `type_id` entry that points into a Revit write result (`#/targets/<i>/type_id`) is accepted when
+that result is stale: it names a type the adapter itself created in this run, and an `ElementId` is stable across
+in-memory edits (§4.10). Every other reference keeps the revision check (AC29). Keep the
 caller references in provenance as in 0002 §4.5.3. Preview uses the validated arguments and pre-image and sends
 no write. The attended call uses the resolved arguments and runs AC12 and AC13 before dispatch.
 
@@ -722,6 +725,7 @@ engine spec 0001; plan T1 carries them.
 | Q9 | Revit version: specs 008 and 009 say 2026, 07 says "2025 and newer" | Owner | Pin 2026 in the allowlist header; widen only after a local test on another version (17) |
 | Q10 | How does T14b dispatch and ledger Revit writes when the shared `HostTarget` requires a PID? | Lead, then owner | Decided (owner answer of 2026-11-26; amendment B-617): Use Revit-specific dispatch and record the pipe and bound document as the durable ledger target (§4.12). Preserve the shared PID-based target contract, following IDEA B-612 Q13. |
 | Q11 | How does a new type get its values while meeting AC15 and the merged model's non-empty `expected_instances` requirement? | Lead, then owner | Decided (owner answer of 2026-11-26; amendment B-617): Keep the merged adapter's non-empty requirement and exact-set check. Per spec 0013 amendment B-614 (owner answer of 2026-11-26), R7 duplicates the type, changes the elements' type, then sets the type values with `expected_instances` equal to the elements actually assigned. |
+| Q12 | After a write advances the model revision (AC22, AC29), may the port still accept the `type_id` of a type created by an earlier write of the same run (spec 0013 R7: duplicate, change type, set type values)? | Lead, then owner | Lead decision (B-629, owner's standing instruction; owner queue): Yes, for write-result `type_id` entries only. The id names a type the adapter created, and an `ElementId` is stable (§4.10). Structure rows and map pairs stay revision-checked. The engine's own invariant 3 still applies to workflow steps; a workflow that chains writes re-reads between them. |
 | R-G1 | No save tool (S12-G11): `HostPort.save` is `NotImplementedGap`; edits stay unsaved | Owner | Q2 |
 | R-G2 | No close or revert tool: the working copy stays open, `restore` unavailable, promotion by file copy impossible | Owner | Q2 |
 | R-G3 | No analytical-model tools and no `check_model` (S12-G11) | Owner | Not needed by the column workflow; `check_model` is the adapter's read-back and integrity set (§4.8) |
