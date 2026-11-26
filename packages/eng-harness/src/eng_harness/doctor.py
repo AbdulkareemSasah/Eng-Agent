@@ -22,6 +22,8 @@ from pydantic import BaseModel, ConfigDict
 
 from eng_harness.adapters import Allowlist
 from eng_harness.adapters.csi import csi_allowlist
+from eng_harness.adapters.idea import idea_allowlist
+from eng_harness.adapters.idea._replies import parse_status as parse_idea_status
 from eng_harness.errors import ToolFailed
 from eng_harness.servers import CallEffect, ServerManager, ServersConfig, load_servers_config
 from eng_harness.servers._buildcheck import tool_list_fingerprint
@@ -37,6 +39,8 @@ _PY, _SASAAH_S, _UV_S, _MEDIUM = (3, 14), 120, 30, 0x2000
 _ADDIN_QUEUE_DEADLINE_S = 60
 _REVIT_ADAPTER = "sasaah-revit-mcp"  # spec 0011 section 4.2
 _REVIT_STATUS_TOOL = "revit_connection_status"  # S-12 inventory; build check (plan 0011 T4)
+_IDEA_ADAPTER = "sasaah-idea-mcp"  # spec 0014 §4.2
+_IDEA_STATUS_TOOL = "idea_status"
 # Spec 0011 section 4.4: bridge-destructive MCP names (kind destructive).
 _REVIT_DESTRUCTIVE = frozenset(
     {
@@ -54,6 +58,7 @@ _LEVELS = {  # winnt.h SECURITY_MANDATORY_*_RID
 }  # fmt: skip
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]")  # file-name rule of servers/_hostlock.py (spec 0002 §4.4.1)
 _FLAGS = ("read_only", "script_enabled")
+_IDEA_STATUS_FIELDS = ("installed", "service", *_FLAGS)
 _STATUS = frozenset({*_FLAGS, "instances", "current_target"})
 _CSI_STATUS_TOOL = "csi_status"
 
@@ -236,10 +241,15 @@ def default_deps() -> DoctorDeps:
         version=(sys.version_info[0], sys.version_info[1]), location=default_location_probe(),
         programs=type("_Dir", (), {"exists": staticmethod(lambda d: Path(d).is_dir())})(),
         roles=LiveRoles(inspector),
-        allowlist_for=lambda a: csi_allowlist() if a == "sasaah-csi-mcp" else None,
+        allowlist_for=_doctor_allowlist,
         inspector=inspector, tokens=WindowsTokens() if os.name == "nt" else None,
         home=Path.home(), windows=os.name == "nt",
     )  # fmt: skip
+
+
+def _doctor_allowlist(adapter: str) -> Allowlist | None:
+    load = {"sasaah-csi-mcp": csi_allowlist, _IDEA_ADAPTER: idea_allowlist}.get(adapter)
+    return load() if load is not None else None
 
 
 def _shown(path: str, show: bool) -> str:
@@ -278,6 +288,9 @@ def _collect(config: ServersConfig, deps: DoctorDeps, show: bool, extra: Sequenc
         if server.adapter == _REVIT_ADAPTER:
             # AC32: Revit checks are a CheckProvider; CSI fingerprint/flags do not apply.
             revit_providers.append(RevitChecks(name, server, facts, show))
+            continue
+        if server.adapter == _IDEA_ADAPTER:
+            rows.extend(_idea_checks(name, server, facts.get((name, "main")) or missed, allow))
             continue
         for role in server.roles:
             hit = facts.get((name, role)) or missed
@@ -351,6 +364,49 @@ def _fingerprint(server: str, role: str, facts: RoleFacts, allowlist: Allowlist 
     if bad:
         return _row(name, "fail", f"{' and '.join(bad)} is not false; {body}")
     return _row(name, "ok", f"matches the allowlist; {body}")
+
+
+def _idea_checks(name: str, server: ServerConfig, facts: RoleFacts, allowlist: Allowlist | None) -> list[Check]:
+    """IDEA build, status, route and timeout diagnostics (spec 0014 AC22, §4.2 and §4.3)."""
+    commit = server.build.sasaah_commit
+    expected = allowlist.sasaah_commit if allowlist is not None else None
+    build = f"Sasaah commit {commit}"
+    if commit != expected:
+        build += f", expected {expected}" if expected else ", no allowlist is packaged for this adapter"
+    timeout = server.roles["main"].call_timeout_s
+    rows = [
+        _row(f"IDEA pinned build {name}", "ok" if commit == expected else "fail", build),
+        _row(
+            f"IDEA read timeout {name}",
+            "warn",
+            f"the single role's call_timeout_s={timeout} bounds every read, Sasaah default {_SASAAH_S} s",
+        ),
+    ]
+    status_name = f"{_IDEA_STATUS_TOOL} {name}"
+    if facts.error is not None or facts.status is None:
+        return [*rows, _row(status_name, "fail", facts.error or f"{_IDEA_STATUS_TOOL} gave no JSON object")]
+    try:
+        status = parse_idea_status(
+            {field: facts.status[field] for field in _IDEA_STATUS_FIELDS if field in facts.status}
+        )
+    except ContractError:
+        return [*rows, _row(status_name, "fail", f"{_IDEA_STATUS_TOOL} gave invalid status fields")]
+    flags_ok = not (status.read_only or status.script_enabled)
+    rows.append(_row(status_name, "ok" if flags_ok else "fail", status.model_dump_json()))
+    if "idea_run_script" in facts.tools:
+        rows.append(
+            _row(f"tool-list fingerprint {name}/main", "fail", "idea_run_script is listed, check --disable-script")
+        )
+    else:
+        rows.append(_fingerprint(name, "main", replace(facts, status=status.model_dump(mode="json")), allowlist))
+    if server.route == "native":
+        ready = any(version.hidden_calculator for version in status.installed)
+        requirement = "an installed hidden calculator and a .ideaCon working copy"
+    else:
+        ready = status.service.reachable
+        requirement = "a reachable IDEA Connection REST service started by the engineer"
+    detail = f"{server.route} requires {requirement}"
+    return [*rows, _row(f"IDEA route {name}", "ok" if ready else "fail", detail)]
 
 
 def _level(name: str, rid: int | None, *, host: bool) -> Check:
@@ -431,8 +487,9 @@ async def _one(manager: ServerManager, server: str, role: str, *, status_tool: s
 
 
 async def _gather(config: ServersConfig, run_dir: Path, launcher: ProcessLauncher) -> dict[tuple[str, str], RoleFacts]:
+    status_tools = {_REVIT_ADAPTER: _REVIT_STATUS_TOOL, _IDEA_ADAPTER: _IDEA_STATUS_TOOL}
     pairs = [
-        (name, role, _REVIT_STATUS_TOOL if server.adapter == _REVIT_ADAPTER else _CSI_STATUS_TOOL)
+        (name, role, status_tools.get(server.adapter, _CSI_STATUS_TOOL))
         for name, server in config.servers.items()
         for role in server.roles
     ]
