@@ -199,7 +199,7 @@ check (§4.12)
 - AC53. Given a changed R1 or R2 module, then mutation tests run on it and a score below `mutation_min` gives MU001.
 - AC53a. Given changed R1 or R2 files for which mutmut produces no mutant, then MU003 and the step passes; given mutants that no test covers, then they count as survivors in the MU001 score (not killed, so they lower it) and are not MU002 (amendment B-336).
 - AC53b. Given a member with files and folders at its top level other than `src/` and `tests/` (for example the `README.md` its build reads), then the mutated test runs see them: the gate lists each of them under mutmut's `also_copy`, except the folders the copy ignores (`.git`, `.venv`, caches, `mutants`) (amendment B-370).
-- AC53c. Given a mutation run that takes longer than the bound of one `ToolRunner` call (900 s, §4.1) and less than `limits.mutation_run_seconds`, then the step completes and judges the score; given a run longer than `limits.mutation_run_seconds`, then MU002 (exit 3) naming that limit (amendment B-383).
+- AC53c. Given a mutation run that takes longer than the former bound of one `ToolRunner` call (900 s) and less than `limits.mutation_run_seconds`, then the step completes and judges the score; given a run longer than `limits.mutation_run_seconds`, then MU002 (exit 3) naming that limit (amendment B-383).
 - AC54. Given a workspace member without `[tool.eng-gate]` (CF006) or a stale `uv.lock` (ST001 on step `lock`), then the
   check fails.
 - AC54a. Given pull-request context and a pull request that adds a third-party dependency (with its stub distribution)
@@ -275,7 +275,7 @@ actions/<name>/action.yml                composite actions used by the root work
 Pure logic sits in the checks; side effects sit behind ports so tests can fake them: `Git` (subprocess `git` with
 `-c core.quotepath=off` and NUL-separated output), `ToolRunner` (ruff, mypy, coverage, pytest, uv through
 `sys.executable -m <tool>` or `uv`), `Clock` (today's date), `Env`, `ApprovalSource` (GitHub reviews, used only with
-bootstrap off). Each `ToolRunner` call is bounded (900 s); a tool that passes the bound is an environment fault (exit 3).
+bootstrap off). Each `ToolRunner` call is bounded (7200 s, the mutation bound; amendment B-619, owner request of 2026-11-26: the test step outgrew 900 s); a tool that passes the bound is an environment fault (exit 3).
 The mutation backend run has its own limit (§4.12, amendment B-383). The gate never edits files except `agents render` and `ratchet --update`, never uses a shell, and never
 prints a secret or a token.
 
