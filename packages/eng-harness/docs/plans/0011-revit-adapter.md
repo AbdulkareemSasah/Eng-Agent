@@ -301,6 +301,30 @@ tasks:
       - "packages/eng-harness/tests/unit/test_doctor.py::test_revit_checks"
     covers: [AC32]
     depends_on: [T4]
+  - id: T14b
+    # Amendment (B-611, documents only): build the Revit tool port of spec §4.12 and dispatch to it from build_ports.
+    # See plan 0002 §3, External amendment (B-611), for the shared factory scope and order.
+    # Amendment (B-617): caller references, Revit dispatch and pre-send evidence in spec §4.8 and §4.12 (Q10, Q11).
+    # Estimate: 215 for the port (35 setup and describe, 90 call and attended write settlement,
+    # 55 preview from arguments and pre-image, 35 read_back); 50 for binding(), revision() and check_model wiring;
+    # 40 for build_ports dispatch; 30 for supports_reconcile and reconcile wiring; 120 for fake-host tests;
+    # 5 for CHANGELOG.md. Total: 460 changed lines.
+    title: Revit tool port, model binder and build_ports dispatch
+    files:
+      - "packages/eng-harness/src/eng_harness/adapters/revit/_toolport.py"
+      - "packages/eng-harness/src/eng_harness/adapters/revit/_session_ops.py"  # only RevitHostPort binding(), revision() and wiring the existing check_model implementation
+      - "packages/eng-harness/src/eng_harness/adapters/__init__.py"  # only the Revit dispatch in build_ports (amendment B-611)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/tests/workflow/adapters/test_revit_toolport.py"
+    max_changed_lines: 460
+    max_sessions: 3
+    tests_first:
+      - "packages/eng-harness/tests/workflow/adapters/test_revit_toolport.py::test_build_ports_dispatches_revit"
+      - "packages/eng-harness/tests/workflow/adapters/test_revit_toolport.py::test_attended_write_preview_call_and_read_back"
+      - "packages/eng-harness/tests/workflow/adapters/test_revit_toolport.py::test_check_model_and_read_units_through_host_port"
+      - "packages/eng-harness/tests/workflow/adapters/test_revit_toolport.py::test_reconcile_lost_write_through_tool_port"
+    covers: [AC12, AC18, AC19, AC20]  # in part: port integration for identity checks, attended writes, read-back and reconciliation
+    depends_on: [T9, T10, T11]
   - id: T15
     title: Port wiring, crash matrix, stale-map test and the Revit local-testing document
     files:
@@ -316,7 +340,7 @@ tasks:
       - "packages/eng-harness/tests/replay/test_revit_resume.py::test_crash_matrix"
       - "packages/eng-harness/tests/workflow/adapters/test_revit_map_stale.py::test_map_stale_after_edit"
     covers: [AC22, AC29]
-    depends_on: [T10, T11, T12, T13, T14]
+    depends_on: [T10, T11, T12, T13, T14, T14b]  # Amendment (B-611, documents only): the crash matrix and stale-map test use T14b's assembled Revit ports.
   - id: T16
     title: "Mutation scope: the section 9 modules in r1_modules"
     # Amendment (B-601, owner decision D-46, 2026-11-20): CI mutates only modules listed in
@@ -370,7 +394,7 @@ reconcile). Session operations and the pipe-keyed lock (T11) are independent of 
 reader. The mapping calc (T12) needs only the kinds, so it may run beside T9 to T11, but all tasks edit
 `CHANGELOG.md` and several edit `_edits.py`, `_buildcheck.py` or `_config.py`, so they run one after another by
 pull-request order (`depends_on` shows the needed order, not a parallel plan). T13 and T14 are the record script and
-the doctor; T15 wires the ports and adds the crash matrix and the stale-map test.
+the doctor. T14b assembles the Revit ports used by T15's crash matrix and stale-map test.
 
 Every task is test-first ([process/05](../../../../design/process/05-testing-and-verification.md) §9): its first
 commit holds the tests of `tests_first` (and, for T12, the golden files with hand-derived expected values), and they fail
@@ -459,8 +483,23 @@ the owner's local run.
 version, open document base name, and the warning when the `write` role's `call_timeout_s` is not above the add-in
 queue deadline (spec §4.2 rule 1).
 
-**T15 Wiring and documents** (AC22, AC29). Port wiring for the Revit adapter, the crash matrix against real fake
-processes, the stale-map test, and the Revit section of `docs/local-testing.md` (spec §12, L1 to L15).
+**T14b Revit tool port, model binder and `build_ports` dispatch. Amendment (B-611).** Build the Revit tool port
+of spec §4.12 on the shared `AdapterToolPort` framework. Add `binding()` and `revision()` to `RevitHostPort` using
+its bound document and model identity, following the binder interface used by CSI. Assemble the host and tool ports
+with the Revit allowlist in `build_ports` (see plan 0002 §3). Wire T9's attended writes, read-back and model checks
+and T10's `RevitReconciler`. Use the returned ports to test the preview from arguments and pre-image, attended
+call and read-back, model checks and units, and reconciliation of a lost write via `supports_reconcile` and `reconcile`.
+T15 uses those ports for the crash matrix and stale-map test.
+
+**Amendment (B-617).** Test the reference caller shape (§4.8), scalar length validation and row selection,
+including AC12 using both ids from the selected row and refusing a mismatched `uniqueId` before a write. Assert
+the host argument mapping, the durable pipe and document target, and the §4.12 pre-send evidence in the
+attended and lost-write cases. Verify reconciliation uses the persisted request (Q10). For a new-type setter,
+test a non-empty `expected_instances` equal to the elements actually assigned, as required by spec 0013 R7
+(amendment B-614, Q11).
+
+**T15 Wiring and documents** (AC22, AC29). The crash matrix against real fake processes and the stale-map test use
+the Revit ports from T14b. T15 also adds the Revit section of `docs/local-testing.md` (spec §12, L1 to L15).
 
 **T16 Mutation scope** (amendment B-601, decision D-46; spec §9). Adds `adapters/revit/_errors.py`, `_edits.py` and
 `_units.py` to `r1_modules` (`_reconcile.py` is T10's; `calcs/frame_element_map.py` is already covered by `calcs/**`).
@@ -475,8 +514,8 @@ each module reaches `mutation_min`, measured per module as the task's front-matt
 - Runtime: none new (`mcp`, `eng-contract`, `pydantic` as in plan 0002). Development: none new.
 - Work items before T1: plan 0002 T6 and T6b (allowlist, build check), T7 to T10 (lock, guard, framework, errors, identity,
   session operations) as the tasks named below need them: T3 needs plan 0002 T8b, T5 needs T9, T7 needs T11, T8 needs
-  T12, T10 needs T14, T11 needs T10, T13 needs T17, T14 needs T18, T15 needs T19a (amendment B-475). Engine plan 0001 as for plan 0002 (T1
-  edits `ports.py` of engine T6).
+  T12, T10 needs T14, T11 needs T10, T13 needs T17, T14 needs T18, T14b and T15 need T19a (amendments B-611 and B-475).
+  Engine plan 0001 as for plan 0002 (T1 edits `ports.py` of engine T6).
 - T12 needs the calc framework of plan 0003 (T1 to T6) and the helper style of its T12 (`placement_compare`).
 - Plan 0008 (SAFE) also edits `servers/_buildcheck.py` and the allowlist header shape: whichever lands second adapts to
   the other in its own task; this plan keeps its fingerprints in its own `adapters/revit/_allowlist.toml`, keyed by role,

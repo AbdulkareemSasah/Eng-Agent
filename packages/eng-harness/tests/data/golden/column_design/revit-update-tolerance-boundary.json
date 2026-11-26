@@ -1,0 +1,301 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.5 (rules U1 to U10); synthetic data, no project value",
+  "method_ref": "§4.4.5 U3",
+  "synthetic": true,
+  "derivation": "t = compare.length_mm = 5 mm (confirmed, mm). U1: the pairs are (C1, u-c1) and (C2, u-c2); both frames have ETABS section C40S at frame_sections index 0, rectangular 400 x 400, so both targets are section_b -> res_01KRC000000000000000000003#/frame_sections/0/shape/b_mm and section_h -> res_01KRC000000000000000000003#/frame_sections/0/shape/h_mm. U2: F1 and F2 have section_b and section_h both reference, so both pairs proceed. U3: the current type 11 has b_mm 405.0, |405 - 400| = 5 <= 5, and h_mm 400.0, |400 - 400| = 0 <= 5, so (C1, u-c1) is no_change [{unique_id u-c1, type_id '11'}]; the comparison is inclusive <=, so a role exactly at the tolerance still matches. The current type 21 has b_mm 400.0, |400 - 400| = 0, and h_mm 405.5, |405.5 - 400| = 5.5 > 5, so (C2, u-c2) is pending; just over the tolerance does not match. U4: the group (F2, C40S) holds only the C2 item; type 21 is the only type of family F2 and is outside, so no type is within and one new type named 'C40S' after the section is planned, from_unique_id 'u-c2', with the U1 role references; no type of that name is in the family. The assignment is {unique_id u-c2, element_id '102', from_type_id '21', new_type_name 'C40S'}. U5: the target is square (400 = 400), so there is no orientation row. U6: changed is empty, so the origin is preexisting, and the new type lists ['preexisting']. U7: expected.elements is [{unique_id u-c2, family F2, type_name 'C40S'}] with the new-type identity (type_id null); expected.types is [{family F2, name 'C40S'}] with the U1 role references; no expected_instances. U8: all seven referenced records are complete, so complete is true. U9: every list holds at most one row, so the ordering is trivial.",
+  "input": {
+    "map": {
+      "calc": {
+        "id": "harness.frame_element_map",
+        "version": 1,
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.frame_element_map",
+        "calc_version": "1",
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "pairs": [
+        {
+          "frame_id": "C1",
+          "unique_id": "u-c1",
+          "element_id": 101,
+          "type_id": 11,
+          "basis": "geometry",
+          "lower_distance_mm": 0.0,
+          "upper_distance_mm": 0.0
+        },
+        {
+          "frame_id": "C2",
+          "unique_id": "u-c2",
+          "element_id": 102,
+          "type_id": 21,
+          "basis": "geometry",
+          "lower_distance_mm": 0.0,
+          "upper_distance_mm": 0.0
+        }
+      ],
+      "ambiguous": [],
+      "unmatched_frames": [],
+      "unmatched_elements": [],
+      "conflicts": [],
+      "complete": true
+    },
+    "frames": {
+      "frames": [
+        {
+          "id": "C1",
+          "kind": "other",
+          "section": "C40S",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "C2",
+          "kind": "other",
+          "section": "C40S",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "C40S",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400,
+            "h_mm": 400
+          }
+        }
+      ],
+      "area_sections": []
+    },
+    "revit": {
+      "elements": [
+        {
+          "unique_id": "u-c1",
+          "element_id": 101,
+          "category": "column",
+          "family": "F1",
+          "type_id": 11,
+          "type_name": "Tcur1",
+          "level_id": 1,
+          "level_name": "L1",
+          "location_kind": "point",
+          "i": null,
+          "j": null,
+          "rotation_deg": 0,
+          "parameters": {}
+        },
+        {
+          "unique_id": "u-c2",
+          "element_id": 102,
+          "category": "column",
+          "family": "F2",
+          "type_id": 21,
+          "type_name": "Tcur2",
+          "level_id": 1,
+          "level_name": "L1",
+          "location_kind": "point",
+          "i": null,
+          "j": null,
+          "rotation_deg": 0,
+          "parameters": {}
+        }
+      ],
+      "types": [
+        {
+          "type_id": 11,
+          "family": "F1",
+          "name": "Tcur1",
+          "instance_ids": [
+            101
+          ],
+          "parameters": {
+            "section_b": {
+              "value": 405.0,
+              "unit": "mm"
+            },
+            "section_h": {
+              "value": 400.0,
+              "unit": "mm"
+            }
+          }
+        },
+        {
+          "type_id": 21,
+          "family": "F2",
+          "name": "Tcur2",
+          "instance_ids": [
+            102
+          ],
+          "parameters": {
+            "section_b": {
+              "value": 400.0,
+              "unit": "mm"
+            },
+            "section_h": {
+              "value": 405.5,
+              "unit": "mm"
+            }
+          }
+        }
+      ]
+    },
+    "role_statuses": {
+      "F1": {
+        "section_b": "reference",
+        "section_h": "reference"
+      },
+      "F2": {
+        "section_b": "reference",
+        "section_h": "reference"
+      }
+    },
+    "revit_placements": {
+      "frames": [
+        {
+          "id": "u-c1",
+          "kind": "column",
+          "section": "F1: Tcur1",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "u-c2",
+          "kind": "column",
+          "section": "F2: Tcur2",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "changed": [],
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.length_mm": {
+          "value": 5,
+          "unit": "mm",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "map": "res_01KRC000000000000000000001",
+    "frames": "res_01KRC000000000000000000002",
+    "sections": "res_01KRC000000000000000000003",
+    "revit": "res_01KRC000000000000000000004",
+    "revit_placements": "res_01KRC000000000000000000005",
+    "changed": "res_01KRC000000000000000000006#/changed",
+    "basis": "res_01KRC000000000000000000007"
+  },
+  "expected": {
+    "new_types": [
+      {
+        "family": "F2",
+        "section": "C40S",
+        "name": "C40S",
+        "from_unique_id": "u-c2",
+        "origins": [
+          "preexisting"
+        ],
+        "roles": {
+          "section_b": "res_01KRC000000000000000000003#/frame_sections/0/shape/b_mm",
+          "section_h": "res_01KRC000000000000000000003#/frame_sections/0/shape/h_mm"
+        }
+      }
+    ],
+    "assignments": [
+      {
+        "unique_id": "u-c2",
+        "element_id": "102",
+        "from_type_id": "21",
+        "type_id": null,
+        "new_type_name": "C40S",
+        "origin": "preexisting"
+      }
+    ],
+    "no_change": [
+      {
+        "unique_id": "u-c1",
+        "type_id": "11"
+      }
+    ],
+    "not_updatable": [],
+    "orientation": [],
+    "expected": {
+      "elements": [
+        {
+          "unique_id": "u-c2",
+          "type_id": null,
+          "family": "F2",
+          "type_name": "C40S"
+        }
+      ],
+      "types": [
+        {
+          "family": "F2",
+          "name": "C40S",
+          "roles": {
+            "section_b": "res_01KRC000000000000000000003#/frame_sections/0/shape/b_mm",
+            "section_h": "res_01KRC000000000000000000003#/frame_sections/0/shape/h_mm"
+          }
+        }
+      ]
+    },
+    "complete": true
+  }
+}

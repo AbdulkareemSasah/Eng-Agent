@@ -1,0 +1,367 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.5 (rules U1 to U10); synthetic data, no project value",
+  "method_ref": "§4.4.5 U2",
+  "synthetic": true,
+  "derivation": "t = compare.length_mm = 5 mm (confirmed, mm). U1: the pairs are (C1, u-1) with section S1 (rectangular 300 x 300, index 0), (C2, u-2) with section S2 (rectangular 400 x 400, index 1) and (C3, u-3) with section S3 (rectangular 500 x 500, index 2); each pair's targets are the section_b and section_h references to its row. U2: F1 has section_h unmapped, so (C1, u-1) is blocked; F2 has section_b candidate, so (C2, u-2) is blocked; F3 has no section_h entry, and a missing required role is treated as unmapped, so (C3, u-3) is blocked. Every blocked pair is not_updatable SECTION_ROLES_UNMAPPED. The block applies although each current type matches its target exactly (|300 - 300| = 0, |400 - 400| = 0, |500 - 500| = 0, all <= 5): the pair proceeds to U3 only if every required role is reference, so U2 runs before U3. U3 and U4 therefore produce no rows. U5: all three targets are square, so there is no orientation row. U6: changed is empty, and blocked pairs carry no origin. U7: no assignments, so expected.elements is []; no new types, so expected.types is []. U8: all seven referenced records are complete, so complete is true. U9: not_updatable is ordered by frame_id (C1, C2, C3).",
+  "input": {
+    "map": {
+      "calc": {
+        "id": "harness.frame_element_map",
+        "version": 1,
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.frame_element_map",
+        "calc_version": "1",
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "pairs": [
+        {
+          "frame_id": "C1",
+          "unique_id": "u-1",
+          "element_id": 101,
+          "type_id": 11,
+          "basis": "geometry",
+          "lower_distance_mm": 0.0,
+          "upper_distance_mm": 0.0
+        },
+        {
+          "frame_id": "C2",
+          "unique_id": "u-2",
+          "element_id": 102,
+          "type_id": 12,
+          "basis": "geometry",
+          "lower_distance_mm": 0.0,
+          "upper_distance_mm": 0.0
+        },
+        {
+          "frame_id": "C3",
+          "unique_id": "u-3",
+          "element_id": 103,
+          "type_id": 13,
+          "basis": "geometry",
+          "lower_distance_mm": 0.0,
+          "upper_distance_mm": 0.0
+        }
+      ],
+      "ambiguous": [],
+      "unmatched_frames": [],
+      "unmatched_elements": [],
+      "conflicts": [],
+      "complete": true
+    },
+    "frames": {
+      "frames": [
+        {
+          "id": "C1",
+          "kind": "other",
+          "section": "S1",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "C2",
+          "kind": "other",
+          "section": "S2",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "C3",
+          "kind": "other",
+          "section": "S3",
+          "i": {
+            "x_mm": 12000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 12000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "S1",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 300,
+            "h_mm": 300
+          }
+        },
+        {
+          "name": "S2",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400,
+            "h_mm": 400
+          }
+        },
+        {
+          "name": "S3",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 500,
+            "h_mm": 500
+          }
+        }
+      ],
+      "area_sections": []
+    },
+    "revit": {
+      "elements": [
+        {
+          "unique_id": "u-1",
+          "element_id": 101,
+          "category": "column",
+          "family": "F1",
+          "type_id": 11,
+          "type_name": "T1",
+          "level_id": 1,
+          "level_name": "L1",
+          "location_kind": "point",
+          "i": null,
+          "j": null,
+          "rotation_deg": 0,
+          "parameters": {}
+        },
+        {
+          "unique_id": "u-2",
+          "element_id": 102,
+          "category": "column",
+          "family": "F2",
+          "type_id": 12,
+          "type_name": "T2",
+          "level_id": 1,
+          "level_name": "L1",
+          "location_kind": "point",
+          "i": null,
+          "j": null,
+          "rotation_deg": 0,
+          "parameters": {}
+        },
+        {
+          "unique_id": "u-3",
+          "element_id": 103,
+          "category": "column",
+          "family": "F3",
+          "type_id": 13,
+          "type_name": "T3",
+          "level_id": 1,
+          "level_name": "L1",
+          "location_kind": "point",
+          "i": null,
+          "j": null,
+          "rotation_deg": 0,
+          "parameters": {}
+        }
+      ],
+      "types": [
+        {
+          "type_id": 11,
+          "family": "F1",
+          "name": "T1",
+          "instance_ids": [
+            101
+          ],
+          "parameters": {
+            "section_b": {
+              "value": 300.0,
+              "unit": "mm"
+            },
+            "section_h": {
+              "value": 300.0,
+              "unit": "mm"
+            }
+          }
+        },
+        {
+          "type_id": 12,
+          "family": "F2",
+          "name": "T2",
+          "instance_ids": [
+            102
+          ],
+          "parameters": {
+            "section_b": {
+              "value": 400.0,
+              "unit": "mm"
+            },
+            "section_h": {
+              "value": 400.0,
+              "unit": "mm"
+            }
+          }
+        },
+        {
+          "type_id": 13,
+          "family": "F3",
+          "name": "T3",
+          "instance_ids": [
+            103
+          ],
+          "parameters": {
+            "section_b": {
+              "value": 500.0,
+              "unit": "mm"
+            },
+            "section_h": {
+              "value": 500.0,
+              "unit": "mm"
+            }
+          }
+        }
+      ]
+    },
+    "role_statuses": {
+      "F1": {
+        "section_b": "reference",
+        "section_h": "unmapped"
+      },
+      "F2": {
+        "section_b": "candidate",
+        "section_h": "reference"
+      },
+      "F3": {
+        "section_b": "reference"
+      }
+    },
+    "revit_placements": {
+      "frames": [
+        {
+          "id": "u-1",
+          "kind": "column",
+          "section": "F1: T1",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "u-2",
+          "kind": "column",
+          "section": "F2: T2",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "u-3",
+          "kind": "column",
+          "section": "F3: T3",
+          "i": {
+            "x_mm": 12000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 12000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "changed": [],
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.length_mm": {
+          "value": 5,
+          "unit": "mm",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "map": "res_01KRC000000000000000000001",
+    "frames": "res_01KRC000000000000000000002",
+    "sections": "res_01KRC000000000000000000003",
+    "revit": "res_01KRC000000000000000000004",
+    "revit_placements": "res_01KRC000000000000000000005",
+    "changed": "res_01KRC000000000000000000006#/changed",
+    "basis": "res_01KRC000000000000000000007"
+  },
+  "expected": {
+    "new_types": [],
+    "assignments": [],
+    "no_change": [],
+    "not_updatable": [
+      {
+        "frame_id": "C1",
+        "code": "SECTION_ROLES_UNMAPPED"
+      },
+      {
+        "frame_id": "C2",
+        "code": "SECTION_ROLES_UNMAPPED"
+      },
+      {
+        "frame_id": "C3",
+        "code": "SECTION_ROLES_UNMAPPED"
+      }
+    ],
+    "orientation": [],
+    "expected": {
+      "elements": [],
+      "types": []
+    },
+    "complete": true
+  }
+}

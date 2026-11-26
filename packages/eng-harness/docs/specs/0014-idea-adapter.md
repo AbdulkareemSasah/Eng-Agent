@@ -170,9 +170,11 @@ decision D-5), a real process over stdio; "fake-host workflow test" runs the rea
 - AC14. Given the verdicts of one call, then they form one `verdicts.set/1` whose verdicts are all `source: host`, with
   `counts` matching, `draft: true` while the load map is unconfirmed (and for route `rest` always, §4.5), `governing` on the
   largest-ratio non-skipped verdict per connection (ties all), `trace_ref` null, the raw reply in a parent
-  `harness.idea_check_raw/1`; a code-pack verdict in the set is a construction error; a reply with no calculated
-  connection gives `PRECONDITION_FAILED` (`analysis_current`), never an empty passing set; a connection `passed` that
-  disagrees with its checks adds one `idea:connection` verdict `NEEDS_ENGINEER`. Tests:
+  `harness.idea_check_raw/1`; a code-pack verdict in the set is a construction error. With no calculated connection,
+  host `errors` yield `ERROR` verdicts that retain the host text per AC12. With neither a calculated connection nor
+  host errors, the reply gives `PRECONDITION_FAILED` (`analysis_current`). Neither case yields a passing set
+  (amendment B-612, owner answer OQ-Q105 of 2026-11-26). A connection `passed` that disagrees with its checks adds
+  one `idea:connection` verdict `NEEDS_ENGINEER`. Tests:
   `tests/unit/adapters/test_idea_verdicts.py::test_set_properties`, `::test_host_only`, `::test_empty_is_precondition`,
   `::test_passed_disagreement`.
 - AC15. Given the design basis field `connection.design_code`, when verdicts are built, then `code` is its value; the host's
@@ -384,7 +386,7 @@ code.
 
 ### 4.7 Loads by reference: the plan, the map, the builder
 
-**Load plan** (argument model of `idea_native_set_loads`): `path` (a working copy), `connection` (explicit identifier or
+**Load plan** (caller input for `idea_native_set_loads`): `path` (a working copy), `connection` (explicit identifier or
 name as the host reports it; never defaulted), `effects`: list of `{name, entries}`, each entry `{beam_segment_id,
 position_host, row: Ref[MemberEndRow]}`. `row` points to one row object of a `forces.member_end/1` result
 (`res_<id>#/rows/<n>`); the six force fields are `engineering_quantity`, so a literal is refused (contract AC42). Choosing
@@ -406,6 +408,29 @@ field untouched; send `idea_native_set_loads(path, loads, connection_id, out_pat
 Sasaah drops all-zero effects before the write (`E/IdeaNativeDigest.cs:8-52`) and reports them (`dropped_zero`); the
 adapter turns that into AC10's warning. The effect `name` is the only link between the plan and the host; effects named
 twice are refused.
+
+**Native load port (amendment B-612).** `describe` names `model` as the model selector, following 0002 §4.5.9 and
+`AdapterToolPort.describe`. `preview`, `call`, `read_back` and `reconcile` take the same caller arguments: `model`
+and the `LoadPlan` fields `path`, `connection`, `member_map` and `effects`. `member_map` maps member IDs to lists of
+segment keys (`beam_segment_id`, `position_host`). `call` uses the bound working copy as the source, as
+`IdeaHostPort.set_loads` does. The adapter builds `NativeSetLoadsArgs` with that `path`, the built `loads`,
+`connection_id` from `connection`, and a fresh `out_path` in the run folder. The adapter sets `confirm` under approval
+when building the wire request. `read_back` reads `connection` on the model's currently bound file (the destination
+after settlement) and returns a stored `harness.idea_loads/1` in canonical units. These port methods accept reference
+plans. `NativeSetLoadsArgs` is internal to the adapter.
+
+**Lost native load reply (amendment B-612).** Follow 0002 §4.5.7 and
+`AdapterToolPort._call`/`_lost_write`: before sending, store `harness.run_output/1` with the source read as
+`value.observed` (canonical units) and the exact prepared request as `value.sent`. The durable ledger entry for that
+`op_id` refers to `#/value/observed` as its pre-image. Keep the request in the same record so the observed pre-image
+and the write intent both survive a lost reply. In that record, encode the two paths relative to the run folder and
+retain the host-ready loads, connection ID and confirmation flag as sent. `reconcile(tool, args, op_id)` finds the
+entry by `op_id`, verifies it against the tool and caller argument hash, and loads the sibling `value.sent` to
+reconstruct `NativeSetLoadsArgs` for `IdeaReconciler`. It reads only the recorded destination and connection and
+compares with the recorded loads (§4.8). Missing or invalid request evidence gives `unknown` without a host write.
+An `applied` decision settles the model on the recorded destination and returns its canonical read-back as
+`Reconciliation.result`. On a fresh engine resume, restore the last journaled IDEA model binding and file hash
+before model lookup and reconciliation, following 0002 §4.5.9 (Q14).
 
 ### 4.8 Errors and timeouts
 
@@ -455,7 +480,30 @@ possible cause when the text contains `licen` or `seat`, as a hint only. The rea
 | `restore` | rebind to an earlier journaled file whose hash equals `saved.file_sha256`, else `CONFLICT`; on route `rest` close and reopen |
 | `model_files` | the bound file; file-copy promotion is possible because no host holds the file open on route `native` (route `rest`: the engineer closes the project in IDEA first, L10) |
 | `started_instances`, `close_started` | empty; the harness never starts IDEA or the service |
-| `describe`, `call`, `preview`, `read_back`, `supports_reconcile`, `reconcile` | §4.4, §4.7, §4.8; `preview` shows the plan, the map and the forces to be written, in canonical units |
+| `describe`, `call`, `preview`, `read_back`, `supports_reconcile`, `reconcile` | §4.4, §4.7, §4.8 and the preview and basis wiring below |
+
+**Write dispatch and ledger targets (amendment B-612, Q13).** IDEA dispatches through the configured route and
+durably records each write before sending it, targeting the bound file on `native` and the bound project on the
+configured service on `rest`. The IDEA ledger preserves the native pre-send evidence defined in §4.7. The shared
+PID-based `HostTarget` contract continues to serve adapters that use it.
+
+**Load preview (amendment B-612).** Follow the stored references of 0002 §4.5.9 and `AdapterToolPort.preview`.
+The load preview returns one item with the tool name as its ID, a label naming the tool and target, the bound
+model in `Preview.models`, and `diff_ref` unset. In order, `Preview.items[0].refs` resolve through the run result
+store to the `#/value` of three `harness.run_output/1` records: the validated reference-based plan with a run-relative
+`path`, the applied map (`status`, `sign_convention`, and `components` with their CSI fields and end signs), and the
+proposed loading (`connection` and `effects` using the canonical load fields of §4.5). The preview reads and builds
+the loading without sending a write. The IDEA branch of `build_ports` uses `_loads.load_shipped_map` for the assembled port.
+For AC7, the assembly test substitutes that loader with `_loads.load_map_file` on the synthetic fixture. The
+shipped unconfirmed map still raises IG-2 before any load host call.
+
+**Frozen basis (amendment B-612).** The assembled IDEA port reads the basis lazily, following 0002 §4.5.8 and
+CSI's `_FrozenTolerance` in `adapters/__init__.py`: load the run header's `basis_ref` with `JournalReader` and
+`StoreBasisPort`, including on resume. Pass the confirmed `connection.design_code` through `design_code_from_basis`
+to the calculation and check-result helpers. Missing or unconfirmed code follows AC15 before a host write. Use
+`checks.readback_relative_tolerance_ratio` from the same basis for load verification, `check_model` and
+`IdeaReconciler`. An unavailable tolerance supplies no numeric default and gives `READBACK_UNAVAILABLE` when
+loads need comparison, as in `_checks.compare_loads_readback`.
 
 ### 4.11 Permission modes
 
@@ -516,7 +564,7 @@ the service is "stopped". Faults, selected by the test: `service_stopped` (stub 
 
 | Risk | Class | Mitigation |
 |---|---|---|
-| A stub or a stale result is read as an IDEA verdict | R1 | Stub markers refused (AC11); route `rest` preflight; empty or uncalculated results are a precondition failure (AC14); every reply shape-checked (AC12); L8 |
+| A stub or a stale result is read as an IDEA verdict | R1 | Stub markers refused (AC11); route `rest` preflight; uncalculated results give host `ERROR` verdicts or a precondition failure (AC14); every reply shape-checked (AC12); L8 |
 | Loads sent in the wrong unit, axis or sign, or to the wrong segment | R1 | Declared unit with status in the report (AC16); map unconfirmed means gap (AC7); exact segment match, structure-preserving build, read-back (AC9, AC10); L2, L9 |
 | Edits believed applied but not part of the calculation | R1 | In-memory edit tools not served (AC6); loads only through a file the calculator reads; L4 |
 | Verdict relabelled or recomputed by the adapter | R1 | Host status wins; disagreement is `NEEDS_ENGINEER`; property test of no upgrade (AC13) |
@@ -565,6 +613,8 @@ versioned with the package; a new Sasaah build is a new allowlist header and new
 | Q10 | The engineer starts the REST service and IDEA; the harness does not (08 §1 said the server would) | Owner | Accept (A9, 16 §5); the doctor reports the state |
 | Q12 | Sasaah fills a missing `check_value` with 0 and `check_status` with false, so the adapter cannot see missing data; a genuine 0 utilization with `check_status` true is also sent to the engineer | Owner | Accept; ask Sasaah (project lane, ADR-0026) to report absent fields as null, then replace the zero rule with a missing-value rule; L6 |
 | Q11 | The load map (signs per component and member end) and its confirming case are engineering content | Owner | Owner commits the confirmed map after L9; the build ships it unset |
+| Q13 | How should T9a dispatch and ledger IDEA writes that address a file or REST project without a PID-based `HostTarget`? | Lead, then owner | Decided (owner answer of 2026-11-26; amendment B-612): IDEA-specific dispatch and durable ledger targets for the native file and REST project (§4.10), preserving the §4.7 pre-send evidence and the shared target contract. |
+| Q14 | How does a fresh engine resume recover the IDEA binding before model lookup and reconciliation? | Lead, then owner | Decided (owner answer of 2026-11-26; amendment B-612): restore the last journaled IDEA binding and file hash before reconciliation (§4.7, following 0002 §4.5.9). Cover a fresh assembly in T9's crash matrix. |
 | IG-1 | `idea_set_loads` forces have no unit (S12-G12) | Owner | Not served; ask Sasaah for a unit field; L2 |
 | IG-2 | ETABS to IDEA axis, sign and member-end mapping unconfirmed (contract G-3) | Owner | `_load_map.toml` unset, `NotImplementedGap`; Q11 |
 | IG-3 | In-memory edit tools do not reach a real calculation (§1 item 2) | Owner | Not served; L4 confirms; Sasaah change (Q1) |
