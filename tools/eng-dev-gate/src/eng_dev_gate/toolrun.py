@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict
 
 from eng_dev_gate.results import EnvironmentFaultError
 
-TOOL_TIMEOUT_SECONDS = 900  # upper bound for one tool call; a hung tool is an environment fault, not a rule result
+TOOL_TIMEOUT_SECONDS = 7200  # one tool call, as limits.mutation_run_seconds (T42); a hung tool is an environment fault
 
 
 class ToolResult(BaseModel):
