@@ -42,7 +42,7 @@ def test_default_bound_is_the_mutation_bound() -> None:
     from eng_dev_gate.config.gate_config import load_gate_config
 
     workspace = Path(__file__).resolve().parents[4]
-    assert toolrun.TOOL_TIMEOUT_SECONDS == load_gate_config(workspace).limits.mutation_run_seconds
+    assert load_gate_config(workspace).limits.mutation_run_seconds == toolrun.TOOL_TIMEOUT_SECONDS
 
 
 def test_python_module_uses_current_interpreter() -> None:
