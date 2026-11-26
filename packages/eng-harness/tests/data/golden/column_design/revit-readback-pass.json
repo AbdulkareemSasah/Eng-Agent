@@ -1,0 +1,40 @@
+{
+  "source": "Eng-harness spec 0013 AC12 and §4.4.6 (B-621), §4.4.5 U7 and Q17 (B-610). Synthetic plan, reads and design basis, with the C30S geometry and tolerance from the T7 shared-type golden.",
+  "method_ref": "§4.4.6 B1 to B4",
+  "synthetic": true,
+  "derivation": "At Revit revisions 1 and 2, u-a and u-b have the planned F1/C30S, and u-c has reused type id 22. F2/C30S is a decoy. Both C30S roles resolve to 300 mm. The F1 type reads 305 and 300 mm, so the differences are 5 and 0 mm, both within the 5 mm basis. No other element changed. With no issues and 2 > 1, PASS.",
+  "input": {
+    "plan": {
+      "calc": {"id": "harness.revit_column_update", "version": 1, "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "draft"},
+      "draft": true,
+      "trace": {"calc_id": "harness.revit_column_update", "calc_version": "1", "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "inputs": [], "constants": [], "steps": [], "outputs": []},
+      "new_types": [{"family": "F1", "name": "C30S", "roles": {"section_b": "res_01KRC000000000000000000005#/frame_sections/0/shape/b_mm", "section_h": "res_01KRC000000000000000000005#/frame_sections/0/shape/h_mm"}, "section": "C30S", "from_unique_id": "u-a", "origins": ["preexisting", "preexisting"]}],
+      "assignments": [{"unique_id": "u-a", "element_id": "101", "from_type_id": "21", "type_id": null, "new_type_name": "C30S", "origin": "preexisting"},
+        {"unique_id": "u-b", "element_id": "102", "from_type_id": "21", "type_id": null, "new_type_name": "C30S", "origin": "preexisting"},
+        {"unique_id": "u-c", "element_id": "103", "from_type_id": "21", "type_id": "22", "new_type_name": null, "origin": "preexisting"}],
+      "no_change": [], "not_updatable": [], "orientation": [], "complete": true,
+      "expected": {"elements": [{"unique_id": "u-a", "family": "F1", "type_name": "C30S"}, {"unique_id": "u-b", "family": "F1", "type_name": "C30S"}, {"unique_id": "u-c", "type_id": "22"}], "types": [{"family": "F1", "name": "C30S", "roles": {"section_b": "res_01KRC000000000000000000005#/frame_sections/0/shape/b_mm", "section_h": "res_01KRC000000000000000000005#/frame_sections/0/shape/h_mm"}}]}
+    },
+    "before": {
+      "elements": [{"unique_id": "u-a", "element_id": 101, "category": "column", "family": "F1", "type_id": 21, "type_name": "Told", "level_id": 1, "level_name": "L1", "location_kind": "point", "i": null, "j": null, "rotation_deg": 0, "parameters": {}},
+        {"unique_id": "u-b", "element_id": 102, "category": "column", "family": "F1", "type_id": 21, "type_name": "Told", "level_id": 1, "level_name": "L1", "location_kind": "point", "i": null, "j": null, "rotation_deg": 0, "parameters": {}},
+        {"unique_id": "u-c", "element_id": 103, "category": "column", "family": "F1", "type_id": 21, "type_name": "Told", "level_id": 1, "level_name": "L1", "location_kind": "point", "i": null, "j": null, "rotation_deg": 0, "parameters": {}}],
+      "types": [{"type_id": 21, "family": "F1", "name": "Told", "instance_ids": [101, 102, 103], "parameters": {"section_b": {"value": 400, "unit": "mm"}, "section_h": {"value": 400, "unit": "mm"}}},
+        {"type_id": 22, "family": "F1", "name": "C50", "instance_ids": [], "parameters": {"section_b": {"value": 500, "unit": "mm"}, "section_h": {"value": 500, "unit": "mm"}}},
+        {"type_id": 23, "family": "F2", "name": "C30S", "instance_ids": [], "parameters": {"section_b": {"value": 400, "unit": "mm"}, "section_h": {"value": 400, "unit": "mm"}}}]
+    },
+    "after": {
+      "elements": [{"unique_id": "u-a", "element_id": 101, "category": "column", "family": "F1", "type_id": 30, "type_name": "C30S", "level_id": 1, "level_name": "L1", "location_kind": "point", "i": null, "j": null, "rotation_deg": 0, "parameters": {}},
+        {"unique_id": "u-b", "element_id": 102, "category": "column", "family": "F1", "type_id": 30, "type_name": "C30S", "level_id": 1, "level_name": "L1", "location_kind": "point", "i": null, "j": null, "rotation_deg": 0, "parameters": {}},
+        {"unique_id": "u-c", "element_id": 103, "category": "column", "family": "F1", "type_id": 22, "type_name": "C50", "level_id": 1, "level_name": "L1", "location_kind": "point", "i": null, "j": null, "rotation_deg": 0, "parameters": {}}],
+      "types": [{"type_id": 21, "family": "F1", "name": "Told", "instance_ids": [], "parameters": {"section_b": {"value": 400, "unit": "mm"}, "section_h": {"value": 400, "unit": "mm"}}},
+        {"type_id": 22, "family": "F1", "name": "C50", "instance_ids": [103], "parameters": {"section_b": {"value": 500, "unit": "mm"}, "section_h": {"value": 500, "unit": "mm"}}},
+        {"type_id": 23, "family": "F2", "name": "C30S", "instance_ids": [], "parameters": {"section_b": {"value": 400, "unit": "mm"}, "section_h": {"value": 400, "unit": "mm"}}},
+        {"type_id": 30, "family": "F1", "name": "C30S", "instance_ids": [101, 102], "parameters": {"section_b": {"value": 305, "unit": "mm"}, "section_h": {"value": 300, "unit": "mm"}}}]
+    },
+    "basis": {"template": null, "fields": {"compare.length_mm": {"value": 5, "unit": "mm", "source": "engineer:synthetic@2026-01-01T00:00:00.000Z", "confirmed": true, "citation": null}}},
+    "sections": {"frame_sections": [{"name": "C30S", "material": "C30", "shape": {"type": "rectangular", "b_mm": 300, "h_mm": 300}}, {"name": "C50", "material": "C30", "shape": {"type": "rectangular", "b_mm": 500, "h_mm": 500}}], "area_sections": []}
+  },
+  "refs": {"plan": "res_01KRC000000000000000000001", "before": "res_01KRC000000000000000000002", "after": "res_01KRC000000000000000000003", "basis": "res_01KRC000000000000000000004", "sections": "res_01KRC000000000000000000005"},
+  "expected": {"status": "PASS", "issues": [], "before_revision": 1, "after_revision": 2}
+}

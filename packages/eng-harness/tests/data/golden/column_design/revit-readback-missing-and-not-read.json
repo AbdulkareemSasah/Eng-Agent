@@ -1,0 +1,35 @@
+{
+  "source": "Eng-harness spec 0013 AC12 and §4.4.6 (B-621), §4.4.5 U7 and Q17 (B-610). Synthetic plan, reads and design basis, with the C30S geometry and tolerance from the T7 shared-type golden.",
+  "method_ref": "§4.4.6 B1, B4",
+  "synthetic": true,
+  "derivation": "u-a is missing and gets only ELEMENT_MISSING. Its planned F1/C30S type exists but has neither role, so the remaining assignee u-b gets one NOT_READ. u-c is present with F1/C35S, whose type row is absent, so both roles are unread and yield one NOT_READ for u-c. In unique_id order the issues are u-a, u-b, u-c. Revisions 1 to 2, FAIL.",
+  "input": {
+    "plan": {
+      "calc": {"id": "harness.revit_column_update", "version": 1, "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "status": "draft"},
+      "draft": true,
+      "trace": {"calc_id": "harness.revit_column_update", "calc_version": "1", "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "inputs": [], "constants": [], "steps": [], "outputs": []},
+      "new_types": [{"family": "F1", "name": "C30S", "roles": {"section_b": "res_01KRC000000000000000000005#/frame_sections/0/shape/b_mm", "section_h": "res_01KRC000000000000000000005#/frame_sections/0/shape/h_mm"}, "section": "C30S", "from_unique_id": "u-a", "origins": ["preexisting", "preexisting"]}, {"family": "F1", "name": "C35S", "roles": {"section_b": "res_01KRC000000000000000000005#/frame_sections/1/shape/b_mm", "section_h": "res_01KRC000000000000000000005#/frame_sections/1/shape/h_mm"}, "section": "C35S", "from_unique_id": "u-c", "origins": ["preexisting"]}],
+      "assignments": [{"unique_id": "u-a", "element_id": "101", "from_type_id": "21", "type_id": null, "new_type_name": "C30S", "origin": "preexisting"},
+        {"unique_id": "u-b", "element_id": "102", "from_type_id": "21", "type_id": null, "new_type_name": "C30S", "origin": "preexisting"},
+        {"unique_id": "u-c", "element_id": "103", "from_type_id": "21", "type_id": null, "new_type_name": "C35S", "origin": "preexisting"}],
+      "no_change": [], "not_updatable": [], "orientation": [], "complete": true,
+      "expected": {"elements": [{"unique_id": "u-a", "family": "F1", "type_name": "C30S"}, {"unique_id": "u-b", "family": "F1", "type_name": "C30S"}, {"unique_id": "u-c", "family": "F1", "type_name": "C35S"}], "types": [{"family": "F1", "name": "C30S", "roles": {"section_b": "res_01KRC000000000000000000005#/frame_sections/0/shape/b_mm", "section_h": "res_01KRC000000000000000000005#/frame_sections/0/shape/h_mm"}}, {"family": "F1", "name": "C35S", "roles": {"section_b": "res_01KRC000000000000000000005#/frame_sections/1/shape/b_mm", "section_h": "res_01KRC000000000000000000005#/frame_sections/1/shape/h_mm"}}]}
+    },
+    "before": {
+      "elements": [{"unique_id": "u-a", "element_id": 101, "category": "column", "family": "F1", "type_id": 21, "type_name": "Told", "level_id": 1, "level_name": "L1", "location_kind": "point", "i": null, "j": null, "rotation_deg": 0, "parameters": {}},
+        {"unique_id": "u-b", "element_id": 102, "category": "column", "family": "F1", "type_id": 21, "type_name": "Told", "level_id": 1, "level_name": "L1", "location_kind": "point", "i": null, "j": null, "rotation_deg": 0, "parameters": {}},
+        {"unique_id": "u-c", "element_id": 103, "category": "column", "family": "F1", "type_id": 21, "type_name": "Told", "level_id": 1, "level_name": "L1", "location_kind": "point", "i": null, "j": null, "rotation_deg": 0, "parameters": {}}],
+      "types": [{"type_id": 21, "family": "F1", "name": "Told", "instance_ids": [101, 102, 103], "parameters": {"section_b": {"value": 400, "unit": "mm"}, "section_h": {"value": 400, "unit": "mm"}}}]
+    },
+    "after": {
+      "elements": [{"unique_id": "u-b", "element_id": 102, "category": "column", "family": "F1", "type_id": 30, "type_name": "C30S", "level_id": 1, "level_name": "L1", "location_kind": "point", "i": null, "j": null, "rotation_deg": 0, "parameters": {}},
+        {"unique_id": "u-c", "element_id": 103, "category": "column", "family": "F1", "type_id": 31, "type_name": "C35S", "level_id": 1, "level_name": "L1", "location_kind": "point", "i": null, "j": null, "rotation_deg": 0, "parameters": {}}],
+      "types": [{"type_id": 21, "family": "F1", "name": "Told", "instance_ids": [], "parameters": {"section_b": {"value": 400, "unit": "mm"}, "section_h": {"value": 400, "unit": "mm"}}},
+        {"type_id": 30, "family": "F1", "name": "C30S", "instance_ids": [102], "parameters": {}}]
+    },
+    "basis": {"template": null, "fields": {"compare.length_mm": {"value": 5, "unit": "mm", "source": "engineer:synthetic@2026-01-01T00:00:00.000Z", "confirmed": true, "citation": null}}},
+    "sections": {"frame_sections": [{"name": "C30S", "material": "C30", "shape": {"type": "rectangular", "b_mm": 300, "h_mm": 300}}, {"name": "C35S", "material": "C30", "shape": {"type": "rectangular", "b_mm": 350, "h_mm": 350}}], "area_sections": []}
+  },
+  "refs": {"plan": "res_01KRC000000000000000000001", "before": "res_01KRC000000000000000000002", "after": "res_01KRC000000000000000000003", "basis": "res_01KRC000000000000000000004", "sections": "res_01KRC000000000000000000005"},
+  "expected": {"status": "FAIL", "issues": [{"unique_id": "u-a", "code": "ELEMENT_MISSING"}, {"unique_id": "u-b", "code": "NOT_READ"}, {"unique_id": "u-c", "code": "NOT_READ"}], "before_revision": 1, "after_revision": 2}
+}

@@ -93,6 +93,16 @@ CALCS = {
             "basis": "basis.design_basis/1",
         },
     ),
+    "revit-readback": (
+        "harness.revit_column_readback",
+        {
+            "plan": "harness.revit_column_update/1",
+            "before": "harness.revit_structure/1",
+            "after": "harness.revit_structure/1",
+            "basis": "basis.design_basis/1",
+            "sections": "model.sections/1",
+        },
+    ),
 }
 """Per file prefix: the calc id and the record kind of each referenced input field."""
 FILES = golden_files()
@@ -106,13 +116,24 @@ def _calc_of(stem: str) -> tuple[str, dict[str, str]]:
 def test_case(stem: str) -> None:
     case = load_case(FILES[stem])
     calc_id, kinds = _calc_of(stem)
+    meta = input_meta(case.refs, kinds)
+    if stem.startswith("revit-readback-"):
+        # Revit revisions are record metadata and are absent from the resolved structure payloads.
+        for name, revision in (("before", 1), ("after", 2)):
+            meta.refs[name] = meta.refs[name].model_copy(
+                update={"model_id": "mdl_00000000000000000000000000", "model_revision": revision}
+            )
     definition = REGISTRY[calc_id]
     input_type = definition.input_type
     assert isinstance(input_type, type)
     assert issubclass(input_type, CalcInput)
     trace = TraceBuilder()
-    result = definition(input_type.model_validate(case.input), input_meta(case.refs, kinds), trace)
+    result = definition(input_type.model_validate(case.input), meta, trace)
     assert result.model_dump(mode="json") == case.expected
+    if stem == "revit-readback-pass":
+        fields = input_type.model_json_schema()["properties"]
+        assert {name for name, field in fields.items() if field.get("x-eng", {}).get("stale_ok")} == {"before"}
+        assert fields["sections"]["x-eng"]["ref_kinds"] == ["model.sections/1"]
     # AC6: column-demands goldens also pin hand-derived E3-E5 trace steps (values, units, source, uses, formula).
     if stem.startswith("column-demands-"):
         assert case.expected_trace is not None
