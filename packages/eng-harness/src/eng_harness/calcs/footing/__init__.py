@@ -9,6 +9,7 @@ from eng_harness.calcs.footing.layout import footing_layout
 from eng_harness.calcs.footing.plan_size import footing_plan_size
 from eng_harness.calcs.footing.reactions_to_loads import reactions_to_joint_loads
 from eng_harness.calcs.footing.resize import footing_resize
+from eng_harness.calcs.footing.rows import FOOTING_ROW_CALCS
 from eng_harness.calcs.footing.safe_equilibrium import safe_equilibrium
 from eng_harness.calcs.footing.schedule import footing_schedule
 from eng_harness.calcs.footing.status import footing_status
@@ -24,6 +25,7 @@ FOOTING_CALCS: tuple[CalcDef, ...] = (
     footing_schedule,
     reactions_to_joint_loads,
     safe_equilibrium,
+    *FOOTING_ROW_CALCS,
 )
 """The shipped footing calcs, in registration order."""
 
