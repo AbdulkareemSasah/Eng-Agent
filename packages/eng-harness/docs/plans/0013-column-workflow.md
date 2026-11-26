@@ -582,8 +582,9 @@ read-back identity fields in `harness.revit_column_update/1`.
 The T7 golden cases follow U2, U4 and U5 as clarified (amendment B-614, owner answers of 2026-11-26).
 
 **T8 `harness.revit_column_readback`** (spec §4.4.6). Type and value checks per planned element and type, unplanned
-type changes, missing elements, `not_read`, `stale_ok` on `before` only. B1 and B2 use the identity fields supplied by
-T7 (amendment B-610).
+type changes, missing elements, `NOT_READ`, `stale_ok` on `before` only. B1 and B2 use the identity fields supplied by
+T7 (amendment B-610). The top-level `sections` reference input points to the same ETABS `model.sections/1` record
+that T7 used for the plan's role references. Goldens follow amendment B-621.
 
 **T9 Points and rules** (spec §4.8). The four points with their state models, the rules `cm.no_proposal` (only
 for `PASS` columns), `cm.fail_matched`, `map.clean`, `rr.pass`, policy without the model and language-model tiers, lock entries.
