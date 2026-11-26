@@ -361,8 +361,21 @@ def test_decide_unknown_missing_effect_on_readback(tmp_path: Path) -> None:
         {"n": 1},
         ["not-a-dict"],
         [{"ok": True}, "bad"],
+        [{"name": "LE1", "forcesOnSegments": [{"position": 0.0}]}],
+        [{"name": "LE1", "forcesOnSegments": [{"beamSegmentId": 1}]}],
+        [{"name": "LE1", "forcesOnSegments": [{"beamSegmentId": None, "position": 0.0}]}],
     ],
-    ids=["none", "str", "int", "dict", "list_str", "mixed_list"],
+    ids=[
+        "none",
+        "str",
+        "int",
+        "dict",
+        "list_str",
+        "mixed_list",
+        "missing_beam_segment_id",
+        "missing_position",
+        "wrong_segment_types",
+    ],
 )
 def test_decide_unknown_malformed_loads_body(tmp_path: Path, loads_body: Any) -> None:
     """AC18: non-list-of-dicts loads → got_list None → READBACK_UNAVAILABLE → unknown."""
@@ -381,6 +394,13 @@ def test_decide_unknown_malformed_loads_body(tmp_path: Path, loads_body: Any) ->
         assert decided.outcome == "unknown"
         assert decided.evidence["read_back_ok"] is False
         assert decided.evidence["issue_codes"] == ["READBACK_UNAVAILABLE"]
+        if (
+            isinstance(loads_body, list)
+            and loads_body
+            and isinstance(loads_body[0], dict)
+            and "forcesOnSegments" in loads_body[0]
+        ):
+            assert decided.evidence["reason"] == "load read-back reply is malformed"
 
     anyio.run(run)
 

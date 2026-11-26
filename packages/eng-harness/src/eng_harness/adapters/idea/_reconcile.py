@@ -87,12 +87,24 @@ class IdeaReconciler:
         else:
             got_list = None
         requested = [dict(item) for item in lost.model.loads]
-        issues = checks.compare_loads_readback(
-            requested=requested,
-            got=got_list,
-            tolerance_ratio=self._tolerance,
-            connection=lost.model.connection_id,
-        )
+        try:
+            issues = checks.compare_loads_readback(
+                requested=requested,
+                got=got_list,
+                tolerance_ratio=self._tolerance,
+                connection=lost.model.connection_id,
+            )
+        except KeyError, TypeError, ValueError:
+            return Decision(
+                outcome="unknown",
+                evidence={
+                    "out_path": str(out_path),
+                    "exists": True,
+                    "read_back_ok": False,
+                    "issue_codes": ["READBACK_UNAVAILABLE"],
+                    "reason": "load read-back reply is malformed",
+                },
+            )
         mismatch = [issue for issue in issues if issue.code in ("READBACK_MISMATCH", "READBACK_UNAVAILABLE")]
         if not mismatch:
             return Decision(

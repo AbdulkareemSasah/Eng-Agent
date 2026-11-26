@@ -354,7 +354,24 @@ async def _process_success(
 ) -> CalculateResult:
     """Refuse stubs, shape-check, map verdicts and store both kinds."""
     dumped = result.model_dump(by_alias=True, mode="json") if hasattr(result, "model_dump") else result
-    body = parse_reply_json(dumped)
+    try:
+        body = parse_reply_json(dumped)
+    except ContractError as error:
+        if error.detail.host_code != "UNEXPECTED_REPLY":
+            raise
+        evidence = dict(dumped) if isinstance(dumped, Mapping) else {"value": str(dumped)}
+        _refuse_host(
+            store=store,
+            provenance=provenance,
+            tool=tool,
+            reply=evidence,
+            host_code="UNEXPECTED_REPLY",
+            message=error.detail.message,
+            inputs=inputs,
+            files=files,
+            started_at=started_at,
+            duration_ms=duration_ms,
+        )
     # AC12: a bare unexpected shape is UNEXPECTED_REPLY, not OFFLINE_STUB (stub markers need a check reply).
     if not _looks_like_check_reply(body):
         _refuse_host(
@@ -402,7 +419,23 @@ async def _process_success(
                 duration_ms=duration_ms,
             )
         raise
-    raw = parse_check_raw(tagged)
+    try:
+        raw = parse_check_raw(tagged)
+    except ContractError as error:
+        if error.detail.host_code != "UNEXPECTED_REPLY":
+            raise
+        _refuse_host(
+            store=store,
+            provenance=provenance,
+            tool=tool,
+            reply=tagged,
+            host_code="UNEXPECTED_REPLY",
+            message=error.detail.message,
+            inputs=inputs,
+            files=files,
+            started_at=started_at,
+            duration_ms=duration_ms,
+        )
     verdicts = _verdicts_from_connections(
         [c.model_dump(mode="json") for c in raw.connections],
         design_code=design_code,
@@ -469,7 +502,6 @@ async def calculate_native(
 ) -> CalculateResult:
     """Run `idea_native_calculate` with `save: false` and map host verdicts (spec 0014 AC12)."""
     started = provenance.clock.now()
-    began = provenance.clock.now_ms()
     args = build_native_calculate_args(path=str(path), connection_id=connection_id)
     inputs: dict[str, RefInput | LiteralInput] = {
         "path": LiteralInput(literal=Path(path).name),
@@ -478,6 +510,7 @@ async def calculate_native(
     if connection_id is not None:
         inputs["connection_id"] = LiteralInput(literal=connection_id)
     files = (_file_source(path),)
+    began = provenance.clock.now_ms()
     result = await sessions.call(server, role, "idea_native_calculate", args, CallEffect.READ)
     duration_ms = provenance.clock.now_ms() - began
     if result.is_error:

@@ -318,8 +318,76 @@ def test_raise_host_unexpected_and_mapped() -> None:
             ids=SeededIdSource(b"rh2", FixedClock(_START)),
             op_id="op-1",
         )
-    assert mapped.value.detail.code is ErrorCode.TIMEOUT_UNKNOWN_OUTCOME
-    assert mapped.value.detail.host_method == "idea_calculate" or mapped.value.detail.op_id == "op-1"
+    detail = mapped.value.detail
+    assert detail.code is ErrorCode.TIMEOUT_UNKNOWN_OUTCOME
+    assert detail.host_method is None
+    assert detail.op_id == "op-1"
+
+
+def test_raise_host_preserves_mapped_detail_fields() -> None:
+    """AC17: _raise_host preserves mapper field, precondition, incident id, hint and value details exactly."""
+    field_reply = CallToolResult(
+        content=[
+            TextContent(
+                type="text",
+                text='{"code":"connection_not_found","message":"license seat unavailable"}',
+            )
+        ],
+        is_error=True,
+    )
+    with pytest.raises(ContractError) as field_error:
+        m._raise_host(
+            field_reply,
+            tool="idea_get_check_results",
+            effect=CallEffect.READ,
+            ids=SeededIdSource(b"rh-field", FixedClock(_START)),
+        )
+    field_detail = field_error.value.detail
+    assert field_detail.code is ErrorCode.NOT_FOUND
+    assert field_detail.field == "connection"
+    assert field_detail.precondition is None
+    assert field_detail.incident_id is None
+    assert field_detail.hint == "license seat may be unavailable (hint only; Sasaah has no license logic)"
+    assert field_detail.expected is None
+    assert field_detail.received is None
+
+    precondition_reply = CallToolResult(
+        content=[TextContent(type="text", text='{"code":"no_project","message":"project is not open"}')],
+        is_error=True,
+    )
+    with pytest.raises(ContractError) as precondition_error:
+        m._raise_host(
+            precondition_reply,
+            tool="idea_list_connections",
+            effect=CallEffect.READ,
+            ids=SeededIdSource(b"rh-precondition", FixedClock(_START)),
+        )
+    precondition_detail = precondition_error.value.detail
+    assert precondition_detail.code is ErrorCode.PRECONDITION_FAILED
+    assert precondition_detail.field is None
+    assert precondition_detail.precondition is Precondition.model_open
+    assert precondition_detail.incident_id is None
+    assert precondition_detail.hint is None
+    assert precondition_detail.expected is None
+    assert precondition_detail.received is None
+
+    incident_ids = SeededIdSource(b"rh-incident", FixedClock(_START))
+    expected_incident = SeededIdSource(b"rh-incident", FixedClock(_START)).new_ulid()
+    with pytest.raises(ContractError) as incident_error:
+        m._raise_host(
+            CallToolResult(content=[], is_error=True),
+            tool="idea_get_check_results",
+            effect=CallEffect.READ,
+            ids=incident_ids,
+        )
+    incident_detail = incident_error.value.detail
+    assert incident_detail.code is ErrorCode.INTERNAL
+    assert incident_detail.field is None
+    assert incident_detail.precondition is None
+    assert incident_detail.incident_id == expected_incident
+    assert incident_detail.hint is None
+    assert incident_detail.expected is None
+    assert incident_detail.received is None
 
 
 def test_store_pair(tmp_path: Any) -> None:
@@ -826,6 +894,68 @@ def test_process_success_unexpected_shape_exact_literals(tmp_path: Any) -> None:
         assert detail.retryable is False
 
     anyio.run(body)
+
+
+@pytest.mark.parametrize(
+    "reply_kind",
+    ["malformed_connections", "multiple_text_blocks", "non_object_json"],
+)
+def test_process_success_late_unexpected_reply_stores_failure_evidence(reply_kind: str) -> None:
+    """AC11/AC12: parser-level UNEXPECTED_REPLY keeps evidence and reports the called host method."""
+    puts: list[tuple[str, dict[str, Any]]] = []
+
+    class _EvidenceStore:
+        def put(self, kind: str, payload: dict[str, Any], _producer: Any, **_kwargs: Any) -> None:
+            puts.append((kind, payload))
+
+    if reply_kind == "malformed_connections":
+        reply = CallToolResult(
+            content=[
+                TextContent(
+                    type="text",
+                    text='{"offline_stub":false,"backend":"rest","connections":"oops"}',
+                )
+            ],
+            is_error=False,
+        )
+        expected_evidence: dict[str, Any] = {
+            "offline_stub": False,
+            "backend": "rest",
+            "connections": "oops",
+            "route": "rest",
+        }
+    elif reply_kind == "multiple_text_blocks":
+        reply = CallToolResult(
+            content=[
+                TextContent(type="text", text='{"offline_stub":false}'),
+                TextContent(type="text", text='{"connections":[]}'),
+            ],
+            is_error=False,
+        )
+        expected_evidence = reply.model_dump(by_alias=True, mode="json")
+    else:
+        reply = CallToolResult(content=[TextContent(type="text", text="[]")], is_error=False)
+        expected_evidence = reply.model_dump(by_alias=True, mode="json")
+
+    async def run() -> None:
+        with pytest.raises(ContractError) as raised:
+            await m._process_success(
+                reply,
+                tool="idea_calculate",
+                design_code=_DESIGN_CODE,
+                route="rest",
+                load_map_confirmed=False,
+                store=cast(ResultStore, _EvidenceStore()),
+                **_store_kwargs(),
+            )
+        detail = raised.value.detail
+        assert detail.code is ErrorCode.HOST_ERROR
+        assert detail.host_code == "UNEXPECTED_REPLY"
+        assert detail.host_method == "idea_calculate"
+        assert detail.retryable is False
+
+    anyio.run(run)
+    assert puts == [("harness.run_output/1", {"value": expected_evidence})]
 
 
 def test_require_service_reachable_exact_messages_and_call_shape() -> None:
