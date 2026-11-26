@@ -392,6 +392,7 @@ tasks:
     # Amendment (B-417, documents only): registers the shipped workflow: workflows/__init__.py exports the blocks and block.discover() reads it lazily (spec 4.2), so blocks.lock.json gains the entries; about 15 lines, 380 to 395; tests/unit/test_block.py::test_main_writes_the_lock is isolated from the shipped blocks, about 3 lines, 395 to 400.
     # Amendment (B-511, documents only): split from the former T9 (see T9a); 230 is an estimate, to measure at write time.
     # Amendment (B-543, documents only): the v1 exit for a model locked after analysis (spec 4.5, AC15: about 10 lines) and the re-read before step 6 with its return to step 3 (spec 4.5.1, AC13 second clause: about 15) in _cycle.py; test_engineer_changes.py::test_edit_during_change_set_wait added; promote takes the key (plan 0001 T23). 230 to 255 (an estimate).
+    # Amendment (B-587, documents only): owner decision OQ-Q101 of 2026-11-20 (engine spec 4.6 invariant 7, 4.7, AC43; spec 4.5 steps 11 and 12, 4.7, AC23): in approve_each_write the invariant-7 p~pre.save keeps its place after any working-copy swap, the lease, literals, sibling admission and invariant-9 first-use binding and units read; only the p~pre.approve preview moves after that save, before the write, so test_approvals_per_mode[approve_each_write] passes. The three engine files and the engine test file below join, each limited to that order by its comment: an external amendment of plan 0001 files, recorded in that plan's section 3. tests_first unchanged: test_approvals_per_mode is listed already, and the engine test is not in this task's first test commit (TF008). About 20 engine lines: 255 to 275 (an estimate).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.model_edit_cycle (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -401,6 +402,9 @@ tasks:
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_cycle.py"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_finish.py"
       - "packages/eng-harness/src/eng_harness/blocks.lock.json"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"  # only the order in _tool_json: after Modes.enter's copy/swap part, reorder the pre-steps as one block: lease, literals, touch, bind, prepare, then Modes.enter's preview part (amendment B-587)
+      - "packages/eng-harness/src/eng_harness/engine/_modes.py"  # only split Modes.enter into its copy/swap part and its preview part, called after Guard.prepare; the copy, preview and approval rules are unchanged (amendment B-587)
+      - "packages/eng-harness/src/eng_harness/engine/_invariants.py"  # only Guard.prepare and Guard.save; the save keeps its place after sibling admission and first-use binding and units, and its path, arguments, role pre_analysis and model_saved are unchanged (amendment B-587)
       - "packages/eng-harness/tests/workflow/edit_cycle/conftest.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_cycle.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py"
@@ -408,7 +412,8 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_modes.py"
       - "packages/eng-harness/tests/unit/edit_cycle/test_definition.py"
       - "packages/eng-harness/tests/unit/test_block.py"  # isolates test_main_writes_the_lock from the shipped blocks (amendment B-417)
-    max_changed_lines: 255
+      - "packages/eng-harness/tests/workflow/test_invariants.py"  # only test_save_before_analysis: an approve_each_write case in which p~pre.save is journaled before p~pre.approve (engine AC43; amendment B-587)
+    max_changed_lines: 275
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/unit/edit_cycle/test_definition.py::test_workflow_registered"
@@ -999,6 +1004,16 @@ The merged test `tests/unit/test_block.py::test_main_writes_the_lock` runs `main
 `discover()`, and expects `"[]\n"`; once `discover()` returns the shipped blocks it would fail, so the task lists that file
 and monkeypatches `block.discover` there to return an empty `Registry`, keeping the expectation (what the shipped blocks
 are is checked by `test_block_lock.py` and `test_workflow_registered`).
+Amendment (B-587; engine spec §4.6 invariant 7, §4.7, AC43; spec §4.5 steps 11 and 12, §4.7, AC23; owner decision
+OQ-Q101 of 2026-11-20): in `approve_each_write` the engine inserted the `p~pre.approve` preview of steps 11 and 12
+before the invariant-7 `p~pre.save`, so the save changed the working copy and the write met `ApprovalVoid`. T9b keeps
+the save after any working-copy swap, the lease, literals, sibling admission and invariant-9 first-use binding and
+units read; it splits `Modes.enter` into copy/swap and preview parts and moves only the preview after `Guard.prepare`,
+before the write. It
+edits `engine/_ctx_impl.py`, `engine/_modes.py` and `engine/_invariants.py` for that order only (the limit of each is
+its comment in the front matter), and `tests/workflow/test_invariants.py::test_save_before_analysis` gains an
+`approve_each_write` case that checks the save is journaled before the preview; `test_approvals_per_mode` then passes in
+every mode. Engine plan 0001 records this external amendment in its section 3.
 Amendment (B-544; spec §4.5 steps 13 and 14, §4.6, AC41, AC42): T9a's step 13 parallel also calls
 `csi_read_model_state` (`F`) and passes the drift read `cases` empty and `combos` every combination of `R[k]`'s
 `harness.csi_name_lists/1`; step 14 runs `harness.host_design_verdicts` and `harness.design_summary` once per kind of
@@ -1190,7 +1205,7 @@ paths; the merged cases, which pass the record, keep their expectations. T17 wai
 | T8 | plan 0001 T10 to T17 and T22 (the stop on a check that is not clean, which step 9 can meet; until spec Q14 is answered T8 adds no routing for it, see T8; amendment B-503); plan 0002 T19a (amendment B-475); plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, owner decision OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths; plan 0001 T23 (`Preview.models` takes the key) and T17 of this plan (amendment B-543); plan 0001 T24 (the first `ctx.basis` read as engine work; T8 then replaces `_Loaded` in `conftest.py` by `StoreBasisPort`) and T13b of this plan (amendment B-569); `ModelFile` in `block.py` from this task, which also switches `_model_files` to `PurePath` identity match after plan 0006 T14c merged first with the `Path` walk (amendments B-569, B-574) |
 | T8b | plan 0001 T17 (`tests/rules/test_block_modules.py`) and T23 (`ctx.py`), both merged: an external amendment of plan 0001 files, recorded in that plan's section 3; T8 of this plan (`_cycle.py`); T9a waits for T8b (amendment B-569) |
 | T9a | plan 0002 T13 (analysis and design tools); plan 0006 T10 (engineer-turn labels) |
-| T9b | plan 0001 T16b (promotion; B-499) and T23 (`ctx.promote` takes the key, through T8; amendment B-543); plan 0002 T15 (for the final unlock test; until then the v1 exit) |
+| T9b | plan 0001 T16b (promotion; B-499) and T23 (`ctx.promote` takes the key, through T8; amendment B-543); plan 0002 T15 (for the final unlock test; until then the v1 exit); plan 0001 T22 (`_invariants.py`, `test_invariants.py`) and plan 0002 T19a (`_modes.py`, `_ctx_impl.py`), both merged, the last tasks that edited the engine files T9b edits for the save order: an external amendment of plan 0001 files, recorded in that plan's section 3 (amendment B-587) |
 | T10, T10b | plan 0006 T11 to T13 (report model, sections, document) |
 | T11 | plan 0006 T14 is not needed: the tests drive the engine directly |
 | T12 | plan 0001 T19 (crash-matrix worker); plan 0002 T19a (amendment B-475) |
@@ -1220,7 +1235,8 @@ paths; the merged cases, which pass the record, keep their expectations. T17 wai
   silent-failure and test lenses; T2 to T5 and T7 also against the R1 rules (no literal, cited method, golden sources);
   T5 and T6 also with the security lens (allowlist, always-ask); T13b also against engine §4.5.4, §4.6 "Tool saves"
   and §4.9 (the save's revision in the approval chain and the resume check) and T8b with the security lens (the
-  block-module scan; amendment B-569). Second-family review and owner approvals are
+  block-module scan; amendment B-569); T9b also against engine §4.6 invariant 7, §4.7 and §4.9 (the save order and its
+  replay; amendment B-587). Second-family review and owner approvals are
   `awaiting owner`.
 
 ## 5. Rollback
