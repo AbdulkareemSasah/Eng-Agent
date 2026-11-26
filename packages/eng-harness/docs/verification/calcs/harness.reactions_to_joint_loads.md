@@ -2,7 +2,7 @@
 
 - Calc id: `harness.reactions_to_joint_loads`
 - Version: 1
-- Content hash: `da4738f86a28bdbe4deb9d5e18de6b069e6a6118a4f7fa313494fb59115e58ae` (from `calcs.lock.json`; any later change to the calc or to a module it imports changes it and the owner re-verifies)
+- Content hash: `fd070ff9ddcc5fa34b9f121b6d41b285b61d46a1bfb97b4d681c0e6857424c71` (from `calcs.lock.json`; any later change to the calc or to a module it imports changes it and the owner re-verifies)
 - Status: draft (not approved; ADR-0028 section 4: no entry in `approvals.yaml`)
 - Method source: eng-harness spec 0010 section 4.9 items M1 to M4 (and step 2), acceptance criterion AC24; basis field `compare.length_mm` read as spec 0003 section 4.4 states (confirmed, unit mm, value >= 0); sign negation as BP section 4.1 (action and reaction); soft engineering outcomes as payload statuses per spec 0003 section 4.2
 - Constants: two `Cited`: zero length 0 mm (lower bound of `compare.length_mm`, spec 0003 4.4) and calc version 1. The length tolerance is the basis field, never a literal. No engineering number.

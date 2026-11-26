@@ -2,7 +2,7 @@
 
 - Calc id: `harness.footing_plan_size`
 - Version: 1
-- Content hash: `02e956834edac5f767c55de2b8d7c42671a241fb63c2b465569d91caf6de29b7`
+- Content hash: `8330ffa4b1adb261a28ef2e2132a37c9b80ff851911d8629cd6ca0020ccdf805`
 - Status: draft under ADR-0028 §4. Independent verification and owner approval are pending.
 - Method: [spec 0010 §4.4.2](../../specs/0010-design-isolated-footing.md), P0–P6 and AC7, as amended by B-567 (OQ-Q64).
   The sign and gross overburden terms come from [the bearing-pressure clause spec](../../../../structural-codes/docs/clauses/aci318_14/aci318_14.13_3_1_1.bearing_pressure_service.md), §3 and §4.1 S3.

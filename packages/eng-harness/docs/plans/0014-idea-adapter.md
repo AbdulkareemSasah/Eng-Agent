@@ -190,7 +190,7 @@ tasks:
   - id: T8
     title: Calculation on both routes, host-verdict reads, reconciliation and the stub-refusal workflows
     files:
-      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.idea (amendment B-356)
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.idea (amendment B-356); r1_modules entries for adapters/idea/_reconcile.py and adapters/idea/_calculate.py (amendment B-601)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/idea/_calculate.py"
       - "packages/eng-harness/src/eng_harness/adapters/idea/_reconcile.py"
@@ -210,6 +210,28 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_idea_reconcile.py::test_calculate_unknown_no_rerun"
     covers: [AC11, AC12, AC13, AC18]   # AC13 in part: the fake-fault workflow; the mapping is T5
     depends_on: [T5, T7]
+  - id: T9a
+    # Amendment (B-608, documents only): build the IDEA tool port of spec §4.10 and dispatch to it from build_ports.
+    # See plan 0002 §3, External amendment (B-608), for the shared factory scope and order.
+    # Estimate: 250 for the port (55 setup and model binding, 15 describe, 85 call and write settlement,
+    # 40 preview, 25 read_back, 10 supports_reconcile, 20 reconcile); 35 for build_ports dispatch;
+    # 45 to wire the reconciler and three calculation/check-result functions; 145 for the fake-host tests;
+    # 5 for CHANGELOG.md. Total: 480 changed lines.
+    title: IDEA tool port and build_ports dispatch
+    files:
+      - "packages/eng-harness/src/eng_harness/adapters/idea/_toolport.py"
+      - "packages/eng-harness/src/eng_harness/adapters/__init__.py"  # only the IDEA dispatch in build_ports (amendment B-608)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/tests/workflow/adapters/test_idea_toolport.py"
+    max_changed_lines: 480
+    max_sessions: 3
+    tests_first:
+      - "packages/eng-harness/tests/workflow/adapters/test_idea_toolport.py::test_build_ports_dispatches_idea_by_route"
+      - "packages/eng-harness/tests/workflow/adapters/test_idea_toolport.py::test_native_load_preview_call_and_read_back"
+      - "packages/eng-harness/tests/workflow/adapters/test_idea_toolport.py::test_calculation_and_check_results_through_port"
+      - "packages/eng-harness/tests/workflow/adapters/test_idea_toolport.py::test_reconcile_lost_writes_through_port"
+    covers: [AC2, AC7, AC8, AC10, AC11, AC12, AC18]  # port integration
+    depends_on: [T8]
   - id: T9
     title: End-to-end cycles, crash matrix, recorded-reply contract tests, doctor section and the IDEA local-testing steps
     files:
@@ -232,7 +254,39 @@ tasks:
       - "packages/eng-harness/tests/contract/test_idea_recordings.py::test_synthetic_matches_recordings"
       - "packages/eng-harness/tests/unit/test_doctor.py::test_idea_section"
     covers: [AC20, AC21, AC22]
-    depends_on: [T8]
+    depends_on: [T8, T9a]  # Amendment (B-608, documents only): the cycles and crash matrix use T9a's assembled ports.
+  - id: T10
+    title: "Mutation scope: the section 9 modules in r1_modules"
+    # Amendment (B-601, owner decision D-46, 2026-11-20): CI mutates only modules listed in
+    # [tool.eng-gate] r1_modules; spec 0014 section 9 names adapters/idea/_errors.py that is
+    # merged but absent from that list (_stub.py, _verdicts.py and _loads.py are already in
+    # r1_modules; _reconcile.py and _calculate.py are added by B-307 T8). This task adds that path to r1_modules,
+    # adds a contract guard that the section 9 list is covered by a glob, and strengthens the
+    # existing unit tests until the module reaches mutation_min (80 %) with real tests. No
+    # exclusions, pragmas or lowered thresholds; no module may be removed from r1_modules to
+    # pass MU001. No source module is listed: the work strengthens tests only. If the module
+    # cannot reach 80 % without a source change, the implementing writer reports
+    # NEEDS_PLAN_AMENDMENT. The blocked typed-loads work sketched in section 2 stays out of the
+    # front matter and takes the next free id when it is amended in.
+    # The writer measures one module at a time: an unpushed scratch commit that adds a comment
+    # line to that module only, then `uv run eng-gate mutation --package eng-harness --base HEAD~1`;
+    # the writer records each module's score in the verification record and drops the commit.
+    # The measurement runs on Linux (CI, a Linux cloud session, or WSL); a notice other than
+    # MU003 is not a score, and only a scored run with no MU001 is at or above mutation_min.
+    # The independent reviewer re-runs the per-module measurement on Linux and attaches its
+    # output (killed/total per module) to the pull request under "Review"; the work item does
+    # not merge without it (amendment B-601).
+    files:
+      - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py"  # shared by the five B-601 tasks; this task adds test_spec_0014_section_9_modules_in_r1
+      - "packages/eng-harness/tests/unit/adapters/test_idea_errors.py"  # adapters/idea/_errors.py
+    max_changed_lines: 40
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py::test_spec_0014_section_9_modules_in_r1"
+    covers: []  # section 9 mutation scope is not an AC; this plan's covers style lists ACs only
+    depends_on: [T4, T8]  # T4 _errors.py; T8 (B-307) also edits r1_modules for _reconcile.py and _calculate.py
 ---
 
 # Implementation plan: the `sasaah-idea-mcp` adapter
@@ -247,8 +301,8 @@ first (server options and the allowlist with the 58-tool partition, T1 to T3), t
 rules that decide what the harness believes from IDEA (T4, T5), then the session and the gaps (T6), and only then the one
 write the adapter has, the loads (T7), because it depends on the confirmed load map that the owner has not yet committed:
 the map ships unset and T7's tests use a synthetic map, so the step raises `NotImplementedGap` (IG-2) on real use. The
-calculation glue (T8) joins the pieces; T9 runs the whole cycle, the crash matrix and the recorded-reply tests, and writes
-the local-test steps of spike S-08.
+calculation glue (T8) joins the pieces. T9a assembles the ports. T9 runs the whole cycle, the crash matrix and the
+recorded-reply tests, and writes the local-test steps of spike S-08.
 
 ## 2. Tasks
 
@@ -292,15 +346,34 @@ status, zero-dropped, read-back mismatch or unavailable) and rebind the model ke
 pre-flight and the stub refusal, host verdicts out, reconciliation of `idea_native_set_loads` by file and read-back, and
 `unknown` without re-run for `idea_calculate`.
 
+**T9a IDEA tool port and `build_ports` dispatch. Amendment (B-608).** Implement the IDEA tool port of spec §4.10
+on the shared `AdapterToolPort` framework. Assemble it with `IdeaHostPort` and the configured route's allowlist in
+`build_ports` (see plan 0002 §3). Through the returned port, test route-specific `describe`, the load `preview` with
+the plan, map and forces in canonical units, and native load `call` and `read_back` (spec §4.4, §4.7).
+Wire T8's `calculate_native`, `calculate_rest` and `get_check_results` and test that the matching tools return host
+verdicts through `call`. Wire `IdeaReconciler` for `supports_reconcile` and `reconcile`; test the native load-write
+outcome from the file and its read-back and the lost REST calculation's `unknown` outcome without a re-run (§4.8).
+
 **T9 End to end** (AC20 to AC22). Both cycles, the crash matrix at every write step, recorded-reply contract tests
 (skipped with a reason until the owner commits IDEA recordings), the doctor section, the S-08 steps (spec §12 L1 to L11)
 in `docs/local-testing.md` and a record script under `acceptance/scripts/`. If another plan's task has not created
 `docs/local-testing.md`, T9 creates it with the IDEA part only.
 
-**T10 Typed loads on the REST route (blocked, not in the front matter).** Starts only after the owner has run L4 and
-decided Q1 and, in the Sasaah repository, a typed tool that sends loads to the REST service exists (project lane,
-ADR-0026). Then: the tool's allowlist entry, its unit header, its read-back, and the replacement of the IG-1 and IG-3
-gap tests for that tool (a spec change, not a test changed to pass). Its own plan amendment lists files and budget.
+**Amendment (B-608).** T9 depends on T9a. Both cycles and the crash matrix use the IDEA ports assembled by `build_ports`.
+
+**T10 Mutation scope** (amendment B-601, decision D-46; spec §9). Adds `adapters/idea/_errors.py` to `r1_modules`
+(`_stub.py`, `_verdicts.py` and `_loads.py` are already listed; `_reconcile.py` is T8's). The guard
+`test_mutation_scope.py::test_spec_0014_section_9_modules_in_r1` holds the spec section 9 paths as a literal tuple and
+asserts that each matches a glob of `r1_modules`, read from `pyproject.toml` through `tomllib` (`**` crosses
+directories, as in the gate). Whichever of the five B-601 tasks lands first creates `test_mutation_scope.py` and its
+shared helper; the others add only their own test function (amendment B-601). The existing unit tests are strengthened
+until the module reaches `mutation_min`, measured as the task's front-matter comment states.
+
+**Typed loads on the REST route (blocked, not in the front matter; takes the next free id when amended in).** Starts
+only after the owner has run L4 and decided Q1 and, in the Sasaah repository, a typed tool that sends loads to the REST
+service exists (project lane, ADR-0026). Then: the tool's allowlist entry, its unit header, its read-back, and the
+replacement of the IG-1 and IG-3 gap tests for that tool (a spec change, not a test changed to pass). Its own plan
+amendment lists files and budget.
 
 ## 3. Dependencies
 

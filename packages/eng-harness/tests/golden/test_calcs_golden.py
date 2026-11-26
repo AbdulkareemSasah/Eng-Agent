@@ -14,6 +14,7 @@ PREFIXES = {
     "summary": "harness.design_summary",
     "round": "harness.section_round",
     "placement": "harness.placement_compare",
+    "frame": "harness.frame_element_map",
 }
 FILES = {p.stem: p for p in golden_files()}
 
