@@ -1,0 +1,1712 @@
+{
+  "$defs": {
+    "AgentInfo": {
+      "additionalProperties": false,
+      "description": "The agent that wrote the record: the tool, and the model family and line only (spec 0015 4.3).",
+      "properties": {
+        "model_line": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Line"
+        },
+        "tool": {
+          "title": "Tool",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool"
+      ],
+      "title": "AgentInfo",
+      "type": "object"
+    },
+    "DidInstead": {
+      "additionalProperties": false,
+      "description": "What the agent did instead of the missing capability (spec 0015 4.3).",
+      "properties": {
+        "at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(agent:.+|harness|dev-session:.+)$",
+          "title": "By",
+          "type": "string"
+        },
+        "kind": {
+          "const": "did_instead",
+          "title": "Kind",
+          "type": "string"
+        },
+        "policy": {
+          "enum": [
+            "full",
+            "sanitized"
+          ],
+          "title": "Policy",
+          "type": "string"
+        },
+        "prev_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prev Sha256",
+          "type": "string"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Refs",
+          "type": "array"
+        },
+        "schema": {
+          "const": "harness.tasklog_record/1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "text_en": {
+          "title": "Text En",
+          "type": "string"
+        },
+        "way": {
+          "enum": [
+            "harness_workflow",
+            "owner_by_hand",
+            "partial",
+            "deferred",
+            "nothing"
+          ],
+          "title": "Way",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "task_id",
+        "seq",
+        "at",
+        "by",
+        "policy",
+        "redactions",
+        "prev_sha256",
+        "kind",
+        "way",
+        "text_en",
+        "refs"
+      ],
+      "title": "DidInstead",
+      "type": "object"
+    },
+    "Handoff": {
+      "additionalProperties": false,
+      "description": "What is done, left and why, and to whom the task goes (spec 0015 4.3).",
+      "properties": {
+        "at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(agent:.+|harness|dev-session:.+)$",
+          "title": "By",
+          "type": "string"
+        },
+        "done_en": {
+          "title": "Done En",
+          "type": "string"
+        },
+        "kind": {
+          "const": "handoff",
+          "title": "Kind",
+          "type": "string"
+        },
+        "left_en": {
+          "title": "Left En",
+          "type": "string"
+        },
+        "policy": {
+          "enum": [
+            "full",
+            "sanitized"
+          ],
+          "title": "Policy",
+          "type": "string"
+        },
+        "prev_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prev Sha256",
+          "type": "string"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "schema": {
+          "const": "harness.tasklog_record/1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "to": {
+          "enum": [
+            "owner",
+            "next_session",
+            "dev_session"
+          ],
+          "title": "To",
+          "type": "string"
+        },
+        "why_en": {
+          "title": "Why En",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "task_id",
+        "seq",
+        "at",
+        "by",
+        "policy",
+        "redactions",
+        "prev_sha256",
+        "kind",
+        "to",
+        "done_en",
+        "left_en",
+        "why_en"
+      ],
+      "title": "Handoff",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "Narration": {
+      "additionalProperties": false,
+      "description": "One English sentence of the story (spec 0015 4.3).",
+      "properties": {
+        "at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(agent:.+|harness|dev-session:.+)$",
+          "title": "By",
+          "type": "string"
+        },
+        "kind": {
+          "const": "narration",
+          "title": "Kind",
+          "type": "string"
+        },
+        "policy": {
+          "enum": [
+            "full",
+            "sanitized"
+          ],
+          "title": "Policy",
+          "type": "string"
+        },
+        "prev_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prev Sha256",
+          "type": "string"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "schema": {
+          "const": "harness.tasklog_record/1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "text_en": {
+          "maxLength": 4000,
+          "title": "Text En",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "task_id",
+        "seq",
+        "at",
+        "by",
+        "policy",
+        "redactions",
+        "prev_sha256",
+        "kind",
+        "text_en"
+      ],
+      "title": "Narration",
+      "type": "object"
+    },
+    "NotFound": {
+      "additionalProperties": false,
+      "description": "A missing capability: `not_implemented` needs a gap id, `other` a long `need_en` (spec 0015 4.3).",
+      "properties": {
+        "at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "blocking": {
+          "title": "Blocking",
+          "type": "boolean"
+        },
+        "by": {
+          "pattern": "^(agent:.+|harness|dev-session:.+)$",
+          "title": "By",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "no_workflow",
+            "tool_not_on_allowlist",
+            "no_edit_kind",
+            "not_implemented",
+            "no_calc",
+            "calc_not_approved",
+            "no_code_pack_check",
+            "host_limitation",
+            "server_limitation",
+            "value_without_source",
+            "harness_unavailable",
+            "harness_defect",
+            "other"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Code"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NotFoundDetail"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "evidence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "gap_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gap Id"
+        },
+        "kind": {
+          "const": "not_found",
+          "title": "Kind",
+          "type": "string"
+        },
+        "need_en": {
+          "title": "Need En",
+          "type": "string"
+        },
+        "need_id": {
+          "title": "Need Id",
+          "type": "string"
+        },
+        "policy": {
+          "enum": [
+            "full",
+            "sanitized"
+          ],
+          "title": "Policy",
+          "type": "string"
+        },
+        "prev_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prev Sha256",
+          "type": "string"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "schema": {
+          "const": "harness.tasklog_record/1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "words_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Words Ref"
+        }
+      },
+      "required": [
+        "schema",
+        "task_id",
+        "seq",
+        "at",
+        "by",
+        "policy",
+        "redactions",
+        "prev_sha256",
+        "kind",
+        "need_id",
+        "category",
+        "need_en",
+        "evidence",
+        "blocking"
+      ],
+      "title": "NotFound",
+      "type": "object"
+    },
+    "NotFoundDetail": {
+      "additionalProperties": false,
+      "description": "The embedded location of a need, so a cloud session needs no workspace (spec 0015 4.3).",
+      "properties": {
+        "field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Kind"
+        },
+        "message_en": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Message En"
+        },
+        "step_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step Path"
+        }
+      },
+      "title": "NotFoundDetail",
+      "type": "object"
+    },
+    "OwnerWords": {
+      "additionalProperties": false,
+      "description": "The owner's verbatim words with the hash of the original bytes (spec 0015 4.3).",
+      "properties": {
+        "at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(agent:.+|harness|dev-session:.+)$",
+          "title": "By",
+          "type": "string"
+        },
+        "gloss_en": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gloss En"
+        },
+        "kind": {
+          "const": "owner_words",
+          "title": "Kind",
+          "type": "string"
+        },
+        "lang": {
+          "title": "Lang",
+          "type": "string"
+        },
+        "policy": {
+          "enum": [
+            "full",
+            "sanitized"
+          ],
+          "title": "Policy",
+          "type": "string"
+        },
+        "prev_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prev Sha256",
+          "type": "string"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "role": {
+          "enum": [
+            "request",
+            "correction",
+            "clarification",
+            "answer"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "schema": {
+          "const": "harness.tasklog_record/1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 20000,
+          "title": "Text",
+          "type": "string"
+        },
+        "text_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Text Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "task_id",
+        "seq",
+        "at",
+        "by",
+        "policy",
+        "redactions",
+        "prev_sha256",
+        "kind",
+        "role",
+        "lang",
+        "text",
+        "text_sha256"
+      ],
+      "title": "OwnerWords",
+      "type": "object"
+    },
+    "Problem": {
+      "additionalProperties": false,
+      "description": "A defect, not a missing capability (spec 0015 4.3).",
+      "properties": {
+        "at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(agent:.+|harness|dev-session:.+)$",
+          "title": "By",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "kind": {
+          "const": "problem",
+          "title": "Kind",
+          "type": "string"
+        },
+        "policy": {
+          "enum": [
+            "full",
+            "sanitized"
+          ],
+          "title": "Policy",
+          "type": "string"
+        },
+        "prev_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prev Sha256",
+          "type": "string"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "schema": {
+          "const": "harness.tasklog_record/1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "text_en": {
+          "title": "Text En",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "task_id",
+        "seq",
+        "at",
+        "by",
+        "policy",
+        "redactions",
+        "prev_sha256",
+        "kind",
+        "text_en",
+        "evidence"
+      ],
+      "title": "Problem",
+      "type": "object"
+    },
+    "Redaction": {
+      "additionalProperties": false,
+      "description": "One withheld span: the field, the guard rule, the offsets and the span hash (spec 0015 4.3).",
+      "properties": {
+        "end": {
+          "minimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "rule": {
+          "title": "Rule",
+          "type": "string"
+        },
+        "span_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Span Sha256",
+          "type": "string"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "field",
+        "rule",
+        "start",
+        "end",
+        "span_sha256"
+      ],
+      "title": "Redaction",
+      "type": "object"
+    },
+    "RunAttached": {
+      "additionalProperties": false,
+      "description": "A run attached to the task, read from its journal (spec 0015 4.3).",
+      "properties": {
+        "at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(agent:.+|harness|dev-session:.+)$",
+          "title": "By",
+          "type": "string"
+        },
+        "chain_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Chain Sha256",
+          "type": "string"
+        },
+        "event_count": {
+          "minimum": 0,
+          "title": "Event Count",
+          "type": "integer"
+        },
+        "exit_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exit Code"
+        },
+        "kind": {
+          "const": "run_attached",
+          "title": "Kind",
+          "type": "string"
+        },
+        "last_seq": {
+          "minimum": 0,
+          "title": "Last Seq",
+          "type": "integer"
+        },
+        "model_files": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Model Files",
+          "type": "array"
+        },
+        "policy": {
+          "enum": [
+            "full",
+            "sanitized"
+          ],
+          "title": "Policy",
+          "type": "string"
+        },
+        "prev_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prev Sha256",
+          "type": "string"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "report": {
+          "title": "Report",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "harness.tasklog_record/1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "status": {
+          "title": "Status",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "timings": {
+          "$ref": "#/$defs/RunTimings"
+        },
+        "unreleased_tools": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Unreleased Tools",
+          "type": "object"
+        },
+        "workflow": {
+          "title": "Workflow",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "task_id",
+        "seq",
+        "at",
+        "by",
+        "policy",
+        "redactions",
+        "prev_sha256",
+        "kind",
+        "run_id",
+        "workflow",
+        "status",
+        "event_count",
+        "last_seq",
+        "chain_sha256",
+        "report",
+        "unreleased_tools",
+        "timings",
+        "model_files"
+      ],
+      "title": "RunAttached",
+      "type": "object"
+    },
+    "RunFact": {
+      "additionalProperties": false,
+      "description": "One fact derived from an attached run's journal (spec 0015 4.3, 4.8).",
+      "properties": {
+        "at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(agent:.+|harness|dev-session:.+)$",
+          "title": "By",
+          "type": "string"
+        },
+        "code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Code"
+        },
+        "event": {
+          "title": "Event",
+          "type": "string"
+        },
+        "field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field"
+        },
+        "gap": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gap"
+        },
+        "journal_seq": {
+          "minimum": 0,
+          "title": "Journal Seq",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "run_fact",
+          "title": "Kind",
+          "type": "string"
+        },
+        "owner_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner Text"
+        },
+        "policy": {
+          "enum": [
+            "full",
+            "sanitized"
+          ],
+          "title": "Policy",
+          "type": "string"
+        },
+        "prev_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prev Sha256",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "schema": {
+          "const": "harness.tasklog_record/1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "summary_en": {
+          "title": "Summary En",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "task_id",
+        "seq",
+        "at",
+        "by",
+        "policy",
+        "redactions",
+        "prev_sha256",
+        "kind",
+        "run_id",
+        "journal_seq",
+        "event",
+        "summary_en"
+      ],
+      "title": "RunFact",
+      "type": "object"
+    },
+    "RunRefused": {
+      "additionalProperties": false,
+      "description": "A run refused before any run folder existed (spec 0015 4.3).",
+      "properties": {
+        "at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(agent:.+|harness|dev-session:.+)$",
+          "title": "By",
+          "type": "string"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "exit_code": {
+          "title": "Exit Code",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "run_refused",
+          "title": "Kind",
+          "type": "string"
+        },
+        "message_en": {
+          "title": "Message En",
+          "type": "string"
+        },
+        "missing": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing",
+          "type": "array"
+        },
+        "policy": {
+          "enum": [
+            "full",
+            "sanitized"
+          ],
+          "title": "Policy",
+          "type": "string"
+        },
+        "prev_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prev Sha256",
+          "type": "string"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "schema": {
+          "const": "harness.tasklog_record/1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "workflow": {
+          "title": "Workflow",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "task_id",
+        "seq",
+        "at",
+        "by",
+        "policy",
+        "redactions",
+        "prev_sha256",
+        "kind",
+        "workflow",
+        "exit_code",
+        "code",
+        "missing",
+        "message_en"
+      ],
+      "title": "RunRefused",
+      "type": "object"
+    },
+    "RunTimings": {
+      "additionalProperties": false,
+      "description": "Machine and waiting milliseconds and resume count of an attached run (spec 0015 4.3).",
+      "properties": {
+        "machine_ms": {
+          "minimum": 0,
+          "title": "Machine Ms",
+          "type": "integer"
+        },
+        "resumes": {
+          "minimum": 0,
+          "title": "Resumes",
+          "type": "integer"
+        },
+        "waiting_ms": {
+          "minimum": 0,
+          "title": "Waiting Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "machine_ms",
+        "waiting_ms",
+        "resumes"
+      ],
+      "title": "RunTimings",
+      "type": "object"
+    },
+    "Searched": {
+      "additionalProperties": false,
+      "description": "What the agent searched for, where, and what it found (spec 0015 4.3).",
+      "properties": {
+        "at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(agent:.+|harness|dev-session:.+)$",
+          "title": "By",
+          "type": "string"
+        },
+        "catalog": {
+          "enum": [
+            "available",
+            "unavailable"
+          ],
+          "title": "Catalog",
+          "type": "string"
+        },
+        "detail_en": {
+          "title": "Detail En",
+          "type": "string"
+        },
+        "for_en": {
+          "title": "For En",
+          "type": "string"
+        },
+        "kind": {
+          "const": "searched",
+          "title": "Kind",
+          "type": "string"
+        },
+        "policy": {
+          "enum": [
+            "full",
+            "sanitized"
+          ],
+          "title": "Policy",
+          "type": "string"
+        },
+        "prev_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prev Sha256",
+          "type": "string"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Refs",
+          "type": "array"
+        },
+        "result": {
+          "enum": [
+            "found",
+            "partial",
+            "not_found"
+          ],
+          "title": "Result",
+          "type": "string"
+        },
+        "schema": {
+          "const": "harness.tasklog_record/1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "where": {
+          "enum": [
+            "workflow_registry",
+            "allowlist",
+            "edit_kinds",
+            "calcs",
+            "code_pack_checks",
+            "cli_tools",
+            "project_lane_tools",
+            "specs",
+            "docs",
+            "other"
+          ],
+          "title": "Where",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "task_id",
+        "seq",
+        "at",
+        "by",
+        "policy",
+        "redactions",
+        "prev_sha256",
+        "kind",
+        "for_en",
+        "where",
+        "result",
+        "detail_en",
+        "refs",
+        "catalog"
+      ],
+      "title": "Searched",
+      "type": "object"
+    },
+    "SessionInfo": {
+      "additionalProperties": false,
+      "description": "The session the record was written in (spec 0015 4.3).",
+      "properties": {
+        "place": {
+          "enum": [
+            "local",
+            "cloud"
+          ],
+          "title": "Place",
+          "type": "string"
+        },
+        "tool_session_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Session Id"
+        },
+        "transcript_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Transcript Sha256"
+        }
+      },
+      "required": [
+        "place"
+      ],
+      "title": "SessionInfo",
+      "type": "object"
+    },
+    "TaskClosed": {
+      "additionalProperties": false,
+      "description": "The close of a task with its status and open needs (spec 0015 4.3).",
+      "properties": {
+        "at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(agent:.+|harness|dev-session:.+)$",
+          "title": "By",
+          "type": "string"
+        },
+        "kind": {
+          "const": "task_closed",
+          "title": "Kind",
+          "type": "string"
+        },
+        "next_en": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next En"
+        },
+        "open_needs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Open Needs",
+          "type": "array"
+        },
+        "policy": {
+          "enum": [
+            "full",
+            "sanitized"
+          ],
+          "title": "Policy",
+          "type": "string"
+        },
+        "prev_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prev Sha256",
+          "type": "string"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "schema": {
+          "const": "harness.tasklog_record/1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "status": {
+          "enum": [
+            "DONE",
+            "DONE_WITH_CONCERNS",
+            "BLOCKED",
+            "NEEDS_CONTEXT",
+            "WITHDRAWN"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "summary_en": {
+          "title": "Summary En",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "task_id",
+        "seq",
+        "at",
+        "by",
+        "policy",
+        "redactions",
+        "prev_sha256",
+        "kind",
+        "status",
+        "summary_en",
+        "open_needs"
+      ],
+      "title": "TaskClosed",
+      "type": "object"
+    },
+    "TaskOpened": {
+      "additionalProperties": false,
+      "description": "The first record of a task (spec 0015 4.3).",
+      "properties": {
+        "agent": {
+          "$ref": "#/$defs/AgentInfo"
+        },
+        "at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(agent:.+|harness|dev-session:.+)$",
+          "title": "By",
+          "type": "string"
+        },
+        "continues": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Continues"
+        },
+        "harness_version": {
+          "title": "Harness Version",
+          "type": "string"
+        },
+        "integration_branch": {
+          "title": "Integration Branch",
+          "type": "string"
+        },
+        "kind": {
+          "const": "task_opened",
+          "title": "Kind",
+          "type": "string"
+        },
+        "policy": {
+          "enum": [
+            "full",
+            "sanitized"
+          ],
+          "title": "Policy",
+          "type": "string"
+        },
+        "prev_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prev Sha256",
+          "type": "string"
+        },
+        "project_label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Project Label"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "repo_commit": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Repo Commit",
+          "type": "string"
+        },
+        "schema": {
+          "const": "harness.tasklog_record/1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "session": {
+          "$ref": "#/$defs/SessionInfo"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "title_en": {
+          "maxLength": 200,
+          "title": "Title En",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "task_id",
+        "seq",
+        "at",
+        "by",
+        "policy",
+        "redactions",
+        "prev_sha256",
+        "kind",
+        "title_en",
+        "agent",
+        "session",
+        "repo_commit",
+        "integration_branch",
+        "harness_version"
+      ],
+      "title": "TaskOpened",
+      "type": "object"
+    },
+    "WithheldAfter": {
+      "additionalProperties": false,
+      "description": "A span withheld after the push, naming the line it changed (spec 0015 4.3, 4.4).",
+      "properties": {
+        "at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(agent:.+|harness|dev-session:.+)$",
+          "title": "By",
+          "type": "string"
+        },
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "kind": {
+          "const": "withheld_after",
+          "title": "Kind",
+          "type": "string"
+        },
+        "line_sha256_before": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Line Sha256 Before",
+          "type": "string"
+        },
+        "policy": {
+          "enum": [
+            "full",
+            "sanitized"
+          ],
+          "title": "Policy",
+          "type": "string"
+        },
+        "prev_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prev Sha256",
+          "type": "string"
+        },
+        "reason_en": {
+          "title": "Reason En",
+          "type": "string"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "rule": {
+          "title": "Rule",
+          "type": "string"
+        },
+        "schema": {
+          "const": "harness.tasklog_record/1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "span_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Span Sha256",
+          "type": "string"
+        },
+        "target_seq": {
+          "minimum": 1,
+          "title": "Target Seq",
+          "type": "integer"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "task_id",
+        "seq",
+        "at",
+        "by",
+        "policy",
+        "redactions",
+        "prev_sha256",
+        "kind",
+        "target_seq",
+        "field",
+        "rule",
+        "span_sha256",
+        "line_sha256_before",
+        "reason_en"
+      ],
+      "title": "WithheldAfter",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "did_instead": "#/$defs/DidInstead",
+      "handoff": "#/$defs/Handoff",
+      "narration": "#/$defs/Narration",
+      "not_found": "#/$defs/NotFound",
+      "owner_words": "#/$defs/OwnerWords",
+      "problem": "#/$defs/Problem",
+      "run_attached": "#/$defs/RunAttached",
+      "run_fact": "#/$defs/RunFact",
+      "run_refused": "#/$defs/RunRefused",
+      "searched": "#/$defs/Searched",
+      "task_closed": "#/$defs/TaskClosed",
+      "task_opened": "#/$defs/TaskOpened",
+      "withheld_after": "#/$defs/WithheldAfter"
+    },
+    "propertyName": "kind"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/TaskOpened"
+    },
+    {
+      "$ref": "#/$defs/OwnerWords"
+    },
+    {
+      "$ref": "#/$defs/Narration"
+    },
+    {
+      "$ref": "#/$defs/Searched"
+    },
+    {
+      "$ref": "#/$defs/NotFound"
+    },
+    {
+      "$ref": "#/$defs/DidInstead"
+    },
+    {
+      "$ref": "#/$defs/Problem"
+    },
+    {
+      "$ref": "#/$defs/Handoff"
+    },
+    {
+      "$ref": "#/$defs/RunRefused"
+    },
+    {
+      "$ref": "#/$defs/RunAttached"
+    },
+    {
+      "$ref": "#/$defs/RunFact"
+    },
+    {
+      "$ref": "#/$defs/TaskClosed"
+    },
+    {
+      "$ref": "#/$defs/WithheldAfter"
+    }
+  ]
+}
