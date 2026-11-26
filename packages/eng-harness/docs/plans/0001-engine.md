@@ -1145,6 +1145,15 @@ redundant reads).
   the same pull request; plan 0007 T8 or plan 0006 T14c, whichever merges first, adds `ModelFile` to `block.py` and its
   test to `tests/unit/test_block.py` (§4.1.2, Q47). T24 of this plan is the engine part of the same findings; plan 0007
   T8 waits for it.
+- External amendment by plan 0007 T9b (amendment B-587, owner decision OQ-Q101 of 2026-11-20; spec §4.6 invariant 7,
+  §4.7 `approve_each_write`, AC43): the invariant-7 `p~pre.save` keeps its place after any working-copy swap, the
+  lease, literals, sibling admission and invariant-9 first-use binding and units read; only the `p~pre.approve`
+  preview moves after that save, before the write. T9b edits, for that order only, `engine/_ctx_impl.py` (the pre-step
+  order in `_tool_json`), `engine/_modes.py` (splitting `Modes.enter` into copy/swap and preview parts) and
+  `engine/_invariants.py` (`Guard.prepare` and `Guard.save`, whose path, arguments, role and `model_saved` stay), and
+  extends T12's `tests/workflow/test_invariants.py::test_save_before_analysis` with an `approve_each_write` case; the
+  limit of each file is its comment in plan 0007. It follows T22 (`_invariants.py`, `test_invariants.py`) and plan 0002 T19a
+  (`_modes.py`, `_ctx_impl.py`), both merged; no task of this plan waits for it.
 
 ## 4. Verification
 

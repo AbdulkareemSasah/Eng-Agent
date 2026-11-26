@@ -192,7 +192,7 @@ tasks:
   - id: T10
     title: Reconciliation by reading for the Revit write tools
     files:
-      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.revit (amendment B-356)
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.revit (amendment B-356); r1_modules entry for adapters/revit/_reconcile.py (amendment B-601)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/revit/_reconcile.py"
       - "packages/eng-harness/tests/workflow/adapters/test_revit_reconcile.py"
@@ -233,6 +233,10 @@ tasks:
     # Amendment (B-595, documents only, OQ-Q104): second input structure (harness.revit_structure/1) supplies
     # element_id and type_id after geometric pairing; collateral PREFIXES, calc-kinds fixture and kind fixture
     # (a missing stale_ok entry is treated as [] by the contract test).
+    # Amendment (B-607, documents only): kinds/calcs.py is in the hash closure of every calc, so adding the kind moves
+    # every calcs.lock.json entry, and the verification records that quote a content hash follow the lock (as B-513);
+    # the calc rules test lists the calc's kind module (eng_harness.kinds.revit). max_changed_lines 380 to 650 (523
+    # measured before the mutation tests; an estimate).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.frame_element_map, eng_harness.kinds and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -247,7 +251,16 @@ tasks:
       - "packages/eng-harness/tests/golden/test_calcs_golden.py"  # PREFIXES entry for frame stems (amendment B-595)
       - "packages/eng-harness/tests/contract/test_calc_kinds.py"  # CALC_KINDS equality for frame_element_map (amendment B-595)
       - "packages/eng-harness/tests/data/kinds/calcs/frame_element_map.json"  # kind fixture (amendment B-595)
-    max_changed_lines: 380
+      - "packages/eng-harness/tests/rules/test_calc_modules.py"  # ALLOWED_MODULES entry for eng_harness.kinds.revit (amendment B-607)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_layout.md"  # content-hash literal follows the lock (amendment B-607)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_plan_size.md"  # as above (amendment B-607)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_resize.md"  # as above (amendment B-607)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_schedule.md"  # as above (amendment B-607)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_status.md"  # as above (amendment B-607)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_subjects.md"  # as above (amendment B-607)
+      - "packages/eng-harness/docs/verification/calcs/harness.reactions_to_joint_loads.md"  # as above (amendment B-607)
+      - "packages/eng-harness/docs/verification/calcs/harness.safe_equilibrium.md"  # as above (amendment B-607)
+    max_changed_lines: 650
     max_sessions: 3
     tests_first:
       # Amendment (B-452): the golden cases of the shared loader tests/golden/test_calcs_golden.py are data, not test
@@ -304,6 +317,39 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_revit_map_stale.py::test_map_stale_after_edit"
     covers: [AC22, AC29]
     depends_on: [T10, T11, T12, T13, T14]
+  - id: T16
+    title: "Mutation scope: the section 9 modules in r1_modules"
+    # Amendment (B-601, owner decision D-46, 2026-11-20): CI mutates only modules listed in
+    # [tool.eng-gate] r1_modules; spec 0011 section 9 names adapters/revit/_errors.py, _edits.py
+    # and _units.py that are merged but absent from that list (_reconcile.py is added by B-239
+    # T10; calcs/frame_element_map.py is already covered by calcs/**). This task adds those three
+    # paths to r1_modules, adds a contract guard that the section 9 list is covered by a glob,
+    # and strengthens the existing tests until each module reaches mutation_min (80 %) with real
+    # tests. No exclusions, pragmas or lowered thresholds; no module may be removed from
+    # r1_modules to pass MU001. No source module is listed: the work strengthens tests only.
+    # If a module cannot reach 80 % without a source change, the implementing writer reports
+    # NEEDS_PLAN_AMENDMENT.
+    # The writer measures one module at a time: an unpushed scratch commit that adds a comment
+    # line to that module only, then `uv run eng-gate mutation --package eng-harness --base HEAD~1`;
+    # the writer records each module's score in the verification record and drops the commit.
+    # The measurement runs on Linux (CI, a Linux cloud session, or WSL); a notice other than
+    # MU003 is not a score, and only a scored run with no MU001 is at or above mutation_min.
+    # The independent reviewer re-runs the per-module measurement on Linux and attaches its
+    # output (killed/total per module) to the pull request under "Review"; the work item does
+    # not merge without it (amendment B-601).
+    files:
+      - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py"  # shared by the five B-601 tasks; this task adds test_spec_0011_section_9_modules_in_r1
+      - "packages/eng-harness/tests/unit/adapters/test_revit_errors.py"  # adapters/revit/_errors.py
+      - "packages/eng-harness/tests/workflow/adapters/test_revit_edits.py"  # adapters/revit/_edits.py
+      - "packages/eng-harness/tests/unit/adapters/test_revit_units.py"  # adapters/revit/_units.py
+    max_changed_lines: 60
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py::test_spec_0011_section_9_modules_in_r1"
+    covers: []  # section 9 mutation scope is not an AC; this plan's covers style lists ACs only
+    depends_on: [T5, T8, T9, T10]  # T5 _errors and _units; T8 and T9 _edits; T10 (B-239) also edits r1_modules for _reconcile.py
 ---
 
 # Implementation plan: the `sasaah-revit-mcp` adapter
@@ -398,6 +444,10 @@ pipe name.
 (`harness.revit_structure/1`; OQ-Q104 / B-595), the optional link map and the basis fields (`compare.length_mm`,
 `mapping.offset_*`), exact arithmetic, the output kind, the verification record (draft), and golden cases derived by
 hand and written in each file's `derivation` field.
+Amendment (B-607): the kind lives in `kinds/calcs.py`, which every calc imports, so the content hash of every calc moves
+and `calcs.lock.json` changes in every entry (spec 0003 §3.2, §4.5). The verification records that quote a content hash
+(the eight listed in `files`) follow the lock and change only in that line; their calcs and status are unchanged, and
+the owner re-verifies them as spec 0003 §4.5 says for any hash change. The calc rules test allows the new kind module.
 
 **T13 Recordings** (spec §4.13, AC31). The Revit scenario of record mode (titles, paths and user names replaced), the
 sanitizer test, the recorded-reply contract tests (run on every applicable committed recording under
@@ -411,6 +461,14 @@ queue deadline (spec §4.2 rule 1).
 
 **T15 Wiring and documents** (AC22, AC29). Port wiring for the Revit adapter, the crash matrix against real fake
 processes, the stale-map test, and the Revit section of `docs/local-testing.md` (spec §12, L1 to L15).
+
+**T16 Mutation scope** (amendment B-601, decision D-46; spec §9). Adds `adapters/revit/_errors.py`, `_edits.py` and
+`_units.py` to `r1_modules` (`_reconcile.py` is T10's; `calcs/frame_element_map.py` is already covered by `calcs/**`).
+The guard `test_mutation_scope.py::test_spec_0011_section_9_modules_in_r1` holds the spec section 9 paths as a literal
+tuple and asserts that each matches a glob of `r1_modules`, read from `pyproject.toml` through `tomllib` (`**` crosses
+directories, as in the gate). Whichever of the five B-601 tasks lands first creates `test_mutation_scope.py` and its
+shared helper; the others add only their own test function (amendment B-601). The existing tests are strengthened until
+each module reaches `mutation_min`, measured per module as the task's front-matter comment states.
 
 ## 3. Dependencies
 
