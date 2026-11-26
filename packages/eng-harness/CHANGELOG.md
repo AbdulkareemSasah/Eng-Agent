@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Task-log guard and privacy policies (draft): `eng_harness.tasklog._guard` withholds owner and harness secret spans with the `<withheld:rule:fp12>` marker and a `Redaction` entry and refuses agent `*_en` fields with `GuardRefusalError` (the gate's rule names and patterns, pinned by `tests/data/tasklog/secret_vectors.json`); `eng_harness.tasklog.privacy` holds the `PrivacyPolicy` protocol, `POLICIES`, `policy_for` and `full`, while `sanitized` raises gap `TL-G1`; the privacy public-module entry (plan 0015 T2, B-625, amendment B-628; spec 0015 AC4, AC5, AC6, AC7, AC8, §4.4, §6, §11 TL-G1).
 - Task-log record models (draft): `eng_harness.tasklog._records` holds the frozen `TaskRecord` union (13 kinds, closed `not_found` categories, `extra="forbid"`) and the `TriageLine` union (4 kinds, closed outcomes, `duplicate_of` exactly for `duplicate`), with schema snapshots under `tests/data/snapshots/tasklog/`; the block, rule and workflow import-rule test; the public-module entries and the r2 entries for the guard, scope, hook and push modules (plan 0015 T1, B-623; spec 0015 AC1, AC2, AC32, AC37, §4.3, §4.3.1).
 - IDEA resume restores the saved working-file binding and hash before reconciliation (plan 0014 T9, B-308, Q14). Added the owner-only recording scenario and S-08 local acceptance steps.
 - Jev decision adapter with injected formats and the shared HTTP client, typed answer validation, ordered batch results, and format revisions in provider metadata. Both backends report gap J-G1 pending spike S-07 (plan 0009 T4, B-223).
