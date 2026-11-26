@@ -6,8 +6,9 @@ from typing import Any
 
 import pytest
 from eng_contract.canonical import canonical_json
-from eng_harness.tasklog._records import TaskRecord, TriageLine
 from pydantic import TypeAdapter, ValidationError
+
+from eng_harness.tasklog._records import TaskRecord, TriageLine
 
 _RECORD_SCHEMA = "harness.tasklog_record/1"
 _TRIAGE_SCHEMA = "harness.tasklog_triage/1"
