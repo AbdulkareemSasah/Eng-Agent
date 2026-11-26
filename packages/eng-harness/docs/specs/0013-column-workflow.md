@@ -424,15 +424,29 @@ Output `harness.revit_column_update/1`: `new_types` (with the origins of their p
 `element_id`, `from_type_id`, target type id or new type name, `origin`), `no_change`, `not_updatable`, `expected` (per element its type; per type its role
 references), `complete`.
 
-#### 4.4.6 `harness.revit_column_readback` v1
+#### 4.4.6 `harness.revit_column_readback` v1 (amendment B-621)
 
-Input: `plan`, `before` (`harness.revit_structure/1`, `stale_ok`, 0003 §4.13), `after` (current), `basis`
-(`compare.length_mm`). Method (expectation rows in U7): B1 each planned element exists by `unique_id` (`ELEMENT_MISSING`)
-and has its planned type by `type_id` for reuse or by (`family`, `type_name`) for a new type (`TYPE_MISMATCH`).
-B2 on the new type in `after.types` identified by (`family`, `name`), each planned role value resolves and is
-within `compare.length_mm` (`VALUE_MISMATCH`). B3 no other element of the read set changed type between `before` and `after`
-(`UNEXPECTED_TYPE_CHANGE`); B4 an unread role is `not_read`. `status` `PASS` only without issues and with
-`after` at a later revision than `before`.
+Inputs are `plan`, `before` (`harness.revit_structure/1`, `stale_ok`, 0003 §4.13), `after` (current), `basis`
+(`compare.length_mm`), and `sections`. As in T7, `sections` is an explicit top-level reference to the same ETABS
+`model.sections/1` record that `harness.revit_column_update` U1 referenced (G1).
+
+- B1 finds each planned element by `unique_id`. A planned element missing from `after` produces only
+  `ELEMENT_MISSING`. For a present element, check the planned identity by `type_id` for reuse or by (`family`,
+  `type_name`) for a new type. A different identity produces `TYPE_MISMATCH` (U7, G4).
+- B2 finds the planned new type in `after.types` by (`family`, `name`). Resolve each planned role reference against
+  `sections` and compare the read value with the resolved value. A difference beyond `compare.length_mm` produces
+  `VALUE_MISMATCH` (G1).
+- B3 checks for `UNEXPECTED_TYPE_CHANGE` only on elements outside `expected.elements` that are present in both
+  `before` and `after`. Additions and removals outside the plan are excluded from the comparison (G4).
+- B4 uses the issue code `NOT_READ` for an unread planned role. If the element's planned (`family`, `type_name`)
+  has no row in `after.types`, treat all its planned roles as unread (G5). `NOT_READ` is the issue-code literal of
+  `harness.revit_column_readback/1`. The lowercase `not_read` in older text denotes the `harness.readback_check/1`
+  item result literal (0003 §4.8, N1).
+
+For each type-level issue code (`VALUE_MISMATCH` or `NOT_READ`), emit one issue keyed by `unique_id` for each
+element present in `after` that the plan assigns to that type, even if several roles produce the same code (G2).
+Order `issues` by (`unique_id`, `code`), following U9's ordering convention (G3). `status` is `PASS` only without
+issues and with `after` at a later revision than `before`.
 
 ### 4.5 Code checks through the CalcPort
 

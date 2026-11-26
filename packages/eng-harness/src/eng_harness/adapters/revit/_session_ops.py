@@ -3,21 +3,29 @@
 Purpose: working-copy open with reply checks, `NotImplementedGap` for save/restore (R-G1, R-G2), empty
 `started_instances`, engineer-save hash registration via injected fingerprints, and the host lock keyed by a hash of
 the pipe name. The adapter never starts, exits or closes Revit or a document. Units: none for paths.
+T14b adds the model binder (`binding`, `revision`) and wires T9's `check_model` (AC19).
 """
 
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any, NoReturn
 
-from eng_contract.envelope import Envelope
+from eng_contract.envelope import Envelope, HostInfo
 from eng_contract.errors import ContractError, ErrorCode, Precondition
 from eng_contract.ids import Clock, IdSource, Timestamp
+from eng_contract.store import ResultStore
+from eng_contract.verdicts import SubjectKind
 
+from eng_harness.adapters._args import HostTarget
+from eng_harness.adapters._descriptors import ToolDescriptor
 from eng_harness.adapters._identity import IdentityStore
-from eng_harness.errors import NotImplementedGap
+from eng_harness.adapters._toolport import Binding
+from eng_harness.adapters.revit._checks import ReadBack, WrittenItems
+from eng_harness.adapters.revit._checks import check_model as _revit_check_model
+from eng_harness.errors import NotImplementedGap, ToolFailed
 from eng_harness.ports import HostInstance, HostLease, HostModelState, SavedModel, ServerCheck, UnitsState
 from eng_harness.servers import CallEffect, ServerManager
 from eng_harness.servers._hostlock import HostLocks
@@ -86,6 +94,10 @@ class RevitHostPort:
         pipe_name: str,
         server: str = "revit",
         host_key: str = "revit",
+        store: ResultStore | None = None,
+        check: ServerCheck | None = None,
+        written: WrittenItems | None = None,
+        tolerance: Callable[[], float | None] | None = None,
     ) -> None:
         self._identity = identity
         self._sessions = sessions
@@ -101,6 +113,7 @@ class RevitHostPort:
         self._bound: dict[str, str] = {}
         self._instances: dict[str, HostInstance] = {}
         self._fingerprints: dict[str, str] = {}
+        self._store, self._check, self._written, self._tolerance = store, check, written, tolerance
 
     @property
     def identity_store(self) -> IdentityStore:
@@ -162,8 +175,124 @@ class RevitHostPort:
         )
 
     async def check_model(self, model_key: str) -> Envelope:
-        """Attended checks land in T9 (`_checks.py`); until then there is no read-back wiring."""
-        raise ContractError(ErrorCode.INTERNAL, "no read-back wiring", incident_id=self._ids.new_ulid())
+        """T14b wiring of T9's read-back and integrity checks over the tool port's written book (AC19)."""
+        if self._store is None or self._check is None or self._written is None:
+            raise ContractError(ErrorCode.INTERNAL, "no read-back wiring", incident_id=self._ids.new_ulid())
+        held = await self.locate(model_key)
+        if held is None:
+            raise ContractError(ErrorCode.PRECONDITION_FAILED, "not open", precondition=Precondition.model_open)
+        path = self._file(model_key)
+        resolved = self._identity.resolve(path)
+        host = HostInfo(
+            program=_PROGRAM,
+            version=await self._revit_version(),
+            model_id=resolved.model_id,
+            model_revision=resolved.revision,
+        )
+
+        async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> Mapping[str, Any]:
+            result = await self._sessions.call(self._server, "read", tool, arguments, effect)
+            return result.model_dump(by_alias=True, mode="json")
+
+        ledger_ids = [
+            item.subject.id
+            for item in self._written.items(model_key)
+            if item.subject.kind == SubjectKind.FRAME and item.subject.id
+        ]
+        readback = ReadBack(
+            written=self._written,
+            store=self._store,
+            check=self._check,
+            tolerance_ratio=self._tolerance() if self._tolerance is not None else None,
+        )
+        return await _revit_check_model(
+            call, readback, model_key, host=host, pre_image_warnings=(), ledger_unique_ids=ledger_ids
+        )
+
+    async def binding(self, host_key: str, model: str | None, descriptor: ToolDescriptor) -> Binding:
+        """Live bound document with its MCP pid, identity and Revit version (T14b; §4.12, 0002 §4.5.9)."""
+        keys = [model] if model is not None else list(self._bound)
+        live = [key for key in keys if host_key == self._host_key and await self.locate(key) is not None]
+        if len(live) != 1:
+            raise ContractError(
+                ErrorCode.PRECONDITION_FAILED, "no unique open model", precondition=Precondition.model_open
+            )
+        key = live[0]
+        self._file(key)
+        pid = self._live_mcp_pid()
+        if pid is None:
+            raise ContractError(
+                ErrorCode.PRECONDITION_FAILED, "no live Revit server", precondition=Precondition.model_open
+            )
+        try:
+            model_id = self._models[key]
+        except KeyError:
+            raise ContractError(
+                ErrorCode.PRECONDITION_FAILED, "not open", precondition=Precondition.model_open
+            ) from None
+        resolved = self._identity._known(model_id)
+        revision = self.revision(resolved.model_id)
+        return Binding(
+            target=HostTarget(product=_PROGRAM, pid=pid),
+            units_system=None,
+            host=HostInfo(
+                program=_PROGRAM,
+                version=await self._revit_version(),
+                model_id=resolved.model_id,
+                model_revision=resolved.revision if revision is None else revision,
+            ),
+            owned=False,
+        )
+
+    def revision(self, model_id: str) -> int | None:
+        """The model state's current revision; absent identities are untracked (reference staleness)."""
+        state = self._identity._states.get(model_id)
+        return None if state is None else state.revision
+
+    def _live_mcp_pid(self) -> int | None:
+        """PID of a live MCP role process for this server, preferring `write` (never invented)."""
+        roles = getattr(self._sessions, "_roles", {})
+        if not isinstance(roles, dict):
+            return None
+        ordered = [
+            (self._server, "write"),
+            (self._server, "read"),
+            *((key[0], key[1]) for key in roles if isinstance(key, tuple) and key[0] == self._server),
+        ]
+        seen: set[tuple[str, str]] = set()
+        for name in ordered:
+            if name in seen:
+                continue
+            seen.add(name)
+            role = roles.get(name)
+            live = getattr(role, "live", None)
+            launched = getattr(live, "launched", None)
+            pid = getattr(launched, "pid", None)
+            if not isinstance(pid, int) or isinstance(pid, bool) or pid < 1:
+                continue
+            wait = getattr(launched, "wait", None)
+            if callable(wait):
+                try:
+                    if wait(0) is not None:
+                        continue
+                except OSError, ValueError, TypeError:
+                    continue
+            return pid
+        return None
+
+    async def _revit_version(self) -> str:
+        """Revit version from the bound document's metadata, empty when unreadable (§4.3, Q9)."""
+        try:
+            result = await self._sessions.call(self._server, "read", "revit_get_model_metadata", {}, CallEffect.READ)
+        except ToolFailed:
+            return ""
+        if result.is_error:
+            return ""
+        body = reply_body(result)
+        if not isinstance(body, dict):
+            return ""
+        version = body.get("revit_version")
+        return version if isinstance(version, str) else ""
 
     async def save(self, model_key: str, role: str) -> SavedModel:
         """No save tool (R-G1); nothing is sent."""
