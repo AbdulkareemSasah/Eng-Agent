@@ -633,6 +633,7 @@ tasks:
     # Amendment (B-412 second review, documents only): split; T17 holds only test files (a `test(...)` pull request, test-first step 3) and names its re-check nodes; the documentation part is T17b.
     # Amendment (B-412 fifth review, documents only): depends on T16b; the run-control wait is engine plan T18 (amended in this pull request), not T10 to T15.
     # Amendment (B-412 eighth review, documents only): the AC19 re-check installs TerminalProgress as the engine's only sink; the AC34 voided display is built in T7b.
+    # Amendment (B-598, documents only): AC48 journal text stays within the engine inline event cap (OQ-Q99); the 10 MB example goes through result payloads and previews only.
     files:
       - "packages/eng-harness/tests/property/test_untrusted_text.py"
       - "packages/eng-harness/tests/replay/test_page_resume.py"

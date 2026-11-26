@@ -120,6 +120,27 @@ tasks:
       - "packages/eng-harness/tests/unit/calcs/test_column_demands.py::test_items_validate_against_checks"
     covers: [AC6, AC7]
     depends_on: [T2]
+  - id: T3b
+    # Amendment (B-596, documents only): code follow-up of L-B282-1 / OQ-Q98. Spec §4.4.2 E3 keeps Mu = |M3|,
+    # Mu_other = |M2| for a symmetric section except the M2-only case (Mu = |M2|, Mu_other = 0); biaxial bending stays
+    # NEEDS_ENGINEER. Risk is the plan's r1, r2, r3 (same as T3; task schema has no per-task risk field).
+    title: Column demands E3 sole nonzero moment in Mu for a symmetric section
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/docs/verification/calcs/harness.column_demands.md"
+      - "packages/eng-harness/src/eng_harness/calcs/column_design/column_demands.py"
+      - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
+      - "packages/eng-harness/tests/data/golden/column_design/column-demands-*.json"
+      - "packages/eng-harness/tests/unit/calcs/test_column_demands.py"
+    max_changed_lines: 80
+    max_sessions: 1
+    tests_first:
+      # Amendment (B-596, after the B-452 rule of plan 0011 T12): a golden case node of tests/golden/column_design/test_golden.py cannot be test-first
+      # evidence (gate TF008, TF010; see the B-452 comment in plan 0011 T12); the refreshed golden JSON goes in the
+      # first test commit and runs in the tests step.
+      - "packages/eng-harness/tests/unit/calcs/test_column_demands.py::test_m2_only_symmetric_puts_sole_moment_in_mu"
+    covers: [AC6]
+    depends_on: [T3]
   - id: T4
     title: Calc harness.column_review (members, governing references, changes)
     # Amendment (B-577, documents only): the B-283 writer measured that ColumnReview in kinds/column_design.py has no
@@ -499,6 +520,17 @@ and layout only (`b_mm == h_mm` and `n_bars_b == n_bars_h`) and `AXES_UNDECLARED
 one reinforcement-limits item per column with `case: null`; `lu_mm` from the frame length; `Ast_mm2` from the layout;
 emits literal JSON values (equal to E3–E5 trace steps), `"tied"`, and `{"$ref": "res_<basis id>#/fields/<path>/value"}`
 for `fc_MPa`, `fy_MPa`, `k_factor` and `ratio_limit` per spec §4.4.2 (`ratio_limit` → `limits.ratio_limit_ratio`; owner answer 2026-11-19); `not_checked` reasons; the trace steps E3 to E5. `test_column_demands.py::test_items_validate_against_checks` validates every emitted item against its real `aci318_14` check input model under `InputPolicy(require_refs=True)` and checks that every required field of the check's input model is present, every emitted name is a field of that model, and the emitted names equal the §4.4.2 list for that check (`ratio_limit` included); the golden harness uses a fixed result-id source so basis references are deterministic. The verification record names each conversion as a C item for the owner (contract G-3, CW-G9 to CW-G11).
+
+**T3b `harness.column_demands` E3 M2-only exception** (spec §4.4.2 E3; amendment B-596; OQ-Q98; L-B282-1). After T3,
+update `column_demands.py` so that for a section symmetric by geometry and layout only the M2-only case changes: when
+`|M3|` is 0 and `|M2|` is non-zero, `Mu = |M2|` and `Mu_other` is 0 (keeping the fixed assignment except for the
+M2-only case); the biaxial, M3-only and both-zero mappings and the biaxial golden are unchanged. Refresh the
+square-uniaxial golden (`column-demands-square-uniaxial`) and its E3–E5 expected trace, the unit test
+`test_m2_only_symmetric_puts_sole_moment_in_mu` (fails first on the merged T3 mapping), verification record
+`docs/verification/calcs/harness.column_demands.md` C item 2 (the new M2-only exception, biaxial unchanged), the
+`column-demands-square-uniaxial` table row, and its Method source line (add B-596 / OQ-Q98); the golden's expected
+trace steps E3 (their formulas for the M2-only row) and the `calcs.lock.json` entry for `harness.column_demands`.
+Risk remains the plan's r1, r2, r3.
 
 **T4 `harness.column_review`** (spec §4.4.3). Reads the host and code verdict sets by reference (separate named
 top-level reference fields for the three code checks), filters to the selected columns, members per 0003 S5, governing
