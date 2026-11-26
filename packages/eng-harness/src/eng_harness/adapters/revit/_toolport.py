@@ -1109,6 +1109,12 @@ class RevitToolPort(AdapterToolPort):
                 }:
                     raise
                 decision = Decision(outcome="unknown", evidence={"reason": "no valid Revit write evidence"})
+            except (
+                KeyError,
+                TypeError,
+                ValueError,
+            ):  # malformed ledger evidence (value.sent): unknown, never a crash (AC20)
+                decision = Decision(outcome="unknown", evidence={"reason": "malformed Revit write evidence"})
         evidence = self._store_result(tool, _RUN_OUTPUT, {"value": dict(decision.evidence)}, host, {}, timing)
         self._health.reconciled(op_id)
         return Reconciliation(
