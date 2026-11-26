@@ -1,0 +1,267 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.5 (rules U1 to U10); synthetic data, no project value",
+  "method_ref": "§4.4.5 U5",
+  "synthetic": true,
+  "derivation": "t = compare.length_mm = 5 mm (confirmed, mm). U1: the pairs are (C1, u-c1) and (C2, u-c2); both frames have ETABS section C40x60 at frame_sections index 0, rectangular 400 x 600, so both targets are section_b -> res_01KRC000000000000000000003#/frame_sections/0/shape/b_mm and section_h -> res_01KRC000000000000000000003#/frame_sections/0/shape/h_mm. U2: F1 has section_b and section_h both reference, so (C1, u-c1) proceeds; F2 has section_h candidate, so (C2, u-c2) is not_updatable SECTION_ROLES_UNMAPPED before U3. U3: the current type 11 has b_mm 400.0, |400 - 400| = 0, and h_mm 600.0, |600 - 600| = 0, so (C1, u-c1) is no_change [{unique_id u-c1, type_id '11'}]. U4 produces no rows: C1 matched at U3 and C2 is blocked. U5: both targets are non-square rectangular (400 != 600), but neither pair proceeds to a write, so orientation is []; by the lead decision, rows exist only for pairs that proceed to a write, hence no row for the non-square no_change pair and no row for the non-square blocked pair. U6: changed is empty, and no_change and blocked rows carry no origin. U7: no assignments, so expected.elements is []; no new types, so expected.types is []. U8: all seven referenced records are complete, so complete is true. U9: no_change and not_updatable each hold one row, so the ordering is trivial.",
+  "input": {
+    "map": {
+      "calc": {
+        "id": "harness.frame_element_map",
+        "version": 1,
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.frame_element_map",
+        "calc_version": "1",
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "pairs": [
+        {
+          "frame_id": "C1",
+          "unique_id": "u-c1",
+          "element_id": 101,
+          "type_id": 11,
+          "basis": "geometry",
+          "lower_distance_mm": 0.0,
+          "upper_distance_mm": 0.0
+        },
+        {
+          "frame_id": "C2",
+          "unique_id": "u-c2",
+          "element_id": 102,
+          "type_id": 21,
+          "basis": "geometry",
+          "lower_distance_mm": 0.0,
+          "upper_distance_mm": 0.0
+        }
+      ],
+      "ambiguous": [],
+      "unmatched_frames": [],
+      "unmatched_elements": [],
+      "conflicts": [],
+      "complete": true
+    },
+    "frames": {
+      "frames": [
+        {
+          "id": "C1",
+          "kind": "other",
+          "section": "C40x60",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 90
+        },
+        {
+          "id": "C2",
+          "kind": "other",
+          "section": "C40x60",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "C40x60",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400,
+            "h_mm": 600
+          }
+        }
+      ],
+      "area_sections": []
+    },
+    "revit": {
+      "elements": [
+        {
+          "unique_id": "u-c1",
+          "element_id": 101,
+          "category": "column",
+          "family": "F1",
+          "type_id": 11,
+          "type_name": "Tcur1",
+          "level_id": 1,
+          "level_name": "L1",
+          "location_kind": "point",
+          "i": null,
+          "j": null,
+          "rotation_deg": 0,
+          "parameters": {}
+        },
+        {
+          "unique_id": "u-c2",
+          "element_id": 102,
+          "category": "column",
+          "family": "F2",
+          "type_id": 21,
+          "type_name": "Tcur2",
+          "level_id": 1,
+          "level_name": "L1",
+          "location_kind": "point",
+          "i": null,
+          "j": null,
+          "rotation_deg": 0,
+          "parameters": {}
+        }
+      ],
+      "types": [
+        {
+          "type_id": 11,
+          "family": "F1",
+          "name": "Tcur1",
+          "instance_ids": [
+            101
+          ],
+          "parameters": {
+            "section_b": {
+              "value": 400.0,
+              "unit": "mm"
+            },
+            "section_h": {
+              "value": 600.0,
+              "unit": "mm"
+            }
+          }
+        },
+        {
+          "type_id": 21,
+          "family": "F2",
+          "name": "Tcur2",
+          "instance_ids": [
+            102
+          ],
+          "parameters": {
+            "section_b": {
+              "value": 400.0,
+              "unit": "mm"
+            },
+            "section_h": {
+              "value": 500.0,
+              "unit": "mm"
+            }
+          }
+        }
+      ]
+    },
+    "role_statuses": {
+      "F1": {
+        "section_b": "reference",
+        "section_h": "reference"
+      },
+      "F2": {
+        "section_b": "reference",
+        "section_h": "candidate"
+      }
+    },
+    "revit_placements": {
+      "frames": [
+        {
+          "id": "u-c1",
+          "kind": "column",
+          "section": "F1: Tcur1",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "u-c2",
+          "kind": "column",
+          "section": "F2: Tcur2",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "changed": [],
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.length_mm": {
+          "value": 5,
+          "unit": "mm",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "map": "res_01KRC000000000000000000001",
+    "frames": "res_01KRC000000000000000000002",
+    "sections": "res_01KRC000000000000000000003",
+    "revit": "res_01KRC000000000000000000004",
+    "revit_placements": "res_01KRC000000000000000000005",
+    "changed": "res_01KRC000000000000000000006#/changed",
+    "basis": "res_01KRC000000000000000000007"
+  },
+  "expected": {
+    "new_types": [],
+    "assignments": [],
+    "no_change": [
+      {
+        "unique_id": "u-c1",
+        "type_id": "11"
+      }
+    ],
+    "not_updatable": [
+      {
+        "frame_id": "C2",
+        "code": "SECTION_ROLES_UNMAPPED"
+      }
+    ],
+    "orientation": [],
+    "expected": {
+      "elements": [],
+      "types": []
+    },
+    "complete": true
+  }
+}
