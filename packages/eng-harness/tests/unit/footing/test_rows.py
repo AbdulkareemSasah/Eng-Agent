@@ -80,7 +80,8 @@ def test_stored_trace_records_exact_selection(
     base, extra = args["base"], args["extra"]
     assert isinstance(base, dict)
     assert isinstance(extra, dict)
-    out = port.run(CALC_ID, args | {"ids": requested})
+    ids: list[JsonValue] = list(requested)
+    out = port.run(CALC_ID, {**args, "ids": ids})
     assert isinstance(out, SuccessEnvelope), out
     trace = Trace.model_validate(store.payload(out.result_id)["trace"])
     assert trace.inputs == [
