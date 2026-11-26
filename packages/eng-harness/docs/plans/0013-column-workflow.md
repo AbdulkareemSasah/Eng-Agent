@@ -254,6 +254,9 @@ tasks:
     depends_on: [T3]
   - id: T7
     title: Calc harness.revit_column_update (plan of Revit type changes by reference)
+    # Amendment (B-618, documents only): kinds/column_design.py is in the hash closure of column_demands, column_review,
+    # reactions_to_joint_loads and safe_equilibrium, so their lock entries move; the two records that quote a content
+    # hash follow the lock (as B-513 and B-607).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.column_design, eng_harness.calcs.column_design.revit_update (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -266,6 +269,8 @@ tasks:
       - "packages/eng-harness/tests/golden/column_design/test_golden.py"
       - "packages/eng-harness/tests/data/golden/column_design/revit-update-*.json"
       - "packages/eng-harness/tests/property/test_revit_column_update.py"
+      - "packages/eng-harness/docs/verification/calcs/harness.reactions_to_joint_loads.md"  # content-hash literal follows the lock (amendment B-618)
+      - "packages/eng-harness/docs/verification/calcs/harness.safe_equilibrium.md"  # as above (amendment B-618)
     max_changed_lines: 380
     max_sessions: 3
     tests_first:
@@ -574,6 +579,7 @@ and structural-codes core plan T15 (`CheckMeta.version`, B-442, already merged).
 each assignment from the design record's changed frames. Amendment B-610 adds explicit validated `role_statuses`
 and `revit_placements` inputs, the U5 rotation reference order, the U10 Revit placements permutation, and the U7
 read-back identity fields in `harness.revit_column_update/1`.
+The T7 golden cases follow U2, U4 and U5 as clarified (amendment B-614, owner answers of 2026-11-26).
 
 **T8 `harness.revit_column_readback`** (spec §4.4.6). Type and value checks per planned element and type, unplanned
 type changes, missing elements, `not_read`, `stale_ok` on `before` only. B1 and B2 use the identity fields supplied by
