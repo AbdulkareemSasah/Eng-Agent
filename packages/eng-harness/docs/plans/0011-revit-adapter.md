@@ -233,6 +233,10 @@ tasks:
     # Amendment (B-595, documents only, OQ-Q104): second input structure (harness.revit_structure/1) supplies
     # element_id and type_id after geometric pairing; collateral PREFIXES, calc-kinds fixture and kind fixture
     # (a missing stale_ok entry is treated as [] by the contract test).
+    # Amendment (B-607, documents only): kinds/calcs.py is in the hash closure of every calc, so adding the kind moves
+    # every calcs.lock.json entry, and the verification records that quote a content hash follow the lock (as B-513);
+    # the calc rules test lists the calc's kind module (eng_harness.kinds.revit). max_changed_lines 380 to 650 (523
+    # measured before the mutation tests; an estimate).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.frame_element_map, eng_harness.kinds and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -247,7 +251,16 @@ tasks:
       - "packages/eng-harness/tests/golden/test_calcs_golden.py"  # PREFIXES entry for frame stems (amendment B-595)
       - "packages/eng-harness/tests/contract/test_calc_kinds.py"  # CALC_KINDS equality for frame_element_map (amendment B-595)
       - "packages/eng-harness/tests/data/kinds/calcs/frame_element_map.json"  # kind fixture (amendment B-595)
-    max_changed_lines: 380
+      - "packages/eng-harness/tests/rules/test_calc_modules.py"  # ALLOWED_MODULES entry for eng_harness.kinds.revit (amendment B-607)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_layout.md"  # content-hash literal follows the lock (amendment B-607)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_plan_size.md"  # as above (amendment B-607)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_resize.md"  # as above (amendment B-607)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_schedule.md"  # as above (amendment B-607)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_status.md"  # as above (amendment B-607)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_subjects.md"  # as above (amendment B-607)
+      - "packages/eng-harness/docs/verification/calcs/harness.reactions_to_joint_loads.md"  # as above (amendment B-607)
+      - "packages/eng-harness/docs/verification/calcs/harness.safe_equilibrium.md"  # as above (amendment B-607)
+    max_changed_lines: 650
     max_sessions: 3
     tests_first:
       # Amendment (B-452): the golden cases of the shared loader tests/golden/test_calcs_golden.py are data, not test
@@ -398,6 +411,10 @@ pipe name.
 (`harness.revit_structure/1`; OQ-Q104 / B-595), the optional link map and the basis fields (`compare.length_mm`,
 `mapping.offset_*`), exact arithmetic, the output kind, the verification record (draft), and golden cases derived by
 hand and written in each file's `derivation` field.
+Amendment (B-607): the kind lives in `kinds/calcs.py`, which every calc imports, so the content hash of every calc moves
+and `calcs.lock.json` changes in every entry (spec 0003 §3.2, §4.5). The verification records that quote a content hash
+(the eight listed in `files`) follow the lock and change only in that line; their calcs and status are unchanged, and
+the owner re-verifies them as spec 0003 §4.5 says for any hash change. The calc rules test allows the new kind module.
 
 **T13 Recordings** (spec §4.13, AC31). The Revit scenario of record mode (titles, paths and user names replaced), the
 sanitizer test, the recorded-reply contract tests (run on every applicable committed recording under
