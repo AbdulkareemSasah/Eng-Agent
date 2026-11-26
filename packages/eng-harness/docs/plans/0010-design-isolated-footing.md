@@ -200,6 +200,8 @@ tasks:
     covers: [AC13, AC14]
     depends_on: [T1]
   - id: T8
+    # Amendment (B-597, documents only; OQ-Q93): the block passes the open footings only (spec §4.6, AC34); no merged
+    # calc changes, so no calc file joins the list; the means of storing an open footings' record is spec Q23
     title: Block design_isolated_footing (rounds, batched checks, decisions, engineer dimensions, resize)
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.isolated_footing (amendment B-356)
@@ -224,15 +226,17 @@ tasks:
       - "packages/eng-harness/tests/workflow/footing/test_block.py::test_engineer_dimensions"
       - "packages/eng-harness/tests/workflow/footing/test_block.py::test_combine_closes"
       - "packages/eng-harness/tests/workflow/footing/test_block.py::test_limit_closes"
+      - "packages/eng-harness/tests/workflow/footing/test_block.py::test_rounds_pass_open_footings_only"  # B-597
       - "packages/eng-harness/tests/workflow/footing/test_decisions.py::test_shadow_suggestion_not_applied"
       - "packages/eng-harness/tests/workflow/footing/test_decisions.py::test_no_provider"
       - "packages/eng-harness/tests/workflow/footing/test_decisions.py::test_one_screen_per_round"
-    covers: [AC15, AC16, AC17, AC18, AC19, AC20]
+    covers: [AC15, AC16, AC17, AC18, AC19, AC20, AC34]
     depends_on: [T2, T4, T4b, T5, T6, T7]  # amendment (B-567): T4 split, plan size in T4, resize in T4b
   - id: T9
     # Amendment (B-418, documents only): T9 adds the structural-codes-sbc304-2018 workspace dependency and the SBC
     # allowlist ids (moved from T2); uv.lock, _calc/_code_packs.py and test_code_pack_route.py added
     # Amendment (B-417, documents only): starts after plan 0007 T9b, which creates the shipped-workflow registry in workflows/__init__.py and makes block.discover() read it; this task adds its blocks to that registry
+    # Amendment (B-597, documents only): step 13 (the schedule) waits for spec Q24.
     title: Workflow isolated_footing_design (definition, basis fields, steps 1 to 13, review, code packs)
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.isolated_footing (amendment B-356); structural-codes-sbc304-2018 dependency (B-418)
@@ -270,13 +274,16 @@ tasks:
     # every footing calc's content-hash closure, so T10 also refreshes only the content-hash line in the six footing
     # verification records. Input harness.base_reactions/1 is plan 0008 T7 (F.T7); depends_on gains that cross-plan
     # wait (comment). External amendment of T1 recorded in §3. Risk set already includes r2.
+    # Amendment (B-592, documents only): T10 must import the registered host kinds from eng_harness._kinds instead of
+    # copying them into kinds/footing.py; it may only extend the allowed-import table in test_calc_modules.py for
+    # eng_harness._kinds kind models per spec 0003 §4.3. External amendment of plan 0003 T6 recorded there.
     title: Calcs harness.reactions_to_joint_loads and harness.safe_equilibrium
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.footing, eng_harness.calcs.footing.reactions_to_loads and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/calcs/footing/__init__.py"
-      - "packages/eng-harness/src/eng_harness/calcs/footing/reactions_to_loads.py"
-      - "packages/eng-harness/src/eng_harness/calcs/footing/safe_equilibrium.py"
+      - "packages/eng-harness/src/eng_harness/calcs/footing/reactions_to_loads.py"  # import registered host kinds from eng_harness._kinds; do not copy into kinds/footing.py (amendment B-592)
+      - "packages/eng-harness/src/eng_harness/calcs/footing/safe_equilibrium.py"  # import registered host kinds from eng_harness._kinds; do not copy into kinds/footing.py (amendment B-592)
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
       - "packages/eng-harness/docs/verification/calcs/harness.reactions_to_joint_loads.md"
       - "packages/eng-harness/docs/verification/calcs/harness.safe_equilibrium.md"
@@ -294,6 +301,7 @@ tasks:
       - "packages/eng-harness/tests/golden/footing/test_equilibrium.py"
       - "packages/eng-harness/tests/data/golden/footing/loads-*.json"
       - "packages/eng-harness/tests/data/golden/footing/equilibrium-*.json"
+      - "packages/eng-harness/tests/rules/test_calc_modules.py"  # T10 may only extend the allowed-import table for eng_harness._kinds kind models per spec 0003 §4.3 (amendment B-592)
     max_changed_lines: 320
     max_sessions: 3
     tests_first:
@@ -457,13 +465,21 @@ through which the command line of plan 0006 T14 finds workflows) and registers t
 
 **T8 Block** (spec §4.6). The rounds loop with `ctx.attempts`, the six batched checks through the route of T2 with the
 ACI pack, `decide_many`, engineer dimensions, resize and closures. Tests drive the block through a test workflow in
-`tests/workflow/footing/conftest.py`.
+`tests/workflow/footing/conftest.py`. By the owner answer of 2026-11-20 (OQ-Q93, option (b); amendment B-597), the
+block passes the open footings only (spec §4.6, AC34): no closed footing is laid out, checked, judged or resized again,
+each keeps its last result in its closure, and no merged calc changes (T4, T4b, T5 and T6 stay as merged).
+`test_rounds_pass_open_footings_only` runs several footings of which some close while the others continue and checks,
+from the journal and the stored records, that every later layout, batch item, status row and resize row names an open
+footing only. T8's tests also cover the empty open set and check that no calc runs on an empty record. How the block
+stores an open footings' record is spec Q23, which the lead settles before T8 continues;
+if the answer adds a calc or an engine call, a plan amendment lists its files and task.
 
 **T9 Workflow** (spec §4.2, §4.7, §4.8). Definition, input and output models, `basis_fields`, steps 1 to 13 and 15, the
 seismic refusal, the SAFE-source gap, the SBC run (with the `structural-codes-sbc304-2018` workspace dependency, its
 `uv.lock` entry and the SBC ids from `check_id_for` in the route's allowlist in `_calc/_code_packs.py`, with their
 allowlist cases in `tests/unit/calcs/test_code_pack_route.py`, moved here from T2 by amendment B-418),
-approvals per mode, and registration in `workflows/__init__.py`
+approvals per mode. Step 13, the schedule, waits for spec Q24 (amendment B-597). Registration is in
+`workflows/__init__.py`
 (the module through which the command line of plan 0006 finds workflows: plan 0006 T14 defines the `CliDeps`
 workflow-registry field, amendment B-412, and plan 0006 T18a binds its default to the registry that plan 0007 T9b
 creates, amendment B-471, without waiting for this task; if those tasks name another module, this task follows it and
@@ -473,7 +489,10 @@ the file list is amended).
 magnitude with the basis tolerance. Amendment (B-585, documents only): T10 registers the result kind
 `harness.reactions_to_joint_loads/1` in `kinds/footing.py` (T1 owns the file; only that kind plus its contract fixture),
 refreshes only the content-hash line of the six footing verification records, and waits for plan 0008 T7
-(`harness.base_reactions/1`, F.T7) as well as plan 0008 T5.
+(`harness.base_reactions/1`, F.T7) as well as plan 0008 T5. Amendment (B-592, documents only): T10 imports the
+registered host kinds from `eng_harness._kinds` and may only extend the allowed-import table in
+`tests/rules/test_calc_modules.py` for those kind models (spec 0003 §4.3); it must not copy host kinds into
+`kinds/footing.py`.
 
 **T11 SAFE stage** (spec §4.9). The child block, its approval, the candidate-map rule, the soil-pressure limit, and the
 contract test that every tool the workflow can call is in the CSI allowlist and none is an escape hatch.

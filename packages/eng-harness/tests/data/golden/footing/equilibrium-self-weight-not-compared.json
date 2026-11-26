@@ -1,0 +1,92 @@
+{
+  "source": "eng-harness spec 0010 section 4.9, synthetic fixture",
+  "method_ref": "\u00a74.9 step 6",
+  "synthetic": true,
+  "derivation": "Pattern SELF has self_weight_ratio = 1.0 in the SAFE load set, so it is a self-weight pattern. Spec 0010 4.9 step 6: self-weight patterns are NOT_COMPARED (even though |R| and |A| would fail the tolerance). A = -50 kN from loads; R = -200 kN from base reactions; status NOT_COMPARED, self_weight true.",
+  "input": {
+    "loads": {
+      "axes": "global",
+      "loads": [
+        {
+          "joint": "P1",
+          "pattern": "SELF",
+          "FX_kN": 0.0,
+          "FY_kN": 0.0,
+          "FZ_kN": -50.0,
+          "MX_kNm": 0.0,
+          "MY_kNm": 0.0,
+          "MZ_kNm": 0.0,
+          "punch_x_mm": null,
+          "punch_y_mm": null
+        }
+      ]
+    },
+    "base_reactions": {
+      "moment_reference": "host_unconfirmed/1",
+      "rows": [
+        {
+          "case": {
+            "case": "SELF",
+            "case_type": "load_pattern",
+            "step": null
+          },
+          "FX_kN": 0.0,
+          "FY_kN": 0.0,
+          "FZ_kN": -200.0,
+          "MX_kNm": 0.0,
+          "MY_kNm": 0.0,
+          "MZ_kNm": 0.0
+        }
+      ]
+    },
+    "safe_load_set": {
+      "patterns": [
+        {
+          "name": "SELF",
+          "type": "dead",
+          "self_weight_ratio": 1.0
+        }
+      ],
+      "combinations": [],
+      "frame_loads": [],
+      "area_loads": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.length_mm": {
+          "value": 10.0,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "checks.equilibrium_relative_tolerance_ratio": {
+          "value": 0.01,
+          "unit": "1",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "loads": "res_00000000000000000000000001",
+    "base_reactions": "res_00000000000000000000000002",
+    "safe_load_set": "res_00000000000000000000000003",
+    "basis": "res_00000000000000000000000004"
+  },
+  "expected": {
+    "tolerance": 0.01,
+    "patterns": [
+      {
+        "pattern": "SELF",
+        "self_weight": true,
+        "applied_kN": -50.0,
+        "reaction_kN": -200.0,
+        "status": "NOT_COMPARED"
+      }
+    ]
+  }
+}

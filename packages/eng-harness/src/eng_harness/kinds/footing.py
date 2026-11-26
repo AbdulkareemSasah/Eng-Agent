@@ -7,6 +7,7 @@ Units: suffixes name the unit (`_mm`, `_mm2`, `_kN`); ratios are dimensionless. 
 from collections.abc import Iterable, Sequence
 from typing import Annotated, Any, Literal, Self
 
+from eng_contract.kinds.model import Combination
 from eng_contract.verdicts import VerdictStatus
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints, model_validator
 
@@ -236,6 +237,35 @@ class SafeEquilibrium(CalcPayload):
     patterns: list[PatternRow]
 
 
+class JointLoadRow(_P):
+    """One load row of `harness.reactions_to_joint_loads/1` (same shape as `harness.joint_loads/1` rows)."""
+
+    joint: _Str
+    pattern: _Str
+    FX_kN: float
+    FY_kN: float
+    FZ_kN: float
+    MX_kNm: float
+    MY_kNm: float
+    MZ_kNm: float
+    punch_x_mm: Annotated[float, Field(gt=0)] | None = None
+    punch_y_mm: Annotated[float, Field(gt=0)] | None = None
+
+
+class ReactionsToJointLoads(CalcPayload):
+    """Result of `harness.reactions_to_joint_loads` (spec 0010 4.9): loads plus combinations to add.
+
+    `status` / `reason` carry engineering outcomes of §4.9 (M2 unmatched, M4 missing pattern, step-2 combo
+    conflict) as payload statuses per spec 0003 §4.2; `OK` has `reason` null.
+    """
+
+    axes: Literal["global"] = "global"
+    loads: list[JointLoadRow]
+    combinations_to_add: list[Combination]
+    status: _Str
+    reason: _Str | None
+
+
 FOOTING_KINDS: dict[str, type[BaseModel]] = {
     "harness.footing_subjects/1": FootingSubjects,
     "harness.footing_dims/1": FootingDims,
@@ -243,5 +273,6 @@ FOOTING_KINDS: dict[str, type[BaseModel]] = {
     "harness.footing_status/1": FootingStatus,
     "harness.footing_schedule/1": FootingSchedule,
     "harness.safe_equilibrium/1": SafeEquilibrium,
+    "harness.reactions_to_joint_loads/1": ReactionsToJointLoads,
 }
 """The footing kinds by name, registered in `eng_harness._kinds`."""

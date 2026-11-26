@@ -1,0 +1,25 @@
+# IDEA load map (spec 0014 section 4.7, IG-2 / Q11). Engineering content; draft.
+# Every sign ships unset; status is unconfirmed until the owner commits confirmed values with the
+# confirming reference case (L9). CSI field names are those of forces.member_end/1 listed in section 4.7.
+# No sign, axis or end rule is guessed and none is copied from Sasaah.
+status = "unconfirmed"
+sign_convention = "host_local/1"
+
+[components.n]
+csi_field = "P_kN"
+# sign_i / sign_j unset
+
+[components.qy]
+csi_field = "V2_kN"
+
+[components.qz]
+csi_field = "V3_kN"
+
+[components.mx]
+csi_field = "T_kNm"
+
+[components.my]
+csi_field = "M2_kNm"
+
+[components.mz]
+csi_field = "M3_kNm"

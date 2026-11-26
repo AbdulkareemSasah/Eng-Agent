@@ -247,6 +247,7 @@ def test_ratios_are_referenced_not_computed(case: tuple[dict[str, Any], dict[str
         refs={
             name: RefMeta(
                 result_id=result_id,
+                ref=result_id,
                 kind=KINDS[name],
                 complete=True,
                 model_id=None,
@@ -341,6 +342,7 @@ def test_permutation_invariant(case: tuple[dict[str, Any], dict[str, str]], data
             refs={
                 name: RefMeta(
                     result_id=result_id,
+                    ref=result_id,
                     kind=KINDS[name],
                     complete=True,
                     model_id=None,

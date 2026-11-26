@@ -52,6 +52,22 @@ class IdentityStore:
         self._write_location(path, updated.model_id, digest)
         return updated
 
+    def register_hash(self, model_id: str, path: Path, *, fingerprint: str, previous_fingerprint: str) -> Resolution:
+        """Register `path`'s content hash under `model_id` (spec 0011 AC25 / §4.9).
+
+        When `fingerprint` equals `previous_fingerprint` (the adapter's last known state fingerprint), the
+        revision is unchanged: an engineer save of the harness's edits. When it differs, the revision rises
+        with `MODEL_CHANGED_OUTSIDE`. The caller supplies both fingerprints (product-neutral; no host name).
+        """
+        path = path.resolve()
+        digest = _sha256(path)
+        if fingerprint == previous_fingerprint:
+            state = self._require(model_id)
+            self._write_content(digest, model_id, state.revision, keep_older=True)
+            self._write_location(path, model_id, digest)
+            return self._known(model_id)
+        return self._outside(model_id, path, digest)
+
     def _derive(self, older: str, path: Path, digest: str) -> Resolution:
         created = self._states.create(new_model_id(self._ids), derived_from=older)
         self._write_location(path, created.model_id, digest)  # the content index keeps the older identity

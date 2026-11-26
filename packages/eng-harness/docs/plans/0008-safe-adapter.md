@@ -169,11 +169,16 @@ tasks:
   - id: T7
     # Amendment (B-418, documents only): T7 wires SG-2, SG-3, SG-4, SG-5 and SG-9 to their steps (AC24, AC25) and SG-6
     title: SAFE analysis on the long role, soil pressure, base reaction and joint reaction readers, design gaps
+    # Amendment (B-588, documents only): AC23's ToolPort path needs the SAFE result-reader TOKENS, ANALYSIS_MODELS and
+    # READERS from products/_safe_results.py merged into the shared registries in adapters/csi/_tools.py (the T6 pattern
+    # for _safe_loads); measured by the B-216 writer on packages/eng-harness/src/eng_harness/adapters/csi/_tools.py
+    # (not previously in T7's files). Every other non-test file of that branch was already listed here.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_safe_results.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_safe.py"
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_tools.py"  # T7 may only merge the SAFE result-reader tokens, argument models and readers from products/_safe_results.py into the shared registries (the T6 pattern) (amendment B-588)
       - "packages/eng-harness/src/eng_harness/adapters/csi/_gaps.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_allowlist.toml"
       - "packages/eng-harness/src/eng_harness/_kinds.py"
@@ -233,6 +238,38 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_safe_slab_design.py::test_design_run_and_punching_rows"
     covers: [AC24]
     depends_on: [T8]
+  - id: T10
+    title: "Mutation scope: the section 9 modules in r1_modules"
+    # Amendment (B-601, owner decision D-46, 2026-11-20): CI mutates only modules listed in
+    # [tool.eng-gate] r1_modules; spec 0008 section 9 names products/_safe_loads.py, _tables.py
+    # and the SAFE reconcile rules that are merged but absent from that list. This task adds
+    # products/_safe_loads.py and csi/_tables.py to r1_modules; adapters/csi/_reconcile.py,
+    # holding the SAFE rules, is added by plan 0002 T24. It adds a contract guard that the
+    # section 9 list is covered by a glob, and strengthens the existing tests until each module
+    # reaches mutation_min (80 %) with real tests. No exclusions, pragmas or lowered
+    # thresholds; no module may be removed from r1_modules to pass MU001. No source module is
+    # listed: the work strengthens tests only. If a module cannot reach 80 % without a source
+    # change, the implementing writer reports NEEDS_PLAN_AMENDMENT.
+    # The writer measures one module at a time: an unpushed scratch commit that adds a comment
+    # line to that module only, then `uv run eng-gate mutation --package eng-harness --base HEAD~1`;
+    # the writer records each module's score in the verification record and drops the commit.
+    # The measurement runs on Linux (CI, a Linux cloud session, or WSL); a notice other than
+    # MU003 is not a score, and only a scored run with no MU001 is at or above mutation_min.
+    # The independent reviewer re-runs the per-module measurement on Linux and attaches its
+    # output (killed/total per module) to the pull request under "Review"; the work item does
+    # not merge without it (amendment B-601).
+    files:
+      - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py"  # shared by the five B-601 tasks; this task adds test_spec_0008_section_9_modules_in_r1
+      - "packages/eng-harness/tests/workflow/adapters/test_safe_loads.py"  # adapters/csi/products/_safe_loads.py
+      - "packages/eng-harness/tests/unit/adapters/test_safe_tables.py"  # adapters/csi/_tables.py
+    max_changed_lines: 50
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py::test_spec_0008_section_9_modules_in_r1"
+    covers: []  # section 9 mutation scope is not an AC; this plan's covers style lists ACs only
+    depends_on: [T4, T6]  # T4 _tables.py; T6 _safe_loads.py; external: plan 0002 T24 (csi/_reconcile.py in r1_modules, which the guard asserts)
 ---
 
 # Implementation plan: SAFE through the CSI adapter
@@ -253,9 +290,11 @@ punching).
 Every task is test-first: its first commit is `test:` with the tests in `tests_first`, failing on `build/v1`
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds a `CHANGELOG.md` line. No
 public module is added (everything is internal), so `[tool.eng-gate] public_modules` is unchanged. Tasks that share a
-source file are serialized by `depends_on`: `_allowlist.toml` (T1, T3, T6, T7, T9), `_safe.py` (T3, T5, T6, T7),
+source file are serialized by `depends_on`: `_allowlist.toml` (T1, T3, T6, T7, T9), `_safe.py` (T3, T5, T6, T7; plan 0012 T3 after them for the gap and step-gap registries only, B-586),
+`products/__init__.py` (T1; plan 0012 T3 after it for the gap and step-gap registry fields only, B-586; plan 0012 T4 after it for ProductProfile.declared_absences only, B-590; plan 0012 T5 after it for ProductProfile.add_frame_naming only, B-594),
 `_safe_state.py` (T4, T5), `_safe_results.py` (T7, T9), `_kinds.py` (T4, T5, T7, T9), `_gaps.py` (T3, T7, T9),
-`_hostport.py` (T3, T5; amendment B-581: T3 for AC6 and AC7 before T5's table map).
+`_hostport.py` (T3, T5; amendment B-581: T3 for AC6 and AC7 before T5's table map; plan 0012 T4 after them for absences-aware state-reader selection and fingerprint on save only, B-590),
+`_tools.py` (T6, T7; amendment B-588: T7 may only merge the SAFE result-reader tokens, argument models and readers from products/_safe_results.py into the shared registries, the T6 pattern; plan 0012 T5 and T6 after them, B-594: T5 may only merge the SAP2000 add-frame builders and tokens, the section check and the reply-name retarget, T6 may only merge the SAP2000 analysis, result-reader and design BUILDERS, TOKENS and READERS, serialize T5 then T6 or either order with the integrator merging), `_reconcile.py` (T6; plan 0012 T4 for absences-aware state-reader selection from the profile only, B-590).
 
 Reuse (spec §2): everything in plan 0002; the SAFE 22 table reference of the Sasaah repository only as a source of field
 keys recorded in `_safe_tables.toml` with status `reference`, never copied code.
@@ -323,7 +362,8 @@ mapping including `SuperDead`.
 
 **T7 Analysis and results** (spec §4.6). Long-role routing for SAFE, the soil pressure reader with `group` (rows carry `step_type` and `case_type`; a non-unique key is `INTERNAL`), the
 base-reaction and joint-reaction readers, analysis status, the `Analysis Messages` read as a `NotImplementedGap` until recorded, and the explicit gaps for
-slab design. T7 wires the steps of SG-2, SG-3, SG-4, SG-5 and SG-9 to their registry entries (AC24, AC25; amendment
+slab design. T7 may only merge the SAFE result-reader tokens, argument models and readers from `products/_safe_results.py` into the shared registries in `csi/_tools.py` (the T6 pattern for `_safe_loads`; amendment B-588), so AC23 reaches the CSI tool port.
+T7 wires the steps of SG-2, SG-3, SG-4, SG-5 and SG-9 to their registry entries (AC24, AC25; amendment
 B-418). AC25's parametrized cases include SG-8, which T6 already raises and which is green at T7's base; this is
 acceptable because the test-first gate counts the test red while any case fails.
 
@@ -338,6 +378,14 @@ and of `csi_design_run` on SAFE, and decided whether `csi_design_run` and a desi
 the field-map entries (`unknown` to `reference` or `candidate`), the `kind` of the design run, the readers, and the
 gap tests for SG-5 replaced because the accepted behavior changes (a spec change, not a test changed to pass). If the
 local test shows that no allowlisted tool can run the SAFE designer, this task is cancelled and SG-5 stays.
+
+**T10 Mutation scope** (amendment B-601, decision D-46; spec §9). Adds `products/_safe_loads.py` and `csi/_tables.py` to
+`r1_modules`; `adapters/csi/_reconcile.py`, holding the SAFE reconcile rules, is added by plan 0002 T24, which also owns
+its tests. The guard `test_mutation_scope.py::test_spec_0008_section_9_modules_in_r1` holds the spec section 9 paths as
+a literal tuple and asserts that each matches a glob of `r1_modules`, read from `pyproject.toml` through `tomllib` (`**`
+crosses directories, as in the gate). Whichever of the five B-601 tasks lands first creates `test_mutation_scope.py`
+and its shared helper; the others add only their own test function (amendment B-601). The existing tests are strengthened
+until each module reaches `mutation_min`, measured per module as the task's front-matter comment states.
 
 ## 3. Dependencies
 
@@ -356,6 +404,29 @@ local test shows that no allowlisted tool can run the SAFE designer, this task i
 - Specs: `eng-contract` 0.1.0 merged. The edit-cycle workflow spec 0007 is not needed; the footing workflow spec uses the
   kinds and gaps defined here.
 - Owner decisions that do not block T1 to T8: Q1 to Q7 of the spec (the recommendations are implemented). Q8 (whether a candidate-mapped soil-pressure result may feed a verdict) is for the footing-workflow spec and does not affect T1 to T9.
+- External amendment (B-586, from plan 0012 T3 / the B-247 writer): plan 0012 T3 amends
+  `packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py` and
+  `packages/eng-harness/src/eng_harness/adapters/csi/products/_safe.py` so the gap and step-gap registries live on
+  `ProductProfile` (`profile(product).step_gaps`); T3 may only move those registries onto the profile (no other change);
+  required for spec 0008 AC2 (`test_no_product_branches_in_shared`). Recorded in this plan's `_safe.py` and
+  `products/__init__.py` serialization above.
+- External amendment (B-590, from plan 0012 T4 / the B-248 writer): plan 0012 T4 amends
+  `packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py` so `ProductProfile` carries
+  `declared_absences` (wired from `_sap2000.DECLARED_ABSENCES`), and
+  `packages/eng-harness/src/eng_harness/adapters/csi/_reconcile.py` so it selects the absences-aware state reader from
+  the profile (no product-name branch; spec 0008 AC2); T4 may only make those profile-field and reader-selection
+  changes. Recorded in this plan's `products/__init__.py`, `_hostport.py` and `_reconcile.py` serialization above. Plan 0002 records
+  the matching external amendment for `_hostport.py`, `products/__init__.py` and `csi/_reconcile.py`.
+- External amendment (B-594, from plan 0012 T5 and T6 / the B-249 and B-250 writers): plan 0012 T5 amends
+  `packages/eng-harness/src/eng_harness/adapters/csi/_tools.py` so it may only merge the SAP2000 add-frame builders
+  and tokens, the section check and the reply-name retarget into the shared registries (no product-name branch), and
+  amends `packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py` so `ProductProfile` carries
+  `add_frame_naming` (wired from `_sap2000`; spec 0008 AC2); plan 0012 T6 amends the same `_tools.py` so it may
+  only merge the SAP2000 analysis, result-reader and design BUILDERS, TOKENS and READERS (the B-588 pattern);
+  T5 and T6 both edit `_tools.py` (serialize T5 then T6, or either order with the integrator merging); required for
+  SAP2000 AC11–AC13 and AC14–AC16 through the CSI tool port. Recorded in this plan's `_tools.py` and
+  `products/__init__.py` serialization above. Plan 0002 records the matching external amendment for `csi/_tools.py`
+  and `products/__init__.py`.
 
 ## 4. Verification
 

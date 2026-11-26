@@ -255,6 +255,10 @@ def _add(kind: str, args: dict[str, Any], product: str) -> dict[str, Any]:
     if kind == "frames" and product == "SAP2000":
         skip = skip | {"label", "story", "name"}
     row = {**{k: v for k, v in args.items() if k not in skip}, "name": name}
+    # List replies use point1/point2 (S-12 / state reader); the write tool takes start/end.
+    if kind == "frames" and "start" in row and "end" in row:
+        row["point1"] = row.pop("start")
+        row["point2"] = row.pop("end")
     if kind == "load_combos":  # store the list-reply shape (type, items), not the tool's arguments
         row = {"name": name, "type": args.get("combo_type", 0), "items": list(args.get("components") or [])}
     items[:] = [r for r in items if r["name"] != name]  # a combination is replaced, not duplicated (S-12 section 2)
@@ -460,10 +464,15 @@ def _note(name: str, args: dict[str, Any]) -> None:
     audit = sys.argv[sys.argv.index("--audit-log") + 1] if "--audit-log" in sys.argv else ""
     role = Path(audit).name.removesuffix("-audit.jsonl").rsplit("-", 1)[-1]
     entry: dict[str, Any] = {"tool": name, "pid": pid, "path": args.get("path"), "role": role}
-    if name == "csi_launch" and isinstance(pid, int):
-        entry["visible"] = bool(args.get("visible", False))
-        launched = data.get("launched")
-        data["launched"] = [*launched, pid] if isinstance(launched, list) else [pid]
+    if name == "csi_launch":
+        if "product" in args:
+            entry["product"] = args["product"]
+        if isinstance(pid, int):
+            entry["visible"] = bool(args.get("visible", False))
+            launched = data.get("launched")
+            data["launched"] = [*launched, pid] if isinstance(launched, list) else [pid]
+    if name == "csi_open_model" and "confirm" in args:
+        entry["confirm"] = bool(args["confirm"])
     calls = data.get("calls")
     data["calls"] = [*calls, entry] if isinstance(calls, list) else [entry]
     path.write_text(json.dumps(data))

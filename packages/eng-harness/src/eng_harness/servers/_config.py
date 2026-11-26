@@ -162,6 +162,8 @@ class ServerConfig(_Model):
     roles: Mapping[str, RoleConfig] = Field(min_length=1)
     service_url: str | None = None  # spec 0014 section 4.2: IDEA only, loopback, passed as --service-url
     idea_dir: str | None = None  # spec 0014 section 4.2: IDEA only, absolute, passed as --idea-dir
+    # spec 0011 §4.8: `[servers.revit.parameters.<family>]` role map; other adapters must omit it
+    parameters: Mapping[str, Mapping[str, Mapping[str, Any]]] = Field(default_factory=dict)
 
     @model_validator(mode="before")
     @classmethod
@@ -322,6 +324,17 @@ class ServerConfig(_Model):
     def _csi_disables_scripts(self) -> Self:
         if self.adapter == _CSI_ADAPTER and "--disable-script" not in self.args:
             raise ValueError("args must contain --disable-script")
+        return self
+
+    @model_validator(mode="after")
+    def _revit_parameters(self) -> Self:
+        """Role map is Revit-only; load-time rules of spec 0011 §4.8 / AC33 run through `_parameters`."""
+        if self.parameters and self.adapter != _REVIT_ADAPTER:
+            raise ValueError("parameters is only for the Revit adapter")
+        if self.adapter == _REVIT_ADAPTER and self.parameters:
+            from eng_harness.adapters.revit._parameters import load_role_map
+
+            load_role_map(self.parameters, key="servers.revit.parameters")
         return self
 
 

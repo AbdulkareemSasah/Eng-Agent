@@ -61,3 +61,39 @@ Plan 0002 T22 (platform launcher; spec 0002 AC49). Needs Windows; only the POSIX
 
 Plan 0002 T19a (CSI port wiring; spec 0002 AC9, AC22, AC36, AC41, AC43 to AC45, AC52). Needs the owner's Windows host:
 26. Enter the built ports around both start and resume, open a copy of an ETABS model, edit, check, save, analyze, design and read results. Verify that a mismatched build stops before opening a model, that the run's frozen `checks.readback_relative_tolerance_ratio` governs checks after resume, and that a timeout with changed units stops before reconciliation. Check the stored pre-image against the pre-write object and restore a run snapshot to a new working file. After the step 2 open of the original, confirm that the run checks only the working copy and, after a kill right after that open, that the original is bound and its units read before the copy opens. Repeat the kill/resume cuts on a copy; setters must not repeat when read-back proves them applied, while interrupted opens, saves, analysis and design require the engineer's outcome decision (no proof of end is available for long tools, H-G7). A `[cli_tools.*]` entry is served beside the CSI tools by the command-line tool adapter (T19b, item 10); an entry the adapter has no argument model for is refused as a `ConfigError` on `cli_tools` (exit 2). Only real synthetic-server processes have run in the container; host reply tables and Windows behavior remain owner-side acceptance.
+
+Plan 0006 (CLI, progress, pages and report; listed by T17b, plan §4). Nothing here runs in CI. Invoke every command as `uv run --package eng-harness eng-harness <command>` (spec 0006 §4.1, AC65, Q18):
+27. The approval page in the owner's real browser: no Content-Security-Policy violation in the console, Arabic and mixed-direction text from a real drawing and model displays correctly, forms submit, and a second tab opens by cookie (spec 0006 G1; risk table row on browser CSP, bidi and form handling).
+28. The report opened and printed from disk: the DRAFT watermark and the layout (spec 0006 G1).
+29. A workstation with an Arabic regional setting, the Hijri calendar and a cp1256 console: `run`, `status` and `report` (spec 0006 AC58).
+30. Expected times and the heartbeat on a real analysis run, with the host programs (needs spec 0007's workflow and the Sasaah servers; spec 0006 AC15).
+31. Opening the launch address through the default browser when the default is not Chromium-based (spec 0006 AC61; beside item 15).
+32. The first run with no workspace configured (amendment B-541, spec 0006 AC70): `main` (`cli/__init__.py`, T14b) calls `resolve_workspace` with `default_location_probe()`, which must classify `%LOCALAPPDATA%\eng\workspaces\default` as local on the owner's Windows machine, so that every command finds the `harness.toml` there.
+
+Plan 0008 (SAFE adapter; listed by T8, spec §12). Nothing here runs in CI. On a copy of a footing model, SAFE 22:
+33. L1. `csi_launch(product="SAFE", visible=false)`: the pid the reply names, the SAFE parent process, survival after the server job closes (silent breakaway, 0002 §12 item 1), and `csi_exit` of a launched hidden instance.
+34. L2. `csi_open_model` and `csi_save_model` on a `.FDB` (both use the same `File` object as `csi_new_model`, C2): the `saved_to` path, the hash change after a save, the files a SAFE model keeps next to it; copy hash equality; what `companion_globs` must list.
+35. L3. `csi_new_blank_model` and `csi_new_model` on SAFE (SG-1, C2).
+36. L4. The live `tools/list` fingerprint of the SAFE entry set, `csi_status` installed products, `serverInfo`.
+37. L5. `csi_db_table_fields` and `csi_db_table_read` of every table in spec 0008 §4.5, with the real columns (for `Soil Pressures`, whether a `StepType` and a `CaseType` column exist and how an envelope combination reports Max and Min), units (also when the present units are millimetres), and `truncated` behavior; the SAFE tables with `unknown` status are recorded for the owner's review.
+38. L6. Whether `Soil Pressures` needs an output selection before it has rows, the `StepType` values it reports for an envelope combination and a multi-step case (key uniqueness of AC22), its row count for a model of about 30 footings, and whether groups of one footing each read within 2000 rows (SG-6).
+39. L7. Sign convention of soil pressure; moment reference and sign of base reactions (Q6).
+40. L8. `csi_set_point_load` on SAFE: replace semantics, rejection of an all-zero row, effect on `XDim` and `YDim`, units tokens, and the read-back table (SG-7, SG-8).
+41. L9. Replies of `csi_list_points`, `csi_list_areas`, `csi_list_grids`, `csi_list_frames` on SAFE (names, unique names).
+42. L10. `csi_run_analysis` on SAFE: duration for a footing model (sizes the `long` role timeout), the save dialog the sessions met, `locked` afterwards, `csi_unlock_model`, the proof-of-end question (0002 H-G7).
+43. L11. `csi_design_run(kind="concrete")` and `csi_design_results` on SAFE: what runs, what the tables hold afterwards, and the design code the model carries (SG-5, C3).
+44. L12. `csi_add_load_pattern` with type `SuperDead` and `csi_add_load_combo` on SAFE (Q7).
+45. L13. `close_started` on a hidden SAFE instance and on a visible one.
+46. L14. Record mode on a SAFE copy (`uv run python acceptance/scripts/record_csi.py --config harness.toml --model <copy.FDB> --product SAFE --analysis --cases <names> --combos <names>`); the owner's review of the recordings before commit.
+47. L15. An ETABS server and a SAFE server in one run: epochs, host-instance locks, a timeout on one (Q1).
+
+Plan 0012 (SAP2000 adapter; listed by T7, spec §12). Nothing here runs in CI. On a copy of a frame model, SAP2000 26:
+48. L1. `csi_launch(product="SAP2000", visible=false)`, the pid, survival after the server job closes, `csi_exit`, the live `tools/list` fingerprint and `csi_status` (AC3, AC5).
+49. L2. `csi_open_model` and `csi_save_model` on `.SDB`: hash change, companion files, copy equality (AC5).
+50. L3. The replies of every `serve` list tool: names, `truncated`, frame fields, and that `csi_list_stories`/`csi_list_grids` answer `unsupported_by_version` on COM (AC7, AC8).
+51. L4. `csi_db_table_fields` and `csi_db_table_read` of each table the readers need (frame, joint and area loads, restraints, pattern and combination definitions, `Analysis Messages`): the owner records them for review (AC10, SP-4). Table names beyond Analysis Messages remain open (OQ-Q102).
+52. L5. `csi_run_analysis`: duration (sizes the `long` timeout), whether the model is locked afterwards, which cases run, the proof-of-end question (AC14, SP-6).
+53. L6. Sign, axes and station semantics of `csi_results_frame_forces`, reactions, and base reactions (AC15).
+54. L7. `csi_design_run` for steel and concrete and the shape of `csi_design_results` for steel and concrete columns (AC16, SP-3).
+55. L8. `csi_frame_details` and `csi_export_joint` on the COM path (the evidence is for bridge targets), `csi_add_frame_by_coord` naming, section requirement and units, `csi_set_point_load` semantics (AC11, SP-5).
+56. L9. Record mode on a SAP2000 copy: record-mode scenario, owner review and commit of recordings, and subsequent contract-test verification against the real server (AC19; amendment B-573).

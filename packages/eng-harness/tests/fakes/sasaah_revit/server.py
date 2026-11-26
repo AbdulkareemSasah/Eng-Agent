@@ -90,7 +90,9 @@ def _default_seed() -> dict[str, Any]:
     """A small in-memory model: one level, grid, column, framing member and type (spec 0011 section 4.13)."""
     length_param = {
         "name": "b",
-        "value": 1.0,  # raw feet (spec 0011 section 4.13)
+        # Spec 0011 section 4.6 / 4.13: parameter storage is rawValue in internal feet.
+        "rawValue": 1.0,
+        "value": 1.0,
         "specId": "autodesk.spec.aec:length-2.0.0",
         "builtInParameter": "STRUCTURAL_SECTION_COMMON_WIDTH",
         "storageType": "Double",
@@ -211,6 +213,18 @@ class State:
         data["model"] = self.model
         _write_control(data)
 
+    def reload(self) -> None:
+        """Reload `model` from the control file so the read and write roles share state (AC19)."""
+        if not CONTROL:
+            return
+        data = _read_control()
+        stored = data.get("model")
+        if isinstance(stored, dict):
+            pipe_name = self.model.get("pipe_name")
+            self.model = copy.deepcopy(stored)
+            if pipe_name is not None:
+                self.model["pipe_name"] = pipe_name
+
     def pop_fault(self, tool: str, kinds: set[str]) -> dict[str, Any] | None:
         """Remove and return the first pending fault of ``kinds`` matching ``tool`` (or any tool)."""
         if not CONTROL:
@@ -297,17 +311,41 @@ def _param_list(owner: dict[str, Any]) -> list[dict[str, Any]]:
     return params
 
 
-def _set_param(owner: dict[str, Any], name: str, value: Any, *, by_guid: str | None = None) -> None:
+# Exact international foot (NIST SP 811); same factor as eng_contract.units / spec 0011 §4.6.
+_MM_PER_FT = 304.8
+
+
+def _length_raw_feet(value: Any, *, value_type: str | None, unit: str | None) -> Any:
+    """Store length writes as raw feet (`rawValue`); non-length values stay as given (spec 0011 §4.6)."""
+    if value_type == "double" and (unit in {None, "mm"}):
+        return float(value) / _MM_PER_FT
+    return value
+
+
+def _set_param(
+    owner: dict[str, Any],
+    name: str,
+    value: Any,
+    *,
+    by_guid: str | None = None,
+    value_type: str | None = None,
+    unit: str | None = None,
+) -> None:
     params = _param_list(owner)
+    # `value` keeps the wire form; `rawValue` is internal feet for length doubles (spec 0011 §4.6).
+    raw = _length_raw_feet(value, value_type=value_type, unit=unit)
     for row in params:
         if by_guid is not None and row.get("guid") == by_guid:
+            row["rawValue"] = raw
             row["value"] = value
             return
         if by_guid is None and row.get("name") == name:
+            row["rawValue"] = raw
             row["value"] = value
             return
     row = {
         "name": name,
+        "rawValue": raw,
         "value": value,
         "specId": "autodesk.spec.aec:length-2.0.0",
         "builtInParameter": name.upper(),
@@ -452,18 +490,43 @@ def _apply_write(name: str, args: dict[str, Any]) -> dict[str, Any]:
         type_ids = args.get("typeIds") or []
         if not type_ids:
             raise BridgeError("invalid_request", "typeIds is required.")
+        value_type = args.get("valueType")
+        unit = args.get("unit")
         for tid in type_ids:
-            _set_param(_type(int(tid)), str(args["parameterName"]), args["value"])
+            _set_param(
+                _type(int(tid)),
+                str(args["parameterName"]),
+                args["value"],
+                value_type=str(value_type) if value_type else None,
+                unit=str(unit) if unit else None,
+            )
         return {"ok": True, "typeIds": list(type_ids)}
     if name == "revit_set_element_parameter_values":
+        value_type = args.get("valueType")
+        unit = args.get("unit")
         for eid in args["elementIds"]:
-            _set_param(_element(int(eid)), str(args["parameterName"]), args["value"])
+            _set_param(
+                _element(int(eid)),
+                str(args["parameterName"]),
+                args["value"],
+                value_type=str(value_type) if value_type else None,
+                unit=str(unit) if unit else None,
+            )
         return {"ok": True, "elementIds": list(args["elementIds"])}
     if name == "revit_set_parameter_value_by_guid":
+        value_type = args.get("valueType")
+        unit = args.get("unit")
         for eid in args["elementIds"]:
             target = args.get("target", "auto")
             owner = _type(int(_element(int(eid))["type_id"])) if target == "type" else _element(int(eid))
-            _set_param(owner, str(args["guid"]), args["value"], by_guid=str(args["guid"]))
+            _set_param(
+                owner,
+                str(args["guid"]),
+                args["value"],
+                by_guid=str(args["guid"]),
+                value_type=str(value_type) if value_type else None,
+                unit=str(unit) if unit else None,
+            )
         return {"ok": True, "elementIds": list(args["elementIds"])}
     if name == "revit_change_element_type":
         type_id = int(args["typeId"])
@@ -500,7 +563,12 @@ def _run_write(name: str, args: dict[str, Any]) -> dict[str, Any]:
 async def _handle_write(name: str, args: dict[str, Any]) -> dict[str, Any]:
     if STATE.read_only:
         raise BridgeError("invalid_request", "Server is running in read-only mode.")
-    if not STATE.model.get("destructive_toolset", True) and name in DESTRUCTIVE:
+    # L-B231-1: refuse a direct tools/call when the fault is present, not only when the model flag is false.
+    if name in DESTRUCTIVE and (
+        STATE.pop_fault(name, {"destructive_toolset_off"}) is not None
+        or STATE.has_fault("destructive_toolset_off") is not None
+        or not STATE.model.get("destructive_toolset", True)
+    ):
         raise BridgeError("forbidden_destructive", "Destructive toolset is off.")
     if STATE.pop_fault(name, {"other_document_active"}):
         STATE.model["active_path"] = r"C:\models\other.rvt"
@@ -514,6 +582,14 @@ async def _handle_write(name: str, args: dict[str, Any]) -> dict[str, Any]:
             "declined by the user",
         )
     if unanswered := STATE.pop_fault(name, {"dialog_unanswered"}):
+        # L-B231-1 / AC18: reply=busy yields the prepare_destructive HOST_BUSY / MODAL_DIALOG text
+        # when the write role timeout exceeds the add-in deadline; otherwise withhold for client timeout.
+        if unanswered.get("reply") == "busy":
+            raise BridgeError(
+                "timeout",
+                "prepare_destructive is already executing",
+                "the gate is waiting for a person",
+            )
         await _withhold(unanswered)
 
     if STATE.pop_fault(name, {"commit_unchecked"}):
@@ -625,6 +701,7 @@ async def on_list_tools(
 
 async def on_call_tool(ctx: ServerRequestContext[Any], params: types.CallToolRequestParams) -> types.CallToolResult:
     """Run one tool and answer in the Revit reply shape (JSON success, string error)."""
+    STATE.reload()  # read and write roles share the persisted model (spec 0011 AC19)
     args = dict(params.arguments or {})
     try:
         result = _ok_result(await _call(params.name, args))

@@ -25,7 +25,17 @@ from eng_harness.servers._procinfo import ProcessIdentity
 
 ConfigFactory = Callable[..., ServersConfig]
 ETABS_EXE = "ETABS.exe"  # spec 0002 section 4.2, the image name that identifies an ETABS instance
-PRODUCTS = [("ETABS", "ETABS.exe", ".EDB", "csi"), ("SAFE", "SAFE.exe", ".FDB", "csi_safe")]
+PRODUCTS = [
+    ("ETABS", "ETABS.exe", ".EDB", "csi"),
+    ("SAFE", "SAFE.exe", ".FDB", "csi_safe"),
+    ("SAP2000", "SAP2000.exe", ".SDB", "csi_sap2000"),  # plan 0012 T3 / spec 0012 AC5
+]
+# Fingerprint-on-save: profile.tables (ETABS/SAFE, plan 0008 T5) or declared_absences (SAP2000, plan 0012 T4 / B-590).
+PRODUCTS_WITH_STATE = [
+    ("ETABS", "ETABS.exe", ".EDB", "csi"),
+    ("SAFE", "SAFE.exe", ".FDB", "csi_safe"),
+    ("SAP2000", "SAP2000.exe", ".SDB", "csi_sap2000"),
+]
 FIRST_PID = 4242  # the pid the CSI fake gives the first instance it launches
 _START = 1_700_000_000_000
 
@@ -275,13 +285,13 @@ def test_restore_after_timeout(
     anyio.run(body)
 
 
-@pytest.mark.parametrize(("product", "exe_name", "ext", "server"), PRODUCTS)
+@pytest.mark.parametrize(("product", "exe_name", "ext", "server"), PRODUCTS_WITH_STATE)
 def test_save_records_the_state_fingerprint(
     tmp_path: Path, make_config: ConfigFactory, control: Path, product: str, exe_name: str, ext: str, server: str
 ) -> None:
     """`save` keeps the saved state's fingerprint, so the engine's resume check sees no `model_differs` (B-451 L3).
 
-    Parametrized over SAFE once its profile.tables are filled (plan 0008 T5 / L-B212-1).
+    Parametrized over products with profile.tables (plan 0008 T5) or declared_absences (plan 0012 T4 / B-590).
     """
     clock = FixedClock(_START)
     ids = SeededIdSource(b"fingerprint", clock)

@@ -718,6 +718,47 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_csi_open_original.py::test_visible_launch"
     covers: [AC51]
     depends_on: [T19c]  # external: plan 0007 T5 and T13 (merged; csi/_tools.py and _hostport.py)
+  - id: T24
+    title: "Mutation scope: the section 9 modules in r1_modules"
+    # Amendment (B-601, owner decision D-46, 2026-11-20): CI mutates only modules listed in
+    # [tool.eng-gate] r1_modules; spec 0002 section 9 names seven R1 modules that are merged but
+    # absent from that list, so they have never been mutated. This task adds those paths to
+    # r1_modules, adds a contract guard that the section 9 list is covered by a glob, and
+    # strengthens the existing unit and workflow tests until each module reaches mutation_min
+    # (80 %) with real tests. adapters/csi/_reconcile.py also holds the SAFE reconcile rules
+    # (spec 0008 section 9) and the add-frame rule (spec 0012 section 9); mutation scores the
+    # whole file, so this task alone adds it and owns its tests, including the SAFE and SAP2000
+    # reconcile test files. No exclusions, pragmas or lowered thresholds; no module may be
+    # removed from r1_modules to pass MU001. No source module is listed: the work strengthens
+    # tests only. If a module cannot reach 80 % without a source change, the implementing
+    # writer reports NEEDS_PLAN_AMENDMENT.
+    # The writer measures one module at a time: an unpushed scratch commit that adds a comment
+    # line to that module only, then `uv run eng-gate mutation --package eng-harness --base HEAD~1`;
+    # the writer records each module's score in the verification record and drops the commit.
+    # The measurement runs on Linux (CI, a Linux cloud session, or WSL); a notice other than
+    # MU003 is not a score, and only a scored run with no MU001 is at or above mutation_min.
+    # The independent reviewer re-runs the per-module measurement on Linux and attaches its
+    # output (killed/total per module) to the pull request under "Review"; the work item does
+    # not merge without it (amendment B-601).
+    files:
+      - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py"  # shared by the five B-601 tasks; this task adds test_spec_0002_section_9_modules_in_r1
+      - "packages/eng-harness/tests/unit/adapters/test_csi_errors.py"  # adapters/_errors.py and adapters/csi/_errors.py
+      - "packages/eng-harness/tests/unit/adapters/test_timeouts.py"  # adapters/_errors.py timeout paths
+      - "packages/eng-harness/tests/workflow/adapters/test_reconcile.py"  # adapters/csi/_reconcile.py
+      - "packages/eng-harness/tests/workflow/adapters/test_safe_reconcile.py"  # SAFE reconcile rules in adapters/csi/_reconcile.py (spec 0008 section 9)
+      - "packages/eng-harness/tests/workflow/adapters/test_sap2000_reconcile.py"  # add-frame rule in adapters/csi/_reconcile.py (spec 0012 section 9)
+      - "packages/eng-harness/tests/unit/adapters/test_args.py"  # adapters/_args.py
+      - "packages/eng-harness/tests/unit/servers/test_buildcheck.py"  # servers/_buildcheck.py
+      - "packages/eng-harness/tests/unit/servers/test_hostlock.py"  # servers/_hostlock.py
+      - "packages/eng-harness/tests/workflow/servers/test_guard.py"  # servers/_guard.py
+    max_changed_lines: 110
+    max_sessions: 3
+    tests_first:
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py::test_spec_0002_section_9_modules_in_r1"
+    covers: []  # section 9 mutation scope is not an AC; this plan's covers style lists ACs only
+    depends_on: [T6b, T7, T8, T9, T14, T19a]  # T6b _buildcheck; T7 _hostlock and _guard; T8 _args; T9 _errors and csi/_errors; T14 and T19a _reconcile; T15 is not a dependency: it is blocked on ADR-0031, and its own diff to csi/_errors.py is mutated once this task lists the module; external: plan 0008 T6 (SAFE rules) and plan 0012 T4 and T5 (add-frame rule) in csi/_reconcile.py
 ---
 
 # Implementation plan: eng-harness servers and adapters
@@ -747,24 +788,29 @@ Every task is test-first: its first commit is `test:` with the tests in `tests_f
 any public module to `[tool.eng-gate] public_modules`. Workflow tests start the synthetic fakes through the harness's
 own launcher (POSIX in Linux CI); `tests/windows/` runs in the Windows CI job. Each adapter task extends the synthetic
 CSI fake (`tests/fakes/sasaah_csi/`, test code) with the behaviour of the tools it adds (spec §4.8.3); the tasks that
-share it (T6b, T10, T11, T11b, T12, T12b, T13, T14, T19a) are serialized by `depends_on` (B-413). Tasks that share a source file are
+share it (T6b, T10, T11, T11b, T12, T12b, T13, T14, T19a; plan 0012 T3 may only record product on csi_launch and confirm on csi_open_model, B-586) are serialized by `depends_on` (B-413). Tasks that share a source file are
 serialized by `depends_on`: `_session.py` (T5, T6b, T7, T20; plan 0014 T3 after them, B-584), `doctor.py` and `test_doctor.py` (T18, T22; B-541), `_toolport.py` (T8b, T9, T12, T14, T16, T19a; T16 and
 T19a are not ordered, so whichever lands second adapts to the other in its own task, B-503; plan 0007 T13b adds a
 no-op hook and is not ordered with T16 either, B-569), `_hostport.py` (T10, T11b,
-T12b, plan 0007 T13, T19c, T23, T19a, then plan 0007 T13b; plan 0008 T3 and T5 after them, B-581; B-503, B-530, B-543, B-569), `_identity.py` and `test_csi_session_ops.py` (T10, T19c;
+T12b, plan 0007 T13, T19c, T23, T19a, then plan 0007 T13b; plan 0008 T3 and T5 after them, B-581; plan 0012 T4 after them for absences-aware state-reader selection and fingerprint on save only, B-590; B-503, B-530, B-543, B-569), `_identity.py` and `test_csi_session_ops.py` (T10, T19c;
 B-530), `csi/_session_ops.py` (T10, T23; B-543),
-`csi/_reconcile.py` (T14, T19a; plan 0008 T6 after them), `adapters/__init__.py` (T22, T19a, T19b; B-541; plan 0007 T13b wires one callback and is not ordered with T19b, so
+`csi/_reconcile.py` (T14, T19a; plan 0008 T6 after them; plan 0012 T4 for absences-aware state-reader selection from the profile only, B-590), `adapters/__init__.py` (T22, T19a, T19b; B-541; plan 0007 T13b wires one callback and is not ordered with T19b, so
 whichever lands second adapts, B-569) and
 `test_build_ports.py` (T19a, T19b; B-475; plan 0008 T1 also edits `build_ports` after T19a: whichever of T19b and 0008 T1 lands second
 adapts to the other in its own task), `csi/_tools.py` (T12, T12b, T13, T15, T23; plan 0007 T5 and T13, B-503: T15 and
 those two are not ordered, and T15 and T23 are not ordered, B-543, so whichever lands second adapts; plan 0007 T13b
-after T13 and T23, not ordered with T15, B-569),
+after T13 and T23, not ordered with T15, B-569; plan 0008 T6 and T7 after them, B-588: T7 may only merge the SAFE
+result-reader tokens, argument models and readers; plan 0012 T5 and T6 after them, B-594: T5 may only merge the
+SAP2000 add-frame builders and tokens, the section check and the reply-name retarget, T6 may only merge the SAP2000
+analysis, result-reader and design BUILDERS, TOKENS and READERS, serialize T5 then T6 or either order with the
+integrator merging),
 `_allowlist.toml` (T12, T13, T15), `_state.py` and `test_csi_state.py` (T11b, T12), `products/_etabs.py` (T11, T12,
-T12b, T13), `products/__init__.py` (T11, T12b), `_replies.py` (T11, T13, T21) and
+T12b, T13), `products/__init__.py` (T11, T12b; plan 0012 T3 for the gap and step-gap registry fields only, B-586; plan 0012 T4 for ProductProfile.declared_absences only, B-590; plan 0012 T5 for ProductProfile.add_frame_naming only, B-594), `_replies.py` (T11, T13, T21) and
 `test_csi_replies.py` (T11, T13), `test_toolport.py` (T8b, T12), `servers/__init__.py` (T1, T5, T22; T17 is not ordered with T22, so whichever lands second adapts, B-541), `servers/_config.py` and `test_config.py` (T1, T6, T20, T22; B-541),
 `_allowlist.py` (T6, T6b, T20) and `test_allowlist.py` (T6, T20) (B-465). `_kinds.py` is shared by T21 and every
-later task of another plan that adds kinds to `HARNESS_KINDS` (plan 0008 T4, T5, T7 and T9, plan 0013 T2; B-503): none
-waits for T21 or T21 for it, and whichever lands second adds its registry to the line the other wrote. Parallel tasks
+later task of another plan that adds kinds to `HARNESS_KINDS` (plan 0008 T4, T5, T7 and T9, plan 0011 T6, plan 0013 T2; B-503, B-589): none
+waits for T21 or T21 for it, and whichever lands second adds its registry to the line the other wrote. Plan 0011 T6 may only
+register `REVIT_KINDS` there (amendment B-589; the same `_kinds.py` listing as plan 0008 T4 for SAFE). Parallel tasks
 (T3 beside T4; T18 beside T8 to T17) share only `CHANGELOG.md` and `pyproject.toml`, merged in pull-request order.
 
 Reuse (spec §2): the MCP SDK's `Client` and message types (not its `stdio_client`), the S-10 job design, the S-02 and
@@ -1116,6 +1162,15 @@ is T19a's, B-530, which comes after T23), then `locate`, `read_units` and `worki
 launch, the copy in the same instance); `test_open_refusals_are_envelopes` checks the three refusals of AC51 return
 failure envelopes; `test_visible_launch` checks the fake's recorded `visible` flag, the run state's and the default.
 
+**T24 Mutation scope** (amendment B-601, decision D-46; spec §9). Adds the seven modules of spec §9 to `r1_modules`,
+among them `adapters/csi/_reconcile.py`, which also holds the SAFE reconcile rules (spec 0008 §9) and the add-frame rule
+(spec 0012 §9), so this task owns that file's tests for all three specs. The guard
+`test_mutation_scope.py::test_spec_0002_section_9_modules_in_r1` holds the spec section 9 paths as a literal tuple and
+asserts that each matches a glob of `r1_modules`, read from `pyproject.toml` through `tomllib` (`**` crosses
+directories, as in the gate). Whichever of the five B-601 tasks lands first creates `test_mutation_scope.py` and its
+shared helper; the others add only their own test function (amendment B-601). The existing tests are strengthened until
+each module reaches `mutation_min`, measured per module as the task's front-matter comment states.
+
 ## 3. Dependencies
 
 - Runtime: `mcp` 2.x (package ADR in T1, owner queue); `eng-contract`, `pydantic` as in the engine plan. No other.
@@ -1145,6 +1200,42 @@ failure envelopes; `test_visible_launch` checks the fake's recorded `visible` fl
   (`BuildExpectation.status_tool`, default `csi_status`; IDEA `idea_status`) instead of the hardcoded `csi_status`, and
   names that tool in the error message; required for IDEA AC3 workflow stops (`test_idea_script_enabled_stops_run`,
   `test_idea_listed_run_script_stops_run`). Recorded in this plan's `_session.py` serialization above.
+- External amendment (B-586, from plan 0012 T3 / the B-247 writer): plan 0012 T3 amends
+  `packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py` so `ProductProfile` carries the gap and
+  step-gap registries (`profile(product).step_gaps`), and may amend `tests/fakes/sasaah_csi/server.py` only to record
+  `product` on `csi_launch` and `confirm` on `csi_open_model` (test only); required for spec 0008 AC2
+  (`test_no_product_branches_in_shared`) and optional launch/open call-log asserts. Recorded in this plan's
+  `products/__init__.py` and fake serialization above. Plan 0008 records the matching external amendment for
+  `products/_safe.py` and `products/__init__.py`.
+- External amendment (B-588, from plan 0008 T7 / the B-216 writer): plan 0008 T7 amends
+  `packages/eng-harness/src/eng_harness/adapters/csi/_tools.py` so it may only merge the SAFE result-reader tokens,
+  argument models and readers from `products/_safe_results.py` into the shared registries (`TOKENS`, `ANALYSIS_MODELS`,
+  `READERS`; the T6 pattern for `_safe_loads`); required for SAFE AC23 (base and joint reactions through the CSI tool
+  port / `tool_allowlist()`). Recorded in this plan's `csi/_tools.py` serialization above.
+- External amendment (B-589, from plan 0011 T6 / the B-235 writer): plan 0011 T6 amends
+  `packages/eng-harness/src/eng_harness/_kinds.py` so it may only register `REVIT_KINDS` on `HARNESS_KINDS`, and adds
+  the kinds contract fixtures under `packages/eng-harness/tests/data/kinds/revit/**`; required for Revit AC33 (kinds
+  usable through the registry; the same `_kinds.py` listing as plan 0008 T4 for SAFE / B-216). Recorded in this plan's
+  `_kinds.py` serialization above.
+- External amendment (B-590, from plan 0012 T4 / the B-248 writer): plan 0012 T4 amends
+  `packages/eng-harness/src/eng_harness/adapters/_hostport.py` so it selects the absences-aware state reader when
+  `profile.declared_absences` is non-empty and records the fingerprint on save when absences or tables are set;
+  amends `packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py` so `ProductProfile` carries
+  `declared_absences` (wired from `_sap2000.DECLARED_ABSENCES`); and amends
+  `packages/eng-harness/src/eng_harness/adapters/csi/_reconcile.py` for the same reader selection; no product-name
+  branch (spec 0008 AC2). Recorded in this plan's `_hostport.py`, `products/__init__.py` and `csi/_reconcile.py`
+  serialization above. Plan 0008 records the matching external amendment for `products/__init__.py` and
+  `csi/_reconcile.py`.
+- External amendment (B-594, from plan 0012 T5 and T6 / the B-249 and B-250 writers): plan 0012 T5 amends
+  `packages/eng-harness/src/eng_harness/adapters/csi/_tools.py` so it may only merge the SAP2000 add-frame builders
+  and tokens, the section check and the reply-name retarget into the shared registries (no product-name branch), and
+  amends `packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py` so `ProductProfile` carries
+  `add_frame_naming` (wired from `_sap2000`; spec 0008 AC2); plan 0012 T6 amends the same `_tools.py` so it may
+  only merge the SAP2000 analysis, result-reader and design BUILDERS, TOKENS and READERS (the B-588 pattern);
+  T5 and T6 both edit `_tools.py` (serialize T5 then T6, or either order with the integrator merging); required for
+  SAP2000 AC11–AC13 and AC14–AC16 through the CSI tool port. Recorded in this plan's `csi/_tools.py` and
+  `products/__init__.py` serialization above. Plan 0008 records the matching external amendment for `_tools.py` and
+  `products/__init__.py`.
 - First live run (amendment B-475, lead decision D-32: the edit cycle of spec 0007 on a copy of a real ETABS model
   comes first). T16, T17 and T19b are off its path, and so are plan 0008 T1 to T3; none is deleted or weakened. Each
   returns before the first task that depends on it: T16, then T19b, with the first workflow that names a command-line

@@ -1,4 +1,8 @@
-"""CSI launch, open and save on the main role (plan 0002 T10; spec 0002 sections 4.4.2, 4.5.8, 4.5.9, 4.6.1)."""
+"""CSI launch, open and save on the main role (plan 0002 T10; spec 0002 sections 4.4.2, 4.5.8, 4.5.9, 4.6.1).
+
+Product-agnostic: the caller passes `product` (ETABS, SAFE or SAP2000), so `.EDB`, `.FDB` and `.SDB` session
+operations share this module (plan 0012 T3; spec 0012 AC5).
+"""
 
 from collections.abc import Mapping
 from dataclasses import dataclass

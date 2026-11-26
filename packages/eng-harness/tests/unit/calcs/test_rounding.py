@@ -33,8 +33,10 @@ def _basis(**fields: dict[str, Any] | None) -> dict[str, Any]:
 
 
 def _ref(n: int, kind: str) -> dict[str, Any]:
+    result_id = f"res_{n:026d}"
     return {
-        "result_id": f"res_{n:026d}",
+        "result_id": result_id,
+        "ref": result_id,
         "kind": kind,
         "complete": True,
         "model_id": None,
