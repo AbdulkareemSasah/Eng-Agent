@@ -152,6 +152,24 @@ def _seed_two_types() -> dict[str, Any]:
     return seed
 
 
+def _seed_guid_on_b() -> dict[str, Any]:
+    """Column 3001's instance parameter `b` carries GUID, as in `_prior`: the GUID setter has a pre-image value."""
+    seed = helpers.seed_model()
+    for element in seed["elements"]:
+        for param in element["parameters"]:
+            if param["name"] == "b":
+                param["guid"] = GUID
+    return seed
+
+
+def _seed_for(tool: str) -> dict[str, Any]:
+    if tool == "revit_change_element_type":
+        return _seed_two_types()
+    if tool == "revit_set_parameter_value_by_guid":
+        return _seed_guid_on_b()
+    return helpers.seed_model()
+
+
 def _descriptor(tool: str) -> ToolDescriptor:
     return revit_allowlist(role="write").descriptor(tool)
 
@@ -324,7 +342,7 @@ async def _pre_image_value(
 def test_outcomes_per_tool(tool: str, applied: bool, expected: str, tmp_path: Path) -> None:
     """AC20: each write tool reconciles applied / not_applied from the state read after a lost reply."""
     control = tmp_path / "control.json"
-    seed = _seed_two_types() if tool == "revit_change_element_type" else helpers.seed_model()
+    seed = _seed_for(tool)
     config = _short_write_timeout(helpers.revit_config(tmp_path, control, seed=seed))
 
     async def body(manager: ServerManager, launcher: helpers.RecordingLauncher) -> None:
