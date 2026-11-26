@@ -368,14 +368,16 @@ per accepted, matched frame, sorted by frame id; others are issues `NOT_IMPLEMEN
 
 #### 4.4.5 `harness.revit_column_update` v1
 
-Input: `map` (`harness.frame_element_map/1`), `frames`, `sections` (this run's ETABS reads), `revit`
-(`harness.revit_structure/1`, role-status source open in Q15), `changed` (reference to the changed frames of the design
-record, AC22), `basis` (`compare.length_mm`). The Revit rotation input for U5 is open in Q16 (amendment B-610). Method:
+Input: `map` (`harness.frame_element_map/1`), `frames` (`model.frame_placements/1`) and `sections` (this run's ETABS
+reads), `revit` (`harness.revit_structure/1`), `role_statuses` (RV §4.8 validation results keyed by family and role,
+Q15), `revit_placements` (the Revit `model.frame_placements/1` read used by R4, Q16), `changed` (reference to the
+changed frames of the design record, AC22), `basis` (`compare.length_mm`). Method:
 
 - U1 targets per pair from the frame's ETABS section: `rectangular` sets roles `section_b` and `section_h`,
   `circular` sets `section_D`; `other` is `not_updatable` `SHAPE_NOT_SUPPORTED`. Each target is the reference
   `<sections result>#/frame_sections/<i>/shape/<field>`.
-- U2 a required role `unmapped` for the element's family gives `SECTION_ROLES_UNMAPPED` (Q15).
+- U2 a required role whose status in `role_statuses` is `unmapped` for the element's family gives
+  `SECTION_ROLES_UNMAPPED`. An unread parameter value remains distinct from an unmapped role (Q15).
 - U3 the element's current type with every role within `compare.length_mm` of its target is `no_change`.
 - U4 otherwise a type of the same family with every role within `compare.length_mm` is `assign` to it; several are
   `TYPE_AMBIGUOUS`; none gives one `new_type` per (family, ETABS section name), named after the ETABS section,
@@ -385,15 +387,19 @@ record, AC22), `basis` (`compare.length_mm`). The Revit rotation input for U5 is
 - U5 both sides carry `rotation_deg` (`model.frame_placements/1` of ETABS and of Revit; RV §4.5 leaves an element
   with a null rotation out of that kind, so every paired element has one), but how the two conventions relate is
   unverified until local test 6 (CW-G7). A non-square rectangular target carries the info issue
-  `ORIENTATION_UNVERIFIED` with references to both rotations (Q16), shown in the R6 preview; no rotation is compared or
-  written. Without a mapped `rotation` role no Revit element enters `model.frame_placements/1`, so no column maps (all
-  frames `unmatched_frames`) and nothing is written.
+  `ORIENTATION_UNVERIFIED`, shown in the R6 preview. In `orientation.rotations`, put
+  `<ETABS placements>#/frames/<i>/rotation_deg` (row by `frame_id`) first, then
+  `<Revit placements>#/frames/<j>/rotation_deg` (row by `unique_id`, RV §4.5), using the actual input row indices (Q16).
+  No rotation is compared or written. Without a mapped `rotation` role no Revit element enters
+  `model.frame_placements/1`, so no column maps (all frames `unmatched_frames`) and nothing is written.
 - U6 each assignment carries `origin`: `changed_in_design` when its frame is in `changed`, otherwise `preexisting`
   (Q10); a new type lists the origins of its pairs.
-- U7 (amendment B-610) `expected.elements` has one row per assignment with the target type name (the reused type's
-  read name or the new type's planned name). B3 checks `no_change` and blocked elements against the before read.
-  `expected.types` has one row per new type with its U1 role references. B2 checks the role sets planned in U4 and R7.
-  Reused types have an element expectation only. Type identity across families is open in Q17.
+- U7 (amendment B-610) `expected.elements` has one row per assignment, keyed by `unique_id`.
+  The `harness.revit_column_update/1` element expectation carries exactly one target identity: `type_id` in the
+  assignment's id representation for reuse, or `family` and `type_name` for a new type (Q17).
+  B3 checks `no_change` and blocked elements against the before read. `expected.types` has one row per new type
+  with `family`, `name` and its U1 role references. B2 checks the role sets planned in U4 and R7.
+  Reused types have an element expectation only.
 - U8 (amendment B-610) `complete` is true exactly when all referenced input records are complete, as in
   `harness.frame_element_map` and `harness.column_review`. U1 to U4 report blocked pairs in `not_updatable`
   independently of input completeness.
@@ -401,12 +407,13 @@ record, AC22), `basis` (`compare.length_mm`). The Revit rotation input for U5 is
   `no_change` and `expected.elements` by `unique_id`, and `not_updatable` and `orientation` by `frame_id`.
   Order `new_types` by (family, ETABS section name), the U4 grouping key, and emit `expected.types` in that same order.
   List one origin per pair in ascending `unique_id` order within each new type (U4, U6), retaining repeated origins.
-- U10 (amendment B-610) For AC11 permute `frames.frames`, `sections.frame_sections` and the `changed` list, as the
-  sibling calcs permute input lists whose kinds allow it (AC5, RV AC28). Keep the map and Revit structure lists in the
-  order their kinds require. Compare the plan fields, including list order, after resolving each reference against
-  its own run's input and replacing it for comparison with its input, row key and field (section name for U1,
-  frame id for U5). Check that each reference resolves to the intended field. U1 pointers use the actual array index
-  (contract §4.6), so raw reference strings and content hashes may differ.
+- U10 (amendment B-610) For AC11 permute `frames.frames`, `revit_placements.frames`, `sections.frame_sections` and
+  the `changed` list, as the sibling calcs permute input lists whose kinds allow it (AC5, RV AC28). Keep the map and
+  Revit structure lists in the order their kinds require. Compare the plan fields, including list order, after
+  resolving each reference against its own run's input and replacing it for comparison with its input, row key and
+  field (section name for U1, ETABS frame id or Revit unique id for U5). Check that each reference resolves to the
+  intended field. U1 and U5 pointers use the actual array index (contract §4.6), so raw reference strings and
+  content hashes may differ.
 
 Output `harness.revit_column_update/1`: `new_types` (with the origins of their pairs), `assignments` (`unique_id`,
 `element_id`, `from_type_id`, target type id or new type name, `origin`), `no_change`, `not_updatable`, `expected` (per element its type; per type its role
@@ -416,8 +423,9 @@ references), `complete`.
 
 Input: `plan`, `before` (`harness.revit_structure/1`, `stale_ok`, 0003 §4.13), `after` (current), `basis`
 (`compare.length_mm`). Method (expectation rows in U7): B1 each planned element exists by `unique_id` (`ELEMENT_MISSING`)
-and has its planned type (`TYPE_MISMATCH`); B2 each planned role value resolves and is within `compare.length_mm`
-(`VALUE_MISMATCH`); B3 no other element of the read set changed type between `before` and `after`
+and has its planned type by `type_id` for reuse or by (`family`, `type_name`) for a new type (`TYPE_MISMATCH`).
+B2 on the new type in `after.types` identified by (`family`, `name`), each planned role value resolves and is
+within `compare.length_mm` (`VALUE_MISMATCH`). B3 no other element of the read set changed type between `before` and `after`
 (`UNEXPECTED_TYPE_CHANGE`); B4 an unread role is `not_read`. `status` `PASS` only without issues and with
 `after` at a later revision than `before`.
 
@@ -474,7 +482,7 @@ engine checks.
 | R2 | `ctx.tool("csi_open_model", ...)` (copy), `ctx.tool("csi_read_model_state", ...)`, `ctx.calc("harness.model_fingerprint", ...)`; unequal to `design_record.fingerprint` → `PRECONDITION_FAILED` (`etabs_revision`) |
 | R3 | `ctx.tool("revit_open_model", ...)` (the adapter's `working_copy`, RV AC23); the Revit state reader (RV §4.9) |
 | R4 | `ctx.calc("harness.frame_element_map", {"frames": <selected columns of this read>, ...})`; `ctx.decide("column_revit.map_result", ...)` |
-| R5 | `ctx.calc("harness.revit_column_update", {"changed": <design record changed frames ref>, ...})` |
+| R5 | `ctx.calc("harness.revit_column_update", ...)` with the design record's `changed` reference, the RV §4.8 validated `role_statuses` and the Revit `revit_placements` reference used by R4, as in §4.4.5 |
 | R6 | `ctx.approve(..., Preview(items=<map summary, one item per new type, role set and assignment, each with its origin and issues>, models=[etabs, revit]), kind=CHANGE_SET)` |
 | R7 | per accepted item in the order new types, role sets, assignments: `ctx.tool("revit_duplicate_family_type" | "revit_set_type_parameter_values" | "revit_change_element_type", args, under=approval, item=<id>)`, lengths as references (engine invariant 2); `approve_each_write` previews and the Revit dialog follow |
 | R8 | Revit state read; `ctx.calc("harness.revit_column_readback", ...)`; `ctx.decide("column_revit.readback_result", ...)` |
@@ -619,9 +627,9 @@ EC and engine amendments of §11 (Q3, Q4) are additive.
 | Q12 | `eng-harness` depending on the workspace packages `structural-codes` and `aci318-14` (§4.5): does an internal dependency need a package ADR (rule A10)? | Owner | Yes, one short package ADR, since the split into repositories (ADR-0028) turns it into a real dependency. The lead owns the ADR as a separate documents follow-up (plan §3, amendment B-578; lead decision D-19). |
 | Q13 | **[added]** A code-pack check's `CalcInfo.version` (§4.5): `CalcInfo.version` is an integer of at least 1 and a merged check has only its pack's string version | Owner, lead | Decided as spec 0010 Q20 (draft, B-442; owner queue): `CalcInfo.version` is the check's `CheckMeta.version` (structural-codes core plan T15) |
 | Q14 | **[added]** Whether the ACI 318-14 column demand fields (`MaxAxialInputs.Pu_kN`, `AxialFlexureInputs.Pu_kN`, `Mu_kNm`, `Mu_other_kNm`) should be `ref_capable` and `engineering_quantity` per CF §4.3 (`MaxAxialInputs.Pu_kN` and `AxialFlexureInputs.Mu_kNm` have neither flag; `AxialFlexureInputs.Pu_kN` and `Mu_other_kNm` have `ref_capable` only); non-blocking for v1 (amendment B-578) | Owner | v1 goes ahead with literal demands inside the referenced `harness.column_check_items/1` record; making them `ref_capable` and `engineering_quantity` later requires a structural-codes plan 0004 amendment paired with a follow-up code-pack route task (the kind stays unchanged) |
-| Q15 | U2 needs a family role status. RV §4.8 defines `unmapped` in the role map, while `harness.revit_structure/1` carries role values only (amendment B-610). Can an absent required role be treated as `unmapped`? | Lead, then owner | Provide U2 with the validated family role statuses from RV §4.8 as an explicit input. Keep an unread value distinct from an unmapped role. |
-| Q16 | U5 cites Revit frame placements, but §4.4.5 lists no Revit placement input, and the merged `harness.frame_element_map/1` carries ids and distances without rotation references (amendment B-610). Which Revit reference and tuple order does U5 use? | Lead, then owner | Pass the Revit `model.frame_placements/1` read used by R4 into R5. Use `<ETABS placements>#/frames/<i>/rotation_deg` by `frame_id`, then `<Revit placements>#/frames/<j>/rotation_deg` by `unique_id` (RV §4.5) in `orientation.rotations`. Include Revit `frames` in the U10 permutation test if this input is approved. |
-| Q17 | U4 and RV AC16 scope new type names to a family. The merged read-back expectations identify types by name only, so B1 and B2 need an identity rule when families share a type name (amendment B-610). | Lead, then owner | Use the existing type id for reuse and (family, name) for new types. Confirm how to carry these identities into read-back and amend the kind if needed. |
+| Q15 | How does U2 obtain the family role statuses that `harness.revit_structure/1` does not carry? | Lead, then owner | Decided (owner answer of 2026-11-26; amendment B-610): Pass the validated RV §4.8 family role statuses as an explicit input. An unread value stays distinct from an unmapped role. |
+| Q16 | Which Revit input supplies U5's rotation reference, and in which order are the two references emitted? | Lead, then owner | Decided (owner answer of 2026-11-26; amendment B-610): Pass the Revit `model.frame_placements/1` read used by R4 into R5. In `orientation.rotations`, give the ETABS rotation reference by `frame_id` first and the Revit rotation reference by `unique_id` second. Permute the Revit `frames` in U10. |
+| Q17 | How do B1 and B2 identify types when families share a type name (U4, RV AC16)? | Lead, then owner | Decided (owner answer of 2026-11-26; amendment B-610): Use the existing type id for reuse and (family, name) for new types in the read-back expectations. |
 | C1 | Clause specs name `materials.concrete_fc` and `materials.rebar_fy`; spec 0004 AC21 requires a quantity field's unit to match its path suffix, and spec 0004 §4.2 shows paths such as `materials.concrete.<grade>.fc_MPa` (blocked by its Q1) | Owner | Done by amendment B-484 (owner decision OQ-Q44): Table A names `materials.concrete_fc_MPa` and `materials.rebar_fy_MPa` |
 | C2 | CF §1 and engine §4.8 say code packs run through the CalcPort, but no merged harness spec defines that route | Owner | Settled by amendment B-405 (draft; the owner approves): engine §4.8 and calcs §4.12 item 4 name the one route; §4.5 here and spec 0010 §4.3 describe it; an id outside the allowlist is `NOT_FOUND` (spec 0010 C3, C4) |
 | C3 | CK Q1 says B-083 passes "frames of kind `column`", but the CSI reader gives `kind: other` (spec 0002 H-G5) | Owner | Columns are the `harness.column_select` result (§4.4.1); amend CK Q1's text |

@@ -261,6 +261,8 @@ tasks:
       - "packages/eng-harness/src/eng_harness/calcs/column_design/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/column_design/revit_update.py"
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
+      - "packages/eng-harness/src/eng_harness/kinds/column_design.py"  # RevitColumnUpdate expected element and type identities only (amendment B-610)
+      - "packages/eng-harness/tests/data/kinds/column_design/revit_column_update*.json"  # valid/invalid fixtures for RevitColumnUpdate expectations (amendment B-610)
       - "packages/eng-harness/tests/golden/column_design/test_golden.py"
       - "packages/eng-harness/tests/data/golden/column_design/revit-update-*.json"
       - "packages/eng-harness/tests/property/test_revit_column_update.py"
@@ -568,16 +570,14 @@ Run `test_production_refused` and `test_only_listed_checks` with the column ids.
 and structural-codes core plan T15 (`CheckMeta.version`, B-442, already merged).
 
 **T7 `harness.revit_column_update`** (spec §4.4.5). Targets by shape as references to ETABS `model.sections/1` fields,
-role statuses, `no_change`, reuse of an equal type, one new type per family and ETABS section, name clashes, the
-orientation-unverified issue with both rotations, the `origin` of each assignment from the design record's
-changed frames, and the expected effects for the read-back.
-
-Amendment B-610. T7 waits for spec Q15 (role-status input), Q16 (Revit rotation input and reference order) and Q17
-(read-back type identity) before implementation. Prepare the AC11 cases from U1, U3, U4 and U6 to U10 where they
-do not depend on those decisions. The full golden cases and permutation test wait for the resolved contracts.
+`no_change`, reuse of an equal type, one new type per family and ETABS section, name clashes, and the `origin` of
+each assignment from the design record's changed frames. Amendment B-610 adds explicit validated `role_statuses`
+and `revit_placements` inputs, the U5 rotation reference order, the U10 Revit placements permutation, and the U7
+read-back identity fields in `harness.revit_column_update/1`.
 
 **T8 `harness.revit_column_readback`** (spec §4.4.6). Type and value checks per planned element and type, unplanned
-type changes, missing elements, `not_read`, `stale_ok` on `before` only.
+type changes, missing elements, `not_read`, `stale_ok` on `before` only. B1 and B2 use the identity fields supplied by
+T7 (amendment B-610).
 
 **T9 Points and rules** (spec §4.8). The four points with their state models, the rules `cm.no_proposal` (only
 for `PASS` columns), `cm.fail_matched`, `map.clean`, `rr.pass`, policy without the model and language-model tiers, lock entries.
