@@ -1,7 +1,5 @@
 """Copy selected rows from two same-kind footing records (spec 0010 §4.4.7)."""
 
-import json
-
 from eng_contract.cited import Cited
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.params import eng_param
@@ -87,7 +85,7 @@ def _select_rows[Row: DimRow | StatusRow | Subject](
     trace.input("ids", list(ids))
     trace.step(
         "selected_rows",
-        json.dumps({footing_id: "extra" if footing_id in extra_rows else "base" for footing_id in selected}),
+        "; ".join(f"{footing_id}={'extra' if footing_id in extra_rows else 'base'}" for footing_id in selected),
         formula="Keep requested ids in sorted order, using extra where present and base otherwise",
         source=_METHOD,
         uses=("base", "extra", "ids"),
