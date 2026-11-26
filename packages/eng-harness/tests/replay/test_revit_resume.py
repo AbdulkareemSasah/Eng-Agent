@@ -28,7 +28,7 @@ from eng_harness.block import Registry
 from eng_harness.engine import Engine, EnginePorts, EngineSettings, PermissionMode, RunRequest, RunStatus
 from eng_harness.journal import JournalReader
 from eng_harness.journal import _events as ev
-from eng_harness.ports import ApprovalAnswer, ApprovalRequest, RunClass
+from eng_harness.ports import ApprovalAnswer, ApprovalRequest, HostLease, RunClass
 from eng_harness.servers import ServersConfig
 
 _CRASHED = 71
@@ -59,8 +59,20 @@ async def _run(
     host_port = ports.host_port
     assert isinstance(tool_port, _RevitRunToolPort)
     assert isinstance(host_port, _RevitRunHostPort)
+    acquire = host_port.acquire
     reconcile = tool_port.reconcile
     inputs = FakeInputPort()
+
+    async def acquire_with_working_copy(host_key: str) -> HostLease:
+        lease = await acquire(host_key)
+        try:
+            # In approve_each_write, the fixture supplies the working copy once the run exists and owns the host.
+            assert run_dir.is_dir()
+            assert await host_port.working_copy("m", run_dir / "copies") == "m@copy"
+        except BaseException:
+            await host_port.release(lease)
+            raise
+        return lease
 
     async def reconcile_and_check(tool: str, args: Any, op_id: str) -> Any:
         entry = tool_port._revit_ledger.find(op_id)
@@ -96,6 +108,8 @@ async def _run(
     patch.setattr(ports.servers, "call", dispatch)
     patch.setattr(ports.tool_port, "call", call_then_cut)
     patch.setattr(tool_port, "reconcile", reconcile_and_check)
+    if cut is not None:
+        patch.setattr(host_port, "acquire", acquire_with_working_copy)
     engine = Engine(
         workspace, Registry([chain(steps)]),
         EnginePorts(ports.tool_port, ports.host_port, FakeCalcPort(RunClass.TRIAL, []),
@@ -105,7 +119,8 @@ async def _run(
     try:
         async with ports:
             if cut is not None:
-                result = await engine.start(request)  # the engine takes the working copy inside the run (spec 0001 4.7)
+                assert not run_dir.exists()
+                result = await engine.start(request)
                 raise AssertionError(f"engine stopped before the cut at {cut}: {result}")
             result = await engine.resume(request.run_id)
     except BaseException:
@@ -143,11 +158,11 @@ def test_crash_matrix(tmp_path: Path, fault: str, applied: bool, cut: str, outco
     assert isinstance(header, ev.RunHeader)
     structure = rig.put_structure()
     duplicate: dict[str, Any] = {
-        "model": "m",
+        "model": "m@copy",
         "source_type_id": {"$ref": f"{structure}#/types/0/type_id"},
         "new_type_name": "Replay type",
     }
-    steps = [(_SET, rig.set_args("m", structure, rig.put_sections())), (_DUPLICATE, duplicate)]
+    steps = [(_SET, rig.set_args("m@copy", structure, rig.put_sections())), (_DUPLICATE, duplicate)]
     request = RunRequest(
         workflow="chain", input={}, basis_ref=header.basis_ref, mode=PermissionMode.APPROVE_EACH_WRITE,
         run_class=RunClass.TRIAL, run_id=f"run_{rig.ids.new_ulid()}",
