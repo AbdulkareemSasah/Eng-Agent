@@ -1,0 +1,454 @@
+{
+  "$defs": {
+    "Answered": {
+      "additionalProperties": false,
+      "description": "The release and commit that answered the need (spec 0015 4.3.1).",
+      "properties": {
+        "at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(agent:.+|harness|dev-session:.+)$",
+          "title": "By",
+          "type": "string"
+        },
+        "commit": {
+          "pattern": "^[0-9a-f]{40}$",
+          "title": "Commit",
+          "type": "string"
+        },
+        "kind": {
+          "const": "answered",
+          "title": "Kind",
+          "type": "string"
+        },
+        "need_id": {
+          "title": "Need Id",
+          "type": "string"
+        },
+        "prev_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prev Sha256",
+          "type": "string"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "release": {
+          "pattern": "^.+==.+$",
+          "title": "Release",
+          "type": "string"
+        },
+        "schema": {
+          "const": "harness.tasklog_triage/1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schema",
+        "need_id",
+        "seq",
+        "at",
+        "by",
+        "redactions",
+        "prev_sha256",
+        "kind",
+        "release",
+        "commit"
+      ],
+      "title": "Answered",
+      "type": "object"
+    },
+    "PublicReleased": {
+      "additionalProperties": false,
+      "description": "The owner's release of the exact `public_en` its hash names (spec 0015 4.3.1).",
+      "properties": {
+        "at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(agent:.+|harness|dev-session:.+)$",
+          "title": "By",
+          "type": "string"
+        },
+        "kind": {
+          "const": "public_released",
+          "title": "Kind",
+          "type": "string"
+        },
+        "need_id": {
+          "title": "Need Id",
+          "type": "string"
+        },
+        "prev_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prev Sha256",
+          "type": "string"
+        },
+        "public_en_released": {
+          "const": "owner",
+          "title": "Public En Released",
+          "type": "string"
+        },
+        "public_en_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Public En Sha256",
+          "type": "string"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "released_on": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "title": "Released On",
+          "type": "string"
+        },
+        "reply_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Reply Sha256",
+          "type": "string"
+        },
+        "schema": {
+          "const": "harness.tasklog_triage/1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schema",
+        "need_id",
+        "seq",
+        "at",
+        "by",
+        "redactions",
+        "prev_sha256",
+        "kind",
+        "public_en_sha256",
+        "public_en_released",
+        "released_on",
+        "reply_sha256"
+      ],
+      "title": "PublicReleased",
+      "type": "object"
+    },
+    "Redaction": {
+      "additionalProperties": false,
+      "description": "One withheld span: the field, the guard rule, the offsets and the span hash (spec 0015 4.3).",
+      "properties": {
+        "end": {
+          "minimum": 0,
+          "title": "End",
+          "type": "integer"
+        },
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "rule": {
+          "title": "Rule",
+          "type": "string"
+        },
+        "span_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Span Sha256",
+          "type": "string"
+        },
+        "start": {
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "field",
+        "rule",
+        "start",
+        "end",
+        "span_sha256"
+      ],
+      "title": "Redaction",
+      "type": "object"
+    },
+    "TriageWithheldAfter": {
+      "additionalProperties": false,
+      "description": "A span withheld in a triage line after the push (spec 0015 4.3.1, 4.4).",
+      "properties": {
+        "at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(agent:.+|harness|dev-session:.+)$",
+          "title": "By",
+          "type": "string"
+        },
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "kind": {
+          "const": "withheld_after",
+          "title": "Kind",
+          "type": "string"
+        },
+        "line_sha256_before": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Line Sha256 Before",
+          "type": "string"
+        },
+        "need_id": {
+          "title": "Need Id",
+          "type": "string"
+        },
+        "prev_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prev Sha256",
+          "type": "string"
+        },
+        "reason_en": {
+          "title": "Reason En",
+          "type": "string"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "rule": {
+          "title": "Rule",
+          "type": "string"
+        },
+        "schema": {
+          "const": "harness.tasklog_triage/1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "span_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Span Sha256",
+          "type": "string"
+        },
+        "target_seq": {
+          "minimum": 1,
+          "title": "Target Seq",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "schema",
+        "need_id",
+        "seq",
+        "at",
+        "by",
+        "redactions",
+        "prev_sha256",
+        "kind",
+        "target_seq",
+        "field",
+        "rule",
+        "span_sha256",
+        "line_sha256_before",
+        "reason_en"
+      ],
+      "title": "TriageWithheldAfter",
+      "type": "object"
+    },
+    "Triaged": {
+      "additionalProperties": false,
+      "description": "The triage of a need; `duplicate_of` is set exactly for `duplicate` (spec 0015 4.3.1).",
+      "properties": {
+        "at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "pattern": "^(agent:.+|harness|dev-session:.+)$",
+          "title": "By",
+          "type": "string"
+        },
+        "duplicate_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duplicate Of"
+        },
+        "issue": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Issue"
+        },
+        "kind": {
+          "const": "triaged",
+          "title": "Kind",
+          "type": "string"
+        },
+        "need_id": {
+          "title": "Need Id",
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "new_spec",
+            "covered",
+            "host_limitation",
+            "out_of_scope",
+            "duplicate",
+            "defect"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "plan": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Plan"
+        },
+        "prev_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prev Sha256",
+          "type": "string"
+        },
+        "public_en": {
+          "title": "Public En",
+          "type": "string"
+        },
+        "public_en_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Public En Sha256",
+          "type": "string"
+        },
+        "redactions": {
+          "items": {
+            "$ref": "#/$defs/Redaction"
+          },
+          "title": "Redactions",
+          "type": "array"
+        },
+        "schema": {
+          "const": "harness.tasklog_triage/1",
+          "title": "Schema",
+          "type": "string"
+        },
+        "seq": {
+          "minimum": 1,
+          "title": "Seq",
+          "type": "integer"
+        },
+        "spec": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Spec"
+        },
+        "work_item": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Work Item"
+        }
+      },
+      "required": [
+        "schema",
+        "need_id",
+        "seq",
+        "at",
+        "by",
+        "redactions",
+        "prev_sha256",
+        "kind",
+        "outcome",
+        "public_en",
+        "public_en_sha256"
+      ],
+      "title": "Triaged",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "answered": "#/$defs/Answered",
+      "public_released": "#/$defs/PublicReleased",
+      "triaged": "#/$defs/Triaged",
+      "withheld_after": "#/$defs/TriageWithheldAfter"
+    },
+    "propertyName": "kind"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Triaged"
+    },
+    {
+      "$ref": "#/$defs/PublicReleased"
+    },
+    {
+      "$ref": "#/$defs/Answered"
+    },
+    {
+      "$ref": "#/$defs/TriageWithheldAfter"
+    }
+  ]
+}
