@@ -331,3 +331,15 @@ def test_release_binds_text_hash() -> None:
     unnamed = {key: value for key, value in released.items() if key != "public_en_sha256"}
     with pytest.raises(ValidationError):
         _TRIAGE.validate_python(unnamed)
+
+
+@pytest.mark.parametrize(
+    ("model", "snapshot"),
+    [pytest.param(TaskRecord, "record-1.json", id="record"), pytest.param(TriageLine, "triage-1.json", id="triage")],
+)
+def test_schema_snapshot_pins_the_models(model: Any, snapshot: str) -> None:
+    """Spec 0015 section 4.3: the committed schema snapshot is pinned against the model's JSON schema."""
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "data" / "snapshots" / "tasklog" / snapshot
+    assert json.loads(path.read_text(encoding="utf-8")) == TypeAdapter(model).json_schema()
