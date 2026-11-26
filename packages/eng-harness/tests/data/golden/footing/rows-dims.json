@@ -1,0 +1,20 @@
+{
+  "source": "Spec 0010 §4.4.7; rows from the synthetic dims kind fixture and layout-x-bottom-top inputs",
+  "method_ref": "§4.4.7 K1 K2",
+  "synthetic": true,
+  "derivation": "First keep J1 from extra (also present in base) and J2 from base (absent from extra). Next keep J1 from that first result and replace J2 with the later row. List J1 then J2, unchanged, despite the reverse request order.",
+  "input": {
+    "base": {"footings": [
+      {"id":"J1","Lx_mm":2000.0,"Ly_mm":2000.0,"h_mm":500.0,"s_mm":200.0,"source":"calc","plan_at_max":false,"depth_at_max":false,"spacing_at_min":false,"status":"OK","reason":null},
+      {"id":"J2","Lx_mm":2500.0,"Ly_mm":2500.0,"h_mm":500.0,"s_mm":200.0,"source":"calc","plan_at_max":false,"depth_at_max":false,"spacing_at_min":false,"status":"OK","reason":null}
+    ]},
+    "extra": {"footings": [{"id":"J1","Lx_mm":2166.0,"Ly_mm":2566.0,"h_mm":500.0,"s_mm":200.0,"source":"calc","plan_at_max":false,"depth_at_max":false,"spacing_at_min":false,"status":"OK","reason":null}]},
+    "ids": ["J2", "J1"],
+    "later": {"footings": [{"id":"J2","Lx_mm":1966.0,"Ly_mm":1766.0,"h_mm":400.0,"s_mm":250.0,"source":"calc","plan_at_max":true,"depth_at_max":false,"spacing_at_min":false,"status":"LIMIT_REACHED","reason":null}]},
+    "later_ids": ["J2", "J1"]
+  },
+  "expected": {"footings": [
+    {"id":"J1","Lx_mm":2166.0,"Ly_mm":2566.0,"h_mm":500.0,"s_mm":200.0,"source":"calc","plan_at_max":false,"depth_at_max":false,"spacing_at_min":false,"status":"OK","reason":null},
+    {"id":"J2","Lx_mm":1966.0,"Ly_mm":1766.0,"h_mm":400.0,"s_mm":250.0,"source":"calc","plan_at_max":true,"depth_at_max":false,"spacing_at_min":false,"status":"LIMIT_REACHED","reason":null}
+  ]}
+}

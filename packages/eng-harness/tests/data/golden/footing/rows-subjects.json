@@ -1,0 +1,20 @@
+{
+  "source": "Spec 0010 §4.4.7; synthetic subjects kind fixture and subjects-excluded golden",
+  "method_ref": "§4.4.7 K1 K2",
+  "synthetic": true,
+  "derivation": "Keep J1 from base and J20 from extra, in that order. Drop unrequested J2. Keep base's excluded J3 unchanged and omit extra's excluded J10.",
+  "input": {
+    "base": {"subjects": [
+      {"id":"J1","joint":"J1","column":"C1","x_mm":0.0,"y_mm":0.0,"cx_mm":400.0,"cy_mm":400.0},
+      {"id":"J2","joint":"J2","column":"C2","x_mm":6000.0,"y_mm":0.0,"cx_mm":400.0,"cy_mm":500.0}
+    ], "excluded": [{"joint":"J3","column":null,"reason":"NO_COLUMN_AT_JOINT"}]},
+    "extra": {"subjects": [
+      {"id":"J20","joint":"J20","column":"C20","x_mm":20000.0,"y_mm":5000.0,"cx_mm":300.0,"cy_mm":500.0}
+    ], "excluded": [{"joint":"J10","column":null,"reason":"NO_COLUMN_AT_JOINT"}]},
+    "ids": ["J20", "J1"]
+  },
+  "expected": {"subjects": [
+    {"id":"J1","joint":"J1","column":"C1","x_mm":0.0,"y_mm":0.0,"cx_mm":400.0,"cy_mm":400.0},
+    {"id":"J20","joint":"J20","column":"C20","x_mm":20000.0,"y_mm":5000.0,"cx_mm":300.0,"cy_mm":500.0}
+  ], "excluded": [{"joint":"J3","column":null,"reason":"NO_COLUMN_AT_JOINT"}]}
+}
