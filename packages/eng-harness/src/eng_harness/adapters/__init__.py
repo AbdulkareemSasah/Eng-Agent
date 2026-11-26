@@ -174,25 +174,32 @@ def build_ports(
     """
     from dataclasses import replace as _replace
 
+    from eng_harness.adapters.idea import idea_allowlist
+    from eng_harness.adapters.idea._toolport import IdeaRunHostPort, IdeaToolPort
     from eng_harness.adapters.revit import revit_allowlist
+    from eng_harness.kinds.idea import IDEA_KINDS
 
-    loaders = {"sasaah-csi-mcp": csi_allowlist, **(allowlists or {})}
+    idea_adapter = "sasaah-idea-mcp"
+    loaders: dict[str, Callable[[str | None], Allowlist]] = {
+        "sasaah-csi-mcp": csi_allowlist,
+        idea_adapter: idea_allowlist,
+        **(allowlists or {}),
+        "sasaah-revit-mcp": lambda _route: revit_allowlist(),
+    }
     loaded: dict[str, Allowlist] = {}
     for name, section in config.servers.items():
-        if section.adapter == "sasaah-revit-mcp":
-            loaded[name] = revit_allowlist()
-            continue
         if section.adapter not in loaders:
             raise ConfigError(f"servers.{name}.adapter", "this adapter is not implemented")
-        loaded[name] = loaders[section.adapter](section.route).for_product(section.product)  # spec 0008 4.1
+        allowlist = loaders[section.adapter](section.route)
+        loaded[name] = allowlist if section.adapter == "sasaah-revit-mcp" else allowlist.for_product(section.product)
     if len(config.servers) != 1:
         raise ConfigError("servers", "CSI port wiring requires one server section")
     name, section = next(iter(config.servers.items()))
-    if section.adapter not in ("sasaah-csi-mcp", "sasaah-revit-mcp"):
+    if section.adapter not in ("sasaah-csi-mcp", "sasaah-revit-mcp", idea_adapter):
         raise ConfigError(f"servers.{name}.adapter", "this adapter is not implemented")
     is_revit = section.adapter == "sasaah-revit-mcp"
     product = section.product  # the server's product profile (spec 0002 4.6, spec 0008 4.1)
-    program = None if is_revit else config.host_program(product)
+    program = None if is_revit or section.adapter == idea_adapter else config.host_program(product)
     inspector = inspector if inspector is not None else platform_inspector()
     launcher = launcher if launcher is not None else platform_launcher(inspector)
     cli = _cli_port(config, workspace, run_dir, clock, ids, launcher, inspector)
@@ -245,6 +252,40 @@ def build_ports(
         reason="unchecked",
     )
     states = ModelStateStore(workspace, clock)
+    if section.adapter == idea_adapter:
+        if cli is not None:
+            raise ConfigError("cli_tools", "IDEA port wiring does not serve command-line tools")
+        if section.route is None:
+            raise ConfigError(f"servers.{name}.route", "IDEA port wiring requires a route")
+        idea_store = ResultStore(workspace, HARNESS_KINDS.extend(IDEA_KINDS), ids, clock)
+        idea_host = IdeaRunHostPort(
+            identity=IdentityStore(workspace=workspace, states=states, ids=ids),
+            sessions=servers,
+            locks=locks,
+            clock=clock,
+            ids=ids,
+            run_dir=run_dir,
+            files=files or {},
+            store=idea_store,
+            server=name,
+            host_key=section.host_key,
+            route=section.route,
+            service_url=section.service_url,
+        )
+        tool_port = IdeaToolPort(
+            config=config,
+            allowlist=loaded[name],
+            server=name,
+            caller=servers,
+            host=idea_host,
+            states=states,
+            store=idea_store,
+            run_dir=run_dir,
+            clock=clock,
+            ids=ids,
+            check=check,
+        )
+        return AdapterPorts(tool_port, idea_host, servers)
     if is_revit:
         # Revit dispatch, after the IDEA dispatch (amendment B-611); B-617 references and Q10/Q11 evidence.
         if section.pipe_name is None:
