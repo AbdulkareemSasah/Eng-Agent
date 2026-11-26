@@ -234,7 +234,13 @@ class Guard:
         args: _Obj = {"model": model, "role": "pre_analysis"}
         recorded = ctx._look(path, "read", "save", args)
         if recorded is not None and (done := ctx._replayed(recorded)) is not None:
-            saved = SavedModel.model_validate(self._store.payload(done.ref)["value"])
+            try:  # the store may no longer hold the result: replay as before, without the revision (as note_stored)
+                payload = self._store.payload(done.ref)
+            except ContractError as exc:
+                if exc.detail.code is not ErrorCode.REF_NOT_FOUND:
+                    raise
+                return
+            saved = SavedModel.model_validate(payload["value"])
             self._revision[saved.model_id] = saved.revision
             return
         began = ctx._begin(path, 1, "read", "save", args, effect="read", model_key=model)
