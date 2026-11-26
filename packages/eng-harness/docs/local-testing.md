@@ -97,3 +97,29 @@ Plan 0012 (SAP2000 adapter; listed by T7, spec §12). Nothing here runs in CI. O
 54. L7. `csi_design_run` for steel and concrete and the shape of `csi_design_results` for steel and concrete columns (AC16, SP-3).
 55. L8. `csi_frame_details` and `csi_export_joint` on the COM path (the evidence is for bridge targets), `csi_add_frame_by_coord` naming, section requirement and units, `csi_set_point_load` semantics (AC11, SP-5).
 56. L9. Record mode on a SAP2000 copy: record-mode scenario, owner review and commit of recordings, and subsequent contract-test verification against the real server (AC19; amendment B-573).
+
+## IDEA StatiCa (plan 0014 T9, spec 0014 §12, spike S-08)
+
+Run these checks in an attended owner session on an anonymized `.ideaCon` copy. Use a separate
+`[servers.idea]` configuration for each route. For REST, start the IDEA Connection service before testing.
+Run `uv run --package eng-harness eng-harness doctor` and keep its output with the session evidence.
+
+- **L1.** Compare the live `tools/list` fingerprint to the pinned allowlist. Record `idea_status` for each installed version, including `has_rest_api`, hidden calculator availability, `service_version`, `read_only`, `script_enabled`, and the routes available.
+- **L2.** Write an owner-supplied reference load with `idea_native_set_loads` to a new output file. Read it back and compare the same effect in IDEA's interface. Compare with an attended `idea_set_loads` session and IOM export to establish the in-memory tool's units (IG-1).
+- **L3.** Capture native load and calculation replies, including checks, errors, warnings, digest, effect and segment fields, and `forcesPercentageOnSegments`. Verify what `position` and `beamSegmentId` identify.
+- **L4.** Change a load in memory and calculate on each applicable route. Compare with the result from the native file-write route to see whether the in-memory edit reached the calculation (IG-3).
+- **L5.** Use a calculation known to exceed the configured `call_timeout_s`. Observe whether REST work continues, what the next call sees, and whether the native calculator process is cleaned up. For a timed-out native load write, check whether the destination exists and read it back if present.
+- **L6.** Compare `check_value` with `check_status` and `skipped`. Capture zero or absent values with a true status, results across cases, and limits other than 100 percent (Q12).
+- **L7.** For the REST service and hidden calculator, observe what happens with no license seat. Record exact error text, elapsed time, and whether the call hangs.
+- **L8.** Stop the service and separately exercise failed live project creation. Capture the exact offline-stub markers.
+- **L9.** Use the owner's reference joint and hand-verifiable load to confirm each mapped component, sign, and member end. Commit the confirmed map and its reference case through review (Q11).
+- **L10.** Check whether REST keeps the uploaded file open and whether it must be closed in IDEA before file-copy promotion.
+- **L11.** Repeatedly open and close the same copy in one server process. Record any changed behavior or stale project state.
+
+From `packages/eng-harness`, record each route with
+`uv run python acceptance/scripts/record_idea.py --config <route-config> --model <copy.ideaCon> --connection <name-or-id>`.
+Use the connection name for native or the numeric connection ID for REST. Add `--calculate` for check results
+and, on native only, `--apply-loads <owner-prepared-loads.json>` for a load write and read-back.
+The recorder stages its own copy and writes the name mapping in its private run directory. Review each exchange
+for client, project, and person identifiers before committing the recordings. Then run
+`uv run pytest tests/contract/test_idea_recordings.py -m recorded`.

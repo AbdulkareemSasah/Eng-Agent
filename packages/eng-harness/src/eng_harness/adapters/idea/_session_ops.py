@@ -12,22 +12,27 @@ Units: none for paths; `read_units` returns the fixed declaration of section 4.6
 from __future__ import annotations
 
 import hashlib
+import os
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from eng_contract.envelope import Envelope, HostInfo, Provenance, make_success
 from eng_contract.errors import ContractError, ErrorCode, Precondition
-from eng_contract.ids import Clock, IdSource, Timestamp
+from eng_contract.ids import Clock, IdSource, ModelId, Timestamp
 from eng_contract.issues import CheckModelSummary, ModelIssue, Severity
 from eng_contract.kinds.issues import ModelCheck
 from eng_contract.refs import RecordSource
 from eng_contract.store import ResultStore
+from pydantic import BaseModel, ConfigDict, TypeAdapter
 
 from eng_harness.adapters._identity import IdentityStore
 from eng_harness.adapters.idea._replies import parse_status
+from eng_harness.journal import JournalReader
+from eng_harness.journal import _events as ev
 from eng_harness.kinds.idea import IdeaStatus
 from eng_harness.ports import HostInstance, HostLease, HostModelState, SavedModel, ServerCheck, UnitsState
 from eng_harness.servers import CallEffect, ServerManager
@@ -57,6 +62,18 @@ class _LoadsIntegrity:
 _PROGRAM = "idea"
 _IDEA_CON = ".ideaCon"
 _UNITS = "N,N.m"  # fixed declaration of spec 0014 section 4.6; IDEA has no unit state to restore
+
+
+class _FileBinding(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    file: Path
+    model_id: ModelId
+    instance: HostInstance
+    file_sha256: str
+
+
+_BINDINGS = TypeAdapter(dict[str, _FileBinding])
 
 
 def require_inside_run(path: Path, run_dir: Path) -> Path:
@@ -158,6 +175,52 @@ class IdeaHostPort:
         self._instances: dict[str, HostInstance] = {}
         self._hashes: dict[str, str] = {}  # journaled file sha256 per model key
         self._loads_integrity: dict[str, _LoadsIntegrity] = {}
+        self._binding_path = self._run_dir / "adapter" / "state.json"
+        self._load_bindings()
+
+    def _load_bindings(self) -> None:
+        """Load the run-local binding and the saved hash before any model lookup (spec 0014 Q14)."""
+        if not self._binding_path.is_file():
+            return
+        bindings = _BINDINGS.validate_json(self._binding_path.read_bytes())
+        if (self._run_dir / "journal.sqlite").is_file():
+            with closing(JournalReader(self._run_dir)) as reader:
+                for event in reader.events():
+                    payload = event.payload
+                    if isinstance(payload, ev.ModelBound) and (binding := bindings.get(payload.model_key)):
+                        instance = binding.instance.model_copy(update={"instance_id": payload.instance_id})
+                        bindings[payload.model_key] = binding.model_copy(update={"instance": instance})
+                    if (
+                        isinstance(payload, ev.ModelSaved)
+                        and (binding := bindings.get(payload.model_key))
+                        and payload.file_name == binding.file.name
+                    ):
+                        bindings[payload.model_key] = binding.model_copy(
+                            update={"model_id": payload.model_id, "file_sha256": payload.file_sha256}
+                        )
+        for key, binding in bindings.items():
+            self._files[key] = require_inside_run(self._run_dir / binding.file, self._run_dir)
+            self._models[key], self._hashes[key] = binding.model_id, binding.file_sha256
+            self._bound[key] = binding.instance.instance_id
+            self._instances[binding.instance.instance_id] = binding.instance
+
+    def _persist_bindings(self) -> None:
+        self._binding_path.parent.mkdir(parents=True, exist_ok=True)
+        bindings = {
+            key: _FileBinding(
+                file=self._files[key].relative_to(self._run_dir),
+                model_id=self._models[key],
+                instance=self._instances[instance_id],
+                file_sha256=self._hashes[key],
+            )
+            for key, instance_id in self._bound.items()
+        }
+        temporary = self._binding_path.with_suffix(".tmp")
+        with temporary.open("wb") as handle:
+            handle.write(_BINDINGS.dump_json(bindings))
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, self._binding_path)
 
     @property
     def identity_store(self) -> IdentityStore:
@@ -190,6 +253,7 @@ class IdeaHostPort:
         instance = self._bind_file(copy_key, dest, resolved.model_id)
         self._hashes[copy_key] = _file_sha256(dest)
         self._instances[instance.instance_id] = instance
+        self._persist_bindings()
         return copy_key
 
     async def ensure_route_ready(self, model_key: str) -> None:
@@ -259,10 +323,10 @@ class IdeaHostPort:
         if model_id is None or model_key not in self._bound:
             raise ContractError(ErrorCode.PRECONDITION_FAILED, "not open", precondition=Precondition.model_open)
         digest = _file_sha256(resolved)
-        state = self._identity.record_save(model_id, resolved, fingerprint=digest)
-        instance = self._bind_file(model_key, resolved, state.model_id)
+        self._identity.record_save(model_id, resolved, fingerprint=digest)
+        self._files[model_key] = resolved
         self._hashes[model_key] = digest
-        self._instances[instance.instance_id] = instance
+        self._persist_bindings()
 
     async def set_loads(
         self,
@@ -393,6 +457,7 @@ class IdeaHostPort:
         recorded = state.file_sha256
         if recorded is None:
             raise ContractError(ErrorCode.INTERNAL, "the save recorded no file hash", incident_id=self._ids.new_ulid())
+        self._persist_bindings()
         return SavedModel(
             model_id=state.model_id,
             revision=state.revision,
@@ -412,6 +477,7 @@ class IdeaHostPort:
         instance = self._bind_file(model_key, path, saved.model_id)
         self._hashes[model_key] = saved.file_sha256
         self._instances[instance.instance_id] = instance
+        self._persist_bindings()
         return instance
 
     async def read_units(self, model_key: str, instance_id: str) -> UnitsState:
