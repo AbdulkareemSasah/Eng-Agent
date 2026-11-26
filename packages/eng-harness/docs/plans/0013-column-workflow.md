@@ -572,6 +572,10 @@ role statuses, `no_change`, reuse of an equal type, one new type per family and 
 orientation-unverified issue with both rotations, the `origin` of each assignment from the design record's
 changed frames, and the expected effects for the read-back.
 
+Amendment B-610. T7 waits for spec Q15 (role-status input), Q16 (Revit rotation input and reference order) and Q17
+(read-back type identity) before implementation. Prepare the AC11 cases from U1, U3, U4 and U6 to U10 where they
+do not depend on those decisions. The full golden cases and permutation test wait for the resolved contracts.
+
 **T8 `harness.revit_column_readback`** (spec §4.4.6). Type and value checks per planned element and type, unplanned
 type changes, missing elements, `not_read`, `stale_ok` on `before` only.
 
