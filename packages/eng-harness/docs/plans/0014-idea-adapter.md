@@ -239,7 +239,7 @@ tasks:
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.doctor (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
-      - "packages/eng-harness/src/eng_harness/doctor/_idea.py"
+      - "packages/eng-harness/src/eng_harness/doctor.py"  # only the IDEA checks (status, route prerequisites, pinned build facts, read-timeout warning); the doctor is one module, as plan 0011 T14 uses it (amendment B-622)
       - "packages/eng-harness/src/eng_harness/adapters/idea/_session_ops.py"  # only persistence and restoration of IDEA bindings and file hashes (amendment B-612, Q14)
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/acceptance/scripts/record_idea.py"
