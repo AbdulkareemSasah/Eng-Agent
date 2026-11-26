@@ -37,5 +37,13 @@ def test_per_call_timeout_overrides_the_bound_of_the_runner(tmp_path: Path) -> N
     assert isinstance(caught.value, EnvironmentFaultError)
 
 
+def test_default_bound_is_the_mutation_bound() -> None:
+    """T42 (amendment B-619): one tool call is bounded by the workspace mutation bound, not the former 900 s."""
+    from eng_dev_gate.config.gate_config import load_gate_config
+
+    workspace = Path(__file__).resolve().parents[4]
+    assert toolrun.TOOL_TIMEOUT_SECONDS == load_gate_config(workspace).limits.mutation_run_seconds
+
+
 def test_python_module_uses_current_interpreter() -> None:
     assert python_module("ruff", "check") == [sys.executable, "-m", "ruff", "check"]
