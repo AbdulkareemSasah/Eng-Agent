@@ -219,9 +219,12 @@ decision D-5), a real process over stdio; "fake-host workflow test" runs the rea
   `tests/workflow/test_idea_cycle.py::test_native_cycle_steps`, `::test_rest_cycle_steps`,
   `tests/replay/test_idea_resume.py::test_crash_matrix`.
 - AC21. Given IDEA recordings, the adapter's contract tests pass on them and the synthetic fake gives the same reply shapes
-  and error codes for every recorded operation; the fake's tool schemas equal the S-12 inventory. Tests:
-  `tests/contract/test_idea_recordings.py::test_adapter_on_recordings`, `::test_synthetic_matches_recordings` (skip with
-  reason when none exists), `tests/contract/test_idea_allowlist.py::test_fake_schemas_match_inventory`,
+  and error codes for every recorded operation; the fake's tool schemas equal the S-12 inventory. The tests run on every
+  applicable committed recording under `acceptance/recordings` and on the synthetic recording produced by record mode
+  for this adapter; the real server is verified only once the owner commits a recording (spec §12; amendment B-624, as
+  B-573 for SAP2000). Tests:
+  `tests/contract/test_idea_recordings.py::test_adapter_on_recordings`, `::test_synthetic_matches_recordings`,
+  `tests/contract/test_idea_allowlist.py::test_fake_schemas_match_inventory`,
   `tests/unit/test_package_contents.py::test_idea_fake_not_shipped`.
 - AC22. Given `eng-harness doctor`, then it prints the pinned build facts, `idea_status` (installed versions, service
   state, `read_only`, `script_enabled`), the route's prerequisites, the Sasaah default timeout (120 s) for comparison, and
