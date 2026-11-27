@@ -1,4 +1,4 @@
-"""Spec 0009 AC14 and AC23–AC26 over the pinned SDK and a synthetic transport."""
+"""Spec 0009 AC14 and AC23 to AC26 over the pinned SDK and a synthetic transport."""
 
 import asyncio
 import json
@@ -43,7 +43,7 @@ def _store() -> FakeCredentialStore:
         None,
         {"choice": "other", "rationale": "Needs depth."},
         {"choice": "deepen", "rationale": "Value 1"},
-        {"choice": "deepen", "rationale": "Value ١"},
+        {"choice": "deepen", "rationale": "Value \u0661"},
         {"choice": "deepen", "rationale": ""},
         {"choice": "deepen", "rationale": "x" * 301},
         {"choice": "deepen", "rationale": "Needs depth.", "extra": True},
