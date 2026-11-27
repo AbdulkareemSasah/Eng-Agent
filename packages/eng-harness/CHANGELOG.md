@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Calc `harness.revit_column_readback` v1 (draft) verifies planned Revit type identities and ETABS-referenced role lengths, reports unread roles and unplanned type changes per element, and requires a later Revit revision for PASS (plan 0013 T8, B-287, spec 0013 AC12 and §4.4.6).
 - Task-log configuration (draft): the `[tasklog]` section of `HarnessConfig` (`worktree` absolute and outside `runs/`, required `integration_branch`, `policy` and `require_task`, optional `agent` and `since`; no `push` key) and the standard-library-only reader of the user-level push file (`push`, `integration_branch`, `remote`), refused inside a git working tree (plan 0015 T4a, B-627; spec 0015 AC26, §4.6, §4.7).
 - Task-log record models (draft): `eng_harness.tasklog._records` holds the frozen `TaskRecord` union (13 kinds, closed `not_found` categories, `extra="forbid"`) and the `TriageLine` union (4 kinds, closed outcomes, `duplicate_of` exactly for `duplicate`), with schema snapshots under `tests/data/snapshots/tasklog/`; the block, rule and workflow import-rule test; the public-module entries and the r2 entries for the guard, scope, hook and push modules (plan 0015 T1, B-623; spec 0015 AC1, AC2, AC32, AC37, §4.3, §4.3.1).
 - IDEA resume restores the saved working-file binding and hash before reconciliation (plan 0014 T9, B-308, Q14). Added the owner-only recording scenario and S-08 local acceptance steps.

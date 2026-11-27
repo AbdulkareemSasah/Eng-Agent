@@ -28,6 +28,9 @@
     "harness.placement_compare": [
       "a_areas",
       "a_frames"
+    ],
+    "harness.revit_column_readback": [
+      "before"
     ]
   },
   "never": [

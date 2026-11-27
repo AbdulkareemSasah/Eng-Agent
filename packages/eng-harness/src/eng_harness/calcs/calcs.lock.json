@@ -111,6 +111,11 @@
       "version": 1
     },
     {
+      "content_sha256": "7e1e187a75de1f88a247b3a4be35483110d0acbb97d01bc8535151503fb2c679",
+      "id": "harness.revit_column_readback",
+      "version": 1
+    },
+    {
       "content_sha256": "4fccf0a7af5080ee5cf18106775026f5a6f95880da84212f1c895166d487fbb7",
       "id": "harness.revit_column_update",
       "version": 1
