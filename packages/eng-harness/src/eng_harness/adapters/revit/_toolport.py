@@ -296,10 +296,12 @@ def _element_row(ref: str, store: ResultStore, current_revision: _Revision) -> t
 
 def _type_id(ref: str, store: ResultStore, current_revision: _Revision, *, field: str) -> int:
     """One type-id entry: `#/types/<i>/type_id` of structure or `#/targets/<i>/type_id` of a write result (§4.8)."""
-    rule = RefRule(kinds=frozenset({_STRUCTURE, _WRITE_RESULT}), field=field)
+    # Amendment B-629 (Q12): a write result names a type this run created; an ElementId survives later edits.
+    rule = RefRule(kinds=frozenset({_STRUCTURE, _WRITE_RESULT}), field=field, stale_ok=True)
     resolved = resolve_ref(ref, rule, store, current_revision)
     _, tokens = parse_ref(ref, field=field)
     if resolved.record_kind == _STRUCTURE:
+        resolve_ref(ref, rule.model_copy(update={"stale_ok": False}), store, current_revision)
         if len(tokens) != len(("types", "0", "type_id")) or tokens[0] != "types" or tokens[2] != "type_id":
             raise ContractError(ErrorCode.INVALID_ARGUMENT, "type ref must select a structure type_id", field=field)
     elif len(tokens) != len(("targets", "0", "type_id")) or tokens[0] != "targets" or tokens[2] != "type_id":
