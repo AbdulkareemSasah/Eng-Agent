@@ -18,6 +18,7 @@ layout_module = importlib.import_module("eng_harness.calcs.footing.layout")
 plan_size_module = importlib.import_module("eng_harness.calcs.footing.plan_size")
 reactions_to_loads_module = importlib.import_module("eng_harness.calcs.footing.reactions_to_loads")
 resize_module = importlib.import_module("eng_harness.calcs.footing.resize")
+rows_module = importlib.import_module("eng_harness.calcs.footing.rows")
 safe_equilibrium_module = importlib.import_module("eng_harness.calcs.footing.safe_equilibrium")
 schedule_module = importlib.import_module("eng_harness.calcs.footing.schedule")
 status_module = importlib.import_module("eng_harness.calcs.footing.status")
@@ -31,6 +32,10 @@ CALCS = {  # calc id -> (module, output kind, spec section naming its method)
     "harness.footing_layout": (layout_module, "harness.footing_design/1", "§4.4.3"),
     "harness.footing_status": (status_module, "harness.footing_status/1", "§4.4.5"),
     "harness.footing_schedule": (schedule_module, "harness.footing_schedule/1", "§4.4.6"),
+    "harness.footing_rows_dims": (rows_module, "harness.footing_dims/1", "§4.4.7"),
+    "harness.footing_rows_design": (rows_module, "harness.footing_design/1", "§4.4.7"),
+    "harness.footing_rows_status": (rows_module, "harness.footing_status/1", "§4.4.7"),
+    "harness.footing_rows_subjects": (rows_module, "harness.footing_subjects/1", "§4.4.7"),
     "harness.reactions_to_joint_loads": (
         reactions_to_loads_module,
         "harness.reactions_to_joint_loads/1",
@@ -89,6 +94,7 @@ def test_the_calc_modules_are_importable_by_their_public_names() -> None:
         "subjects",
         "plan_size",
         "resize",
+        "rows",
         "layout",
         "status",
         "schedule",

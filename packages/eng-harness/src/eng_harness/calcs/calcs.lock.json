@@ -61,6 +61,26 @@
       "version": 1
     },
     {
+      "content_sha256": "905e1b5a9b72762bd84d884428552bc765f8e85da8f0f0d76d4d974d8a872361",
+      "id": "harness.footing_rows_design",
+      "version": 1
+    },
+    {
+      "content_sha256": "3dafef05b3c2cbbe711ead6a72f7aec3525916281bd79c5ec79827bcc8fa2824",
+      "id": "harness.footing_rows_dims",
+      "version": 1
+    },
+    {
+      "content_sha256": "42ebdf30ff93cb99ba50106db391ddde218c33453173b8364c43bb0a4f76c2d6",
+      "id": "harness.footing_rows_status",
+      "version": 1
+    },
+    {
+      "content_sha256": "33cbacc451ea811e6dfc87197d2f719d96e5287b272e7abb1f0593f1c89e92fd",
+      "id": "harness.footing_rows_subjects",
+      "version": 1
+    },
+    {
       "content_sha256": "6e165b4f5803e682bcd1205f4d71663f1bb939f54d77357d67f884edf25615c2",
       "id": "harness.footing_schedule",
       "version": 1
