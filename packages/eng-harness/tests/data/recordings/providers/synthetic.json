@@ -1,0 +1,18 @@
+{
+  "source": "Synthetic provider responses for spec 0009. No service capture.",
+  "choice": {"choice": "deepen", "confidence": 0.8},
+  "answer": {"choice": "deepen", "rationale": "More depth is needed."},
+  "failure": "rate_limited",
+  "delay_s": 60,
+  "jev": {"receipt": "choose", "echo": ["synthetic-request"]},
+  "completion": {
+    "id": "synthetic-completion",
+    "object": "chat.completion",
+    "created": 0,
+    "model": "fixture-model",
+    "choices": [{"index": 0, "finish_reason": "tool_calls", "message": {
+      "role": "assistant",
+      "tool_calls": [{"id": "synthetic-call", "type": "function", "function": {}}]
+    }}]
+  }
+}
