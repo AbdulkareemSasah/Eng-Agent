@@ -307,6 +307,7 @@ def test_main_writes_the_lock(
 ) -> None:
     path = tmp_path / "blocks.lock.json"
     monkeypatch.setattr(block_module, "LOCK_PATH", path)
+    monkeypatch.setattr(block_module, "discover", lambda: Registry([]))  # B-527: isolate from shipped blocks
     assert main(["--write-lock"]) == 0
     assert path.read_text(encoding="utf-8") == "[]\n"
     with pytest.raises(SystemExit) as exit_info:

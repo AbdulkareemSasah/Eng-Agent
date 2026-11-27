@@ -1,1 +1,47 @@
-[]
+[
+  {
+    "name": "apply_change_set",
+    "version": 1,
+    "code_sha256": "07c9c21f02854897f16772db7404b681b1b567801185aa0c06294d691cc00f3a"
+  },
+  {
+    "name": "edit_cycle_once",
+    "version": 1,
+    "code_sha256": "07c9c21f02854897f16772db7404b681b1b567801185aa0c06294d691cc00f3a"
+  },
+  {
+    "name": "engineer_turn_only",
+    "version": 1,
+    "code_sha256": "c8fa16022a8fcd328ddcd181216074d69a0fb935b672833056fba32fa55d0a5c"
+  },
+  {
+    "name": "model_edit_cycle",
+    "version": 1,
+    "code_sha256": "31fe6d8cde55bfab878bebdf5fd255f778bc3d4a36e2d4e66716d59f93cfa577"
+  },
+  {
+    "name": "obtain_change_set",
+    "version": 1,
+    "code_sha256": "07c9c21f02854897f16772db7404b681b1b567801185aa0c06294d691cc00f3a"
+  },
+  {
+    "name": "promote_revision",
+    "version": 1,
+    "code_sha256": "c8fa16022a8fcd328ddcd181216074d69a0fb935b672833056fba32fa55d0a5c"
+  },
+  {
+    "name": "read_state",
+    "version": 1,
+    "code_sha256": "07c9c21f02854897f16772db7404b681b1b567801185aa0c06294d691cc00f3a"
+  },
+  {
+    "name": "run_and_summarize",
+    "version": 1,
+    "code_sha256": "07c9c21f02854897f16772db7404b681b1b567801185aa0c06294d691cc00f3a"
+  },
+  {
+    "name": "sign_off_run",
+    "version": 1,
+    "code_sha256": "c8fa16022a8fcd328ddcd181216074d69a0fb935b672833056fba32fa55d0a5c"
+  }
+]

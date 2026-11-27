@@ -2,7 +2,7 @@
 
 Purpose: `model_edit_cycle` (version 1) with its input and output models and the design basis fields of spec 0007
 4.8, which are the blank template's `ask_each_run` list; the change-set model (plan 0007 T1b) and the child blocks of
-`_cycle.py`. Steps 11 to 17 and the registration of the workflow come with plan 0007 T9a and T9b.
+`_cycle.py`. Steps 11 to 17, the cycle loop and the registration of the workflow are plan 0007 T9a and T9b.
 Units: the quantity fields carry the canonical unit of their name's suffix (contract 4.7.2).
 Errors: `RegistryError` at import for an invalid declaration; the step errors of the ctx calls reach the engine.
 """
@@ -10,11 +10,11 @@ Errors: `RegistryError` at import for an invalid declaration; the step errors of
 from typing import Any
 
 from eng_contract.refs import Ref
+from eng_contract.verdicts import VerdictStatus
 from pydantic import BaseModel, ConfigDict
 
 from eng_harness.block import FieldSpec, ModelFile, workflow
 from eng_harness.ctx import ModelHandle
-from eng_harness.errors import NotImplementedGap
 from eng_harness.workflows.model_edit_cycle._change_set import (
     REFUSED_KIND_GAPS,
     ChangeSetDraft,
@@ -24,11 +24,23 @@ from eng_harness.workflows.model_edit_cycle._change_set import (
 from eng_harness.workflows.model_edit_cycle._cycle import (
     ChangeSetRequest,
     CycleInput,
+    Route,
+    SummarizeInput,
     apply_change_set,
     edit_cycle_once,
     obtain_change_set,
     read_state,
+    run_and_summarize,
 )
+from eng_harness.workflows.model_edit_cycle._finish import (
+    PromoteInput,
+    SignOffInput,
+    TurnOnlyInput,
+    engineer_turn_only,
+    promote_revision,
+    sign_off_run,
+)
+from eng_harness.workflows.model_edit_cycle._points import TurnAction
 
 __all__ = [
     "BASIS_FIELDS",
@@ -42,10 +54,14 @@ __all__ = [
     "EditCycleOutput",
     "apply_change_set",
     "edit_cycle_once",
+    "engineer_turn_only",
     "model_edit_cycle",
     "obtain_change_set",
+    "promote_revision",
     "read_state",
     "refused_gap",
+    "run_and_summarize",
+    "sign_off_run",
 ]
 
 CSI_BUILD = "61da80f61a6562c8e3553168056bc107e3f93013"
@@ -135,8 +151,79 @@ class EditCycleOutput(BaseModel):
     copy_on_open=True,
 )
 async def model_edit_cycle(ctx: Any, inp: EditCycleInput) -> EditCycleOutput:
-    """Step 2, the open of the model, and the first cycle; the rest comes with plan 0007 T9a and T9b."""
+    """Steps 2 to 17: open, the cycle loop, promotion and sign-off (spec 0007 4.5; plan 0007 T9b)."""
     model = inp.model.name
     await ctx.tool("csi_open_model", {"model": model})
-    await ctx.block(edit_cycle_once, CycleInput(model=model, previous=None, ask=True))
-    raise NotImplementedGap("the edit cycle after step 10 is built by plan 0007 T9a and T9b", evidence=["T9a", "T9b"])
+    previous = None
+    designs: dict[str, Any] = {}
+    ask = True
+    done: list[Any] = []
+    summary_refs: list[Any] = []
+    analysis_ref = None
+    file_sha256 = ""
+    fingerprint = ""
+    async for _ in ctx.attempts(ctx.basis.count("attempts.cycles")):
+        out = await ctx.block(edit_cycle_once, CycleInput(model=model, previous=previous, ask=ask))
+        done.append(out)
+        previous = out.state
+        if out.route is Route.DONE:
+            if out.snapshot_sha256:
+                file_sha256 = out.snapshot_sha256
+            if out.fingerprint:
+                fingerprint = out.fingerprint
+            summarized = await ctx.block(
+                run_and_summarize,
+                SummarizeInput(
+                    model=model,
+                    state=out.state,
+                    diff=out.diff,
+                    readback=out.readback,
+                    previous_designs=tuple(designs.items()),
+                ),
+            )
+            designs = dict(summarized.designs)
+            analysis_ref = summarized.analysis
+            summary_refs = [summarized.analysis, *(ref for _, ref in summarized.designs)]
+            turn = summarized.turn
+        elif out.route in (Route.STOPPED, Route.REJECTED):
+            refs = (out.state.status, out.diff) if out.route is Route.STOPPED else (out.diff,)
+            if out.readback is not None:
+                refs = (out.readback, *refs)
+            only = await ctx.block(
+                engineer_turn_only,
+                TurnOnlyInput(
+                    readback_status=(
+                        VerdictStatus.NOT_APPLICABLE if out.readback is None else VerdictStatus.NEEDS_ENGINEER
+                    ),
+                    refs=refs,
+                ),
+            )
+            turn = only.turn
+        else:
+            only = await ctx.block(engineer_turn_only, TurnOnlyInput(refs=(out.diff,)))
+            turn = only.turn
+        if turn is TurnAction.ACCEPT:
+            break
+        ask = turn is TurnAction.MORE_EDITS
+    promoted_out = await ctx.block(promote_revision, PromoteInput(model=model))
+    outputs: list[tuple[str, Any]] = []
+    if analysis_ref is not None:
+        outputs.append(("Analysis summary", analysis_ref))
+    outputs.extend((f"Design summary ({kind})", ref) for kind, ref in designs.items())
+    signed = await ctx.block(sign_off_run, SignOffInput(outputs=tuple(outputs)))
+    if not file_sha256:
+        file_sha256 = promoted_out.file_sha256
+    if not fingerprint:
+        fingerprint = promoted_out.fingerprint or file_sha256
+    return EditCycleOutput(
+        accepted_revision=AcceptedRevision(
+            model_id=promoted_out.model_id,
+            revision=promoted_out.revision,
+            fingerprint=fingerprint,
+            file_sha256=file_sha256,
+        ),
+        cycles=len(done),
+        promoted=promoted_out.promoted,
+        summaries=tuple(summary_refs),
+        signed=signed.signed,
+    )

@@ -313,8 +313,13 @@ def test_stale_ref(tmp_path: Path) -> None:
     assert units.calc_runs == []
 
 
-def test_save_before_analysis(tmp_path: Path) -> None:
+@pytest.mark.parametrize("approve_each_write", [False, True], ids=["autonomous_logged", "approve_each_write"])
+def test_save_before_analysis(tmp_path: Path, approve_each_write: bool) -> None:
     """A tool whose action is analysis or design is preceded by a save, and that save is journaled (AC43)."""
+    from workflows.ctx_flows import change_set, reply, request_id
+
+    from eng_harness.engine import PermissionMode
+
     rig = make_rig(tmp_path)
     _tools(rig.host)
     _open(rig, "m1")
@@ -324,7 +329,19 @@ def test_save_before_analysis(tmp_path: Path) -> None:
         await ctx.tool("design", {"model": "m1"})
         return []
 
-    done = asyncio.run(rig.engine(flow(body)).start(request()))
+    engine = rig.engine(flow(body))
+    if approve_each_write:
+        rig.host.previews["design"] = change_set(rig, "design")
+        paused = asyncio.run(engine.start(request(mode=PermissionMode.APPROVE_EACH_WRITE)))
+        approve_path = "1~pre.approve"
+        rid = request_id(paused.run_id, approve_path)
+        assert (paused.status, paused.pending) == (RunStatus.PAUSED, (rid,))
+        rig.approvals.script(rid, reply(rig))
+        done = asyncio.run(engine.resume(paused.run_id))
+        paths = _paths(rig, done.run_id)
+        assert paths.index("1~pre.save.m1") < paths.index(approve_path) < paths.index("1")
+    else:
+        done = asyncio.run(engine.start(request()))
     assert done.status is RunStatus.COMPLETED
     events = rig.events(done.run_id)
     saves = [e.payload for e in events if isinstance(e.payload, ev.StepStarted) and e.payload.name == "save"]
