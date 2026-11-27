@@ -102,6 +102,18 @@ tasks:
       - "packages/eng-harness/tests/unit/adapters/test_revit_units.py::test_display_value_never_used"
     covers: [AC5, AC6, AC7]
     depends_on: [T3]
+  - id: T5b
+    title: "duplicate_family_type \"already exists\" on a write is reconciled, not refused (amendment B-632, gap OQ-G15)"
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/adapters/revit/_errors.py"
+      - "packages/eng-harness/tests/unit/adapters/test_revit_errors.py"
+    max_changed_lines: 60
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/adapters/test_revit_errors.py::test_duplicate_already_exists_on_write_unknown"
+    covers: [AC21]  # in part: the error mapping that sends the reply to reconciliation (spec section 4.7)
+    depends_on: [T5, T10]
   - id: T6
     # Amendment (B-589, documents only): AC33 needs REVIT_KINDS registered on HARNESS_KINDS in _kinds.py (outside
     # T6's prior files) and the kinds contract fixtures under tests/data/kinds/revit/; measured by the B-235 writer.
@@ -440,6 +452,8 @@ recorded, server start options per role (`--read-only` on `read` only, the expli
 text rules ("NOT executed", "already executing", the code-less texts) and the write-certainty rule (only a text that a
 resend cannot produce is certain: the declined dialog; a consumed-token or "NOT executed" text on a write is unknown), and the
 specification table `_specs.toml` (length and angle only) with the conversions through `eng_contract.units`.
+
+**T5b "already exists" on a write** (amendment B-632; gap OQ-G15 from the B-239 review). Spec §4.7 excepts the `duplicate_family_type` reply `invalid_request` "already exists" from the certain-not-applied rule: a resend of an applied duplicate produces it. `_errors.py` maps it on a write to `TIMEOUT_UNKNOWN_OUTCOME` with the op id, so the engine reconciles it (§4.10, AC21) instead of refusing the step with `INVALID_ARGUMENT`. Every other `invalid_request` text keeps its mapping, and so does the reply on a read.
 
 **T6 Kinds and role map** (spec §4.5, §4.8). The `harness.revit_*` kinds with strict models and the `frame_element_map`
 kind registration point, and the role map loader with statuses and the load-time rules. T6 may only register
