@@ -13,7 +13,7 @@ import anyio
 import pytest
 from eng_contract.envelope import FailureEnvelope
 from eng_contract.ids import SeededIdSource
-from eng_contract.refs import parse_ref
+from eng_contract.refs import Ref, parse_ref
 from eng_contract.store import LocationClass, Workspace
 from eng_contract.units import convert
 from fakes.ports import FakeApprovalPort, FakeCalcPort, FakeInputPort
@@ -162,7 +162,9 @@ def test_crash_matrix(tmp_path: Path, fault: str, applied: bool, cut: str, outco
         "source_type_id": {"$ref": f"{structure}#/types/0/type_id"},
         "new_type_name": "Replay type",
     }
-    steps = [(_SET, rig.set_args("m@copy", structure, rig.put_sections())), (_DUPLICATE, duplicate)]
+    set_args: dict[str, Any] = rig.set_args("m@copy", structure, rig.put_sections())
+    set_args["value_mm"] = Ref.model_validate(set_args["value_mm"])  # invariant 2: an engineering quantity is a Ref
+    steps = [(_SET, set_args), (_DUPLICATE, duplicate)]
     request = RunRequest(
         workflow="chain", input={}, basis_ref=header.basis_ref, mode=PermissionMode.APPROVE_EACH_WRITE,
         run_class=RunClass.TRIAL, run_id=f"run_{rig.ids.new_ulid()}",
