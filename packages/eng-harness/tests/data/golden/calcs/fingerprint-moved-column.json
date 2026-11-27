@@ -1,0 +1,111 @@
+{
+  "source": "eng-harness spec 0003 §4.6 (F1 to F4) and RFC 8785; synthetic read set, no project value",
+  "method_ref": "§4.6 F3",
+  "synthetic": true,
+  "derivation": "Case (c): case (a) with the top end of column F2 moved by 0.001 mm in x (6000.001, written as given: no rounding, F3). Only the frames bytes change; the sections bytes and hash are those of case (a); the fingerprint changes.\nbytes[model.frame_placements/1] = {\"frames\":[{\"i\":{\"x_mm\":0,\"y_mm\":0,\"z_mm\":0},\"i_joint\":null,\"id\":\"F1\",\"j\":{\"x_mm\":0,\"y_mm\":0,\"z_mm\":3000},\"j_joint\":null,\"kind\":\"column\",\"rotation_deg\":0,\"section\":\"S1\",\"story\":null},{\"i\":{\"x_mm\":6000,\"y_mm\":0,\"z_mm\":0},\"i_joint\":null,\"id\":\"F2\",\"j\":{\"x_mm\":6000.001,\"y_mm\":0,\"z_mm\":3000},\"j_joint\":null,\"kind\":\"column\",\"rotation_deg\":0,\"section\":\"S1\",\"story\":null}]}\nbytes[model.sections/1] = {\"area_sections\":[],\"frame_sections\":[{\"material\":\"M1\",\"name\":\"S1\",\"shape\":{\"b_mm\":300,\"h_mm\":500,\"type\":\"rectangular\"}}]}\nbytes[fingerprint] = {\"method\":\"harness.fp/1\",\"sections\":{\"model.frame_placements/1\":\"c334e8a5ab205506604b8c85e26e7c80543ceb57d64e0cba7f9e44b08d56ce0a\",\"model.sections/1\":\"9936edd9284866917b629506692b70ac634a1f4861850d1a5184cb9d5cecfab4\"}}",
+  "inputs": {
+    "input": {
+      "frames": {
+        "frames": [
+          {
+            "id": "F1",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 0,
+              "y_mm": 0,
+              "z_mm": 0
+            },
+            "j": {
+              "x_mm": 0,
+              "y_mm": 0,
+              "z_mm": 3000
+            },
+            "rotation_deg": 0
+          },
+          {
+            "id": "F2",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 6000,
+              "y_mm": 0,
+              "z_mm": 0
+            },
+            "j": {
+              "x_mm": 6000.001,
+              "y_mm": 0,
+              "z_mm": 3000
+            },
+            "rotation_deg": 0
+          }
+        ]
+      },
+      "sections": {
+        "frame_sections": [
+          {
+            "name": "S1",
+            "material": "M1",
+            "shape": {
+              "type": "rectangular",
+              "b_mm": 300,
+              "h_mm": 500
+            }
+          }
+        ],
+        "area_sections": []
+      }
+    },
+    "meta": {
+      "refs": {
+        "frames": {
+          "result_id": "res_00000000000000000000000001",
+          "ref": "res_00000000000000000000000001",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "sections": {
+          "result_id": "res_00000000000000000000000002",
+          "ref": "res_00000000000000000000000002",
+          "kind": "model.sections/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        }
+      }
+    }
+  },
+  "expected": {
+    "method": "harness.fp/1",
+    "model_id": "mdl_00000000000000000000000000",
+    "model_revision": 3,
+    "sections": [
+      {
+        "kind": "model.frame_placements/1",
+        "result_id": "res_00000000000000000000000001",
+        "items": 2,
+        "sha256": "c334e8a5ab205506604b8c85e26e7c80543ceb57d64e0cba7f9e44b08d56ce0a",
+        "complete": true
+      },
+      {
+        "kind": "model.sections/1",
+        "result_id": "res_00000000000000000000000002",
+        "items": 1,
+        "sha256": "9936edd9284866917b629506692b70ac634a1f4861850d1a5184cb9d5cecfab4",
+        "complete": true
+      }
+    ],
+    "covered": [
+      "model.frame_placements/1",
+      "model.sections/1"
+    ],
+    "complete": true,
+    "fingerprint": "fp1:93e5ee6bf8fa4b7ac268d85848d7ad7e8021151756dfb30caefcc2e2b70dbd8a"
+  }
+}

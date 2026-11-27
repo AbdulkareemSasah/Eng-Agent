@@ -1,0 +1,4 @@
+mode: bootstrap
+risk-floor: fail
+  risk-floor: fail
+    [error] RF001 floor ['r2', 'r3'] is not within the recorded risk ['r3']; raised by r2: packages/eng-contract/.gate/agents.yml, packages/eng-contract/AGENTS.md

@@ -1,0 +1,52 @@
+{
+  "schema": "eng-template/1",
+  "meta": {
+    "name": "synthetic-full",
+    "version": "0.1.0",
+    "description": "Synthetic fixture with every section; every value is a placeholder and not an engineering value.",
+    "author": "test fixture",
+    "code_pack": {"name": "synthetic-code", "edition": "none"},
+    "status": "draft",
+    "synthetic": true,
+    "extends": null
+  },
+  "materials": {
+    "alpha": {
+      "strength_MPa": {"value": 1, "unit": "MPa", "citation": "Synthetic placeholder, not an engineering value"}
+    }
+  },
+  "sections": {
+    "beam": {"depth_mm": {"value": 2, "unit": "mm", "citation": "Synthetic placeholder, not an engineering value"}}
+  },
+  "loads": {
+    "floor": {"line_kN_m": {"value": 3, "unit": "kN/m", "citation": "Synthetic placeholder, not an engineering value"}}
+  },
+  "combinations": {
+    "set_a": {"value": {"names": ["c1", "c2"]}, "unit": null, "citation": "Synthetic placeholder, not an engineering value"}
+  },
+  "limits": {
+    "drift_ratio": {
+      "value": 0.5,
+      "unit": "1",
+      "citation": "Synthetic placeholder, not an engineering value",
+      "bounds": {
+        "min": {"value": 0, "unit": "1", "source": "Synthetic placeholder bound"},
+        "max": {"value": 1, "unit": "1", "source": "Synthetic placeholder bound"}
+      }
+    }
+  },
+  "analysis": {
+    "method": {"value": "synthetic-method", "unit": null, "citation": "Synthetic placeholder, not an engineering value"}
+  },
+  "modeling": {
+    "merge_mm": {"value": 4, "unit": "mm", "citation": "Synthetic placeholder, not an engineering value"}
+  },
+  "drawing": {
+    "show_grid": {"value": true, "unit": null, "citation": "Synthetic placeholder, not an engineering value"}
+  },
+  "ask_each_run": [
+    {"path": "limits.ratio_limit_ratio", "label": "Ratio limit", "kind": "quantity", "unit": "1"},
+    {"path": "analysis.stories", "label": "Stories", "kind": "count"},
+    {"path": "analysis.mode", "label": "Mode", "kind": "choice", "choices": ["a", "b"]}
+  ]
+}

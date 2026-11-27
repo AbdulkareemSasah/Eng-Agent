@@ -1,0 +1,506 @@
+{
+  "$defs": {
+    "ContractWarning": {
+      "additionalProperties": false,
+      "description": "Non-fatal condition of a success envelope (spec 4.2.4).",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/WarningCode"
+        },
+        "field": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*|\\[(0|[1-9][0-9]*)\\])*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field"
+        },
+        "message": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ContractWarning",
+      "type": "object"
+    },
+    "ErrorCode": {
+      "description": "The 22 error codes of 04 section 8.1.",
+      "enum": [
+        "INVALID_ARGUMENT",
+        "OUT_OF_RANGE",
+        "UNIT_MISMATCH",
+        "REF_NOT_FOUND",
+        "REF_POINTER_INVALID",
+        "REF_KIND_MISMATCH",
+        "REF_UNIT_MISMATCH",
+        "REF_STALE",
+        "NOT_FOUND",
+        "CONFLICT",
+        "PRECONDITION_FAILED",
+        "CONFIRMATION_REQUIRED",
+        "LIMIT_EXCEEDED",
+        "HOST_NOT_CONNECTED",
+        "HOST_BUSY",
+        "HOST_WEDGED",
+        "HOST_LOCKED",
+        "HOST_ERROR",
+        "TIMEOUT_NO_EFFECT",
+        "TIMEOUT_UNKNOWN_OUTCOME",
+        "NOT_SUPPORTED_BY_VERSION",
+        "INTERNAL"
+      ],
+      "title": "ErrorCode",
+      "type": "string"
+    },
+    "ErrorDetail": {
+      "additionalProperties": false,
+      "description": "Error of a failure envelope (spec 4.2.3). Validation enforces the retry and code-specific rules.",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ErrorCode"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected"
+        },
+        "field": {
+          "anyOf": [
+            {
+              "maxLength": 512,
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*|\\[(0|[1-9][0-9]*)\\])*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field"
+        },
+        "hint": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hint"
+        },
+        "host_code": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Host Code"
+        },
+        "host_method": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Host Method"
+        },
+        "incident_id": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Incident Id"
+        },
+        "message": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        },
+        "precondition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Precondition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "received": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "retryable": {
+          "title": "Retryable",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "retryable"
+      ],
+      "title": "ErrorDetail",
+      "type": "object"
+    },
+    "FailureEnvelope": {
+      "additionalProperties": false,
+      "description": "Reply of a tool that failed (spec 4.2.5).",
+      "properties": {
+        "contract": {
+          "const": "eng-contract/1",
+          "title": "Contract",
+          "type": "string"
+        },
+        "error": {
+          "$ref": "#/$defs/ErrorDetail"
+        },
+        "ok": {
+          "const": false,
+          "title": "Ok",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "contract",
+        "ok",
+        "error"
+      ],
+      "title": "FailureEnvelope",
+      "type": "object"
+    },
+    "FileSource": {
+      "additionalProperties": false,
+      "description": "Input file a result was read from; the base name only, so no personal path is recorded.",
+      "properties": {
+        "name": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^/\\\\]+$",
+          "title": "Name",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "sha256",
+        "size_bytes"
+      ],
+      "title": "FileSource",
+      "type": "object"
+    },
+    "HostInfo": {
+      "additionalProperties": false,
+      "description": "Host program a result was read from (spec 4.2.2).",
+      "properties": {
+        "model_id": {
+          "pattern": "^mdl_[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+          "title": "Model Id",
+          "type": "string"
+        },
+        "model_revision": {
+          "minimum": 0,
+          "title": "Model Revision",
+          "type": "integer"
+        },
+        "program": {
+          "maxLength": 64,
+          "title": "Program",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 64,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "program",
+        "version",
+        "model_id",
+        "model_revision"
+      ],
+      "title": "HostInfo",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "LiteralInput": {
+      "additionalProperties": false,
+      "description": "Input given as a value: `{\"literal\": JsonValue}` (null is a value).",
+      "properties": {
+        "literal": {
+          "$ref": "#/$defs/JsonValue"
+        }
+      },
+      "required": [
+        "literal"
+      ],
+      "title": "LiteralInput",
+      "type": "object"
+    },
+    "Precondition": {
+      "description": "State named by `PRECONDITION_FAILED` (04 section 8.1).",
+      "enum": [
+        "model_saved",
+        "model_open",
+        "analysis_current",
+        "units_verified",
+        "local_workspace"
+      ],
+      "title": "Precondition",
+      "type": "string"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "description": "How a result was produced (spec 4.2.2). `inputs` never re-types a referenced value.",
+      "properties": {
+        "duration_ms": {
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/FileSource"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "host": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HostInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "inputs": {
+          "patternProperties": {
+            "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*|\\[(0|[1-9][0-9]*)\\])*$": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/RefInput"
+                },
+                {
+                  "$ref": "#/$defs/LiteralInput"
+                }
+              ]
+            }
+          },
+          "propertyNames": {
+            "maxLength": 512
+          },
+          "title": "Inputs",
+          "type": "object"
+        },
+        "started_at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+          "title": "Started At",
+          "type": "string"
+        },
+        "tool": {
+          "maxLength": 200,
+          "pattern": "^([a-z0-9][a-z0-9-]*/[a-z0-9_.-]+|engineer|template|harness)$",
+          "title": "Tool",
+          "type": "string"
+        },
+        "tool_version": {
+          "maxLength": 64,
+          "title": "Tool Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool",
+        "tool_version",
+        "inputs",
+        "started_at",
+        "duration_ms"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
+    "RefInput": {
+      "additionalProperties": false,
+      "description": "Input taken from a stored result: `{\"ref\": RefString}`.",
+      "properties": {
+        "ref": {
+          "maxLength": 2000,
+          "pattern": "^res_[0-7][0-9A-HJKMNP-TV-Z]{25}(#[\\s\\S]*)?$",
+          "title": "Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref"
+      ],
+      "title": "RefInput",
+      "type": "object"
+    },
+    "SuccessEnvelope": {
+      "additionalProperties": false,
+      "description": "Reply of a tool that succeeded (spec 4.2.5).",
+      "properties": {
+        "complete": {
+          "title": "Complete",
+          "type": "boolean"
+        },
+        "contract": {
+          "const": "eng-contract/1",
+          "title": "Contract",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "kind": {
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+/[1-9][0-9]{0,3}$",
+          "title": "Kind",
+          "type": "string"
+        },
+        "ok": {
+          "const": true,
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        },
+        "result_id": {
+          "pattern": "^res_[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+          "title": "Result Id",
+          "type": "string"
+        },
+        "summary": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Summary",
+          "type": "object"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/ContractWarning"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "contract",
+        "ok",
+        "result_id",
+        "kind",
+        "summary",
+        "complete",
+        "provenance"
+      ],
+      "title": "SuccessEnvelope",
+      "type": "object"
+    },
+    "WarningCode": {
+      "description": "The five warning codes of 04 section 8.2.",
+      "enum": [
+        "PARTIAL_DATA",
+        "MODEL_CHANGED_OUTSIDE",
+        "DIALOG_DISMISSED",
+        "HOST_WARNING",
+        "DEPRECATED"
+      ],
+      "title": "WarningCode",
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/SuccessEnvelope"
+    },
+    {
+      "$ref": "#/$defs/FailureEnvelope"
+    }
+  ],
+  "properties": {
+    "contract": {
+      "const": "eng-contract/1"
+    },
+    "ok": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "contract",
+    "ok"
+  ],
+  "type": "object"
+}

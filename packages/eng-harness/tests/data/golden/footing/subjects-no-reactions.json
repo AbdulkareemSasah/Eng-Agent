@@ -1,0 +1,96 @@
+{
+  "source": "eng-harness spec 0010 section 4.4.1, synthetic fixture",
+  "method_ref": "\u00a74.4.1 S2",
+  "synthetic": true,
+  "derivation": "No reaction rows: there is no support joint, so no subject and nothing excluded (S2).",
+  "input": {
+    "placements": {
+      "frames": [
+        {
+          "id": "C1",
+          "kind": "column",
+          "section": "SEC-A",
+          "i_joint": "J1",
+          "j_joint": "J1-top",
+          "i": {
+            "x_mm": 0.0,
+            "y_mm": 0.0,
+            "z_mm": 0.0
+          },
+          "j": {
+            "x_mm": 0.0,
+            "y_mm": 0.0,
+            "z_mm": 3000.0
+          },
+          "story": null,
+          "rotation_deg": 0.0
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "SEC-A",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400.0,
+            "h_mm": 600.0
+          }
+        },
+        {
+          "name": "SEC-B",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 300.0,
+            "h_mm": 500.0
+          }
+        },
+        {
+          "name": "SEC-C",
+          "material": "C30",
+          "shape": {
+            "type": "circular",
+            "D_mm": 450.0
+          }
+        },
+        {
+          "name": "SEC-D",
+          "material": "C30",
+          "shape": {
+            "type": "other",
+            "host_shape": "Tee"
+          }
+        }
+      ],
+      "area_sections": []
+    },
+    "reactions": {
+      "axes": "global",
+      "rows": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.angle_deg": {
+          "value": 1.0,
+          "unit": "deg",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "placements": "res_00000000000000000000000001",
+    "sections": "res_00000000000000000000000002",
+    "reactions": "res_00000000000000000000000003",
+    "basis": "res_00000000000000000000000004"
+  },
+  "expected": {
+    "subjects": [],
+    "excluded": []
+  }
+}

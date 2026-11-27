@@ -1,0 +1,116 @@
+{
+  "source": "eng-harness spec 0010 section 4.4.3, synthetic fixture",
+  "method_ref": "\u00a74.4.3 L1 L2 L3 L4 L5",
+  "synthetic": true,
+  "derivation": "Basis: db = 32 mm, bottom_layer = y_bottom, c = 50 mm, reaction_point = base_of_footing. J1 (Lx = 1332, Ly = 1932, h = 450, s = 200, source = engineer): 2c + db = 132; span_x = 1932 - 132 = 1800 (exact multiple 9*200), n_x = 10, s_x = 1800/9 = 200.0, As_x = 10*pi*32^2/4 = 2560*pi; span_y = 1332 - 132 = 1200 (exact multiple 6*200), n_y = 7, s_y = 1200/6 = 200.0, As_y = 7*256*pi = 1792*pi; y_bottom swaps d_x and d_y: d_y = 450 - 50 - 32/2 = 384.0, d_x = 450 - 50 - 3*32/2 = 352.0, d = (352 + 384)/2 = 368.0; cover = end_cover = 50.0; base_of_footing gives reaction_height = 0.0.",
+  "input": {
+    "dims": {
+      "footings": [
+        {
+          "id": "J1",
+          "Lx_mm": 1332.0,
+          "Ly_mm": 1932.0,
+          "h_mm": 450.0,
+          "s_mm": 200.0,
+          "source": "engineer",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "OK",
+          "reason": null
+        }
+      ]
+    },
+    "subjects": {
+      "subjects": [
+        {
+          "id": "J1",
+          "joint": "J1",
+          "column": "C1",
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "cx_mm": 400.0,
+          "cy_mm": 400.0
+        },
+        {
+          "id": "J9",
+          "joint": "J9",
+          "column": "C9",
+          "x_mm": 3000.0,
+          "y_mm": 0.0,
+          "cx_mm": 400.0,
+          "cy_mm": 400.0
+        }
+      ],
+      "excluded": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "reinforcement.bar_diameter_mm": {
+          "value": 32.0,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "reinforcement.bottom_layer": {
+          "value": "y_bottom",
+          "unit": null,
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "durability.cover_footing_mm": {
+          "value": 50.0,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.reaction_point": {
+          "value": "base_of_footing",
+          "unit": null,
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "dims": "res_00000000000000000000000001",
+    "subjects": "res_00000000000000000000000002",
+    "basis": "res_00000000000000000000000003"
+  },
+  "expected": {
+    "footings": [
+      {
+        "id": "J1",
+        "Lx_mm": 1332.0,
+        "Ly_mm": 1932.0,
+        "h_mm": 450.0,
+        "s_mm": 200.0,
+        "source": "engineer",
+        "plan_at_max": false,
+        "depth_at_max": false,
+        "spacing_at_min": false,
+        "status": "OK",
+        "reason": null,
+        "db_mm": 32.0,
+        "n_x": 10,
+        "n_y": 7,
+        "s_x_mm": 200.0,
+        "s_y_mm": 200.0,
+        "As_x_pi_coeff": 2560,
+        "As_y_pi_coeff": 1792,
+        "d_x_mm": 352.0,
+        "d_y_mm": 384.0,
+        "d_mm": 368.0,
+        "cover_mm": 50.0,
+        "end_cover_mm": 50.0,
+        "reaction_height_mm": 0.0
+      }
+    ]
+  }
+}

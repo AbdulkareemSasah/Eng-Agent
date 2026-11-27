@@ -1,0 +1,370 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.5 (rules U1 to U10); synthetic data, no project value",
+  "method_ref": "§4.4.5 U5",
+  "synthetic": true,
+  "derivation": "t = compare.length_mm = 5 mm (confirmed, mm). U1: the pairs are (C1, u-c1) with section C40x60 (rectangular 400 x 600, index 0) and (C2, u-c2) with section C40S (rectangular 400 x 400, index 1); the unpaired ETABS frame X9 is not in the map and is never looked at (targets per pair). U2: F1 and F2 roles are all reference, so both pairs proceed. U3: the current type 11 has h_mm 500.0, |500 - 600| = 100 > 5 for C1, and the current type 13 has b_mm and h_mm 500.0, |500 - 400| = 100 > 5 for C2, so neither is no_change. U4: for C1, type 12 has b_mm 400.0 and h_mm 600.0, both 0 <= 5, while type 11 is outside, so exactly one type is within and C1 reuses type '12'; for C2, type 14 has b_mm and h_mm 400.0, both 0 <= 5, while type 13 is outside, so C2 reuses type '14'. The assignments are {unique_id u-c1, element_id '101', from_type_id '11', type_id '12'} and {unique_id u-c2, element_id '102', from_type_id '13', type_id '14'}. U5: C1's target is non-square rectangular (400 != 600), so its orientation row is [{frame_id C1, rotations [res_01KRC000000000000000000002#/frames/1/rotation_deg, res_01KRC000000000000000000005#/frames/1/rotation_deg]}] with the ETABS row by frame_id first and the Revit row by unique_id second, using the actual input row indices (C1 is at frames index 1 after the decoy X9; u-c1 is at revit_placements index 1 after the decoy u-z9); the carried values are 90 deg (ETABS) and 0 deg (Revit), never compared and never written. C2's target is square (400 = 400), so it has no orientation row although it proceeds. U6: changed is empty, so both origins are preexisting. U7: expected.elements is [{unique_id u-c1, type_id '12'}, {unique_id u-c2, type_id '14'}] with the reuse identity; expected.types is []. U8: all seven referenced records are complete, so complete is true. U9: assignments and expected.elements are ordered by unique_id; orientation holds one row.",
+  "input": {
+    "map": {
+      "calc": {
+        "id": "harness.frame_element_map",
+        "version": 1,
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.frame_element_map",
+        "calc_version": "1",
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "pairs": [
+        {
+          "frame_id": "C1",
+          "unique_id": "u-c1",
+          "element_id": 101,
+          "type_id": 11,
+          "basis": "geometry",
+          "lower_distance_mm": 0.0,
+          "upper_distance_mm": 0.0
+        },
+        {
+          "frame_id": "C2",
+          "unique_id": "u-c2",
+          "element_id": 102,
+          "type_id": 13,
+          "basis": "geometry",
+          "lower_distance_mm": 0.0,
+          "upper_distance_mm": 0.0
+        }
+      ],
+      "ambiguous": [],
+      "unmatched_frames": [],
+      "unmatched_elements": [],
+      "conflicts": [],
+      "complete": true
+    },
+    "frames": {
+      "frames": [
+        {
+          "id": "X9",
+          "kind": "other",
+          "section": "C40S",
+          "i": {
+            "x_mm": 12000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 12000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "C1",
+          "kind": "other",
+          "section": "C40x60",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 90
+        },
+        {
+          "id": "C2",
+          "kind": "other",
+          "section": "C40S",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "C40x60",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400,
+            "h_mm": 600
+          }
+        },
+        {
+          "name": "C40S",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400,
+            "h_mm": 400
+          }
+        }
+      ],
+      "area_sections": []
+    },
+    "revit": {
+      "elements": [
+        {
+          "unique_id": "u-c1",
+          "element_id": 101,
+          "category": "column",
+          "family": "F1",
+          "type_id": 11,
+          "type_name": "Tcur1",
+          "level_id": 1,
+          "level_name": "L1",
+          "location_kind": "point",
+          "i": null,
+          "j": null,
+          "rotation_deg": 0,
+          "parameters": {}
+        },
+        {
+          "unique_id": "u-c2",
+          "element_id": 102,
+          "category": "column",
+          "family": "F2",
+          "type_id": 13,
+          "type_name": "Tcur2",
+          "level_id": 1,
+          "level_name": "L1",
+          "location_kind": "point",
+          "i": null,
+          "j": null,
+          "rotation_deg": 0,
+          "parameters": {}
+        }
+      ],
+      "types": [
+        {
+          "type_id": 11,
+          "family": "F1",
+          "name": "Tcur1",
+          "instance_ids": [
+            101
+          ],
+          "parameters": {
+            "section_b": {
+              "value": 400.0,
+              "unit": "mm"
+            },
+            "section_h": {
+              "value": 500.0,
+              "unit": "mm"
+            }
+          }
+        },
+        {
+          "type_id": 12,
+          "family": "F1",
+          "name": "T46",
+          "instance_ids": [],
+          "parameters": {
+            "section_b": {
+              "value": 400.0,
+              "unit": "mm"
+            },
+            "section_h": {
+              "value": 600.0,
+              "unit": "mm"
+            }
+          }
+        },
+        {
+          "type_id": 13,
+          "family": "F2",
+          "name": "Tcur2",
+          "instance_ids": [
+            102
+          ],
+          "parameters": {
+            "section_b": {
+              "value": 500.0,
+              "unit": "mm"
+            },
+            "section_h": {
+              "value": 500.0,
+              "unit": "mm"
+            }
+          }
+        },
+        {
+          "type_id": 14,
+          "family": "F2",
+          "name": "T44",
+          "instance_ids": [],
+          "parameters": {
+            "section_b": {
+              "value": 400.0,
+              "unit": "mm"
+            },
+            "section_h": {
+              "value": 400.0,
+              "unit": "mm"
+            }
+          }
+        }
+      ]
+    },
+    "role_statuses": {
+      "F1": {
+        "section_b": "reference",
+        "section_h": "reference"
+      },
+      "F2": {
+        "section_b": "reference",
+        "section_h": "reference"
+      }
+    },
+    "revit_placements": {
+      "frames": [
+        {
+          "id": "u-z9",
+          "kind": "column",
+          "section": "F9: T9",
+          "i": {
+            "x_mm": 12000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 12000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "u-c1",
+          "kind": "column",
+          "section": "F1: Tcur1",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "u-c2",
+          "kind": "column",
+          "section": "F2: Tcur2",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "changed": [],
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.length_mm": {
+          "value": 5,
+          "unit": "mm",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "map": "res_01KRC000000000000000000001",
+    "frames": "res_01KRC000000000000000000002",
+    "sections": "res_01KRC000000000000000000003",
+    "revit": "res_01KRC000000000000000000004",
+    "revit_placements": "res_01KRC000000000000000000005",
+    "changed": "res_01KRC000000000000000000006#/changed",
+    "basis": "res_01KRC000000000000000000007"
+  },
+  "expected": {
+    "new_types": [],
+    "assignments": [
+      {
+        "unique_id": "u-c1",
+        "element_id": "101",
+        "from_type_id": "11",
+        "type_id": "12",
+        "new_type_name": null,
+        "origin": "preexisting"
+      },
+      {
+        "unique_id": "u-c2",
+        "element_id": "102",
+        "from_type_id": "13",
+        "type_id": "14",
+        "new_type_name": null,
+        "origin": "preexisting"
+      }
+    ],
+    "no_change": [],
+    "not_updatable": [],
+    "orientation": [
+      {
+        "frame_id": "C1",
+        "rotations": [
+          "res_01KRC000000000000000000002#/frames/1/rotation_deg",
+          "res_01KRC000000000000000000005#/frames/1/rotation_deg"
+        ]
+      }
+    ],
+    "expected": {
+      "elements": [
+        {
+          "unique_id": "u-c1",
+          "type_id": "12",
+          "family": null,
+          "type_name": null
+        },
+        {
+          "unique_id": "u-c2",
+          "type_id": "14",
+          "family": null,
+          "type_name": null
+        }
+      ],
+      "types": []
+    },
+    "complete": true
+  }
+}

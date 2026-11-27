@@ -1,0 +1,12 @@
+name: windows
+description: Run the windows_tests paths of every workspace member (spec 4.14, head variant; pushes to build/v1 only).
+inputs:
+  gate-root:
+    description: Unused; the windows job runs the head variant only. Kept so every action has the same inputs.
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Windows tests
+      shell: bash
+      run: uv run eng-gate windows-tests

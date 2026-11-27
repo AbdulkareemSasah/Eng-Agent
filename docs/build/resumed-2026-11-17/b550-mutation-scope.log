@@ -1,0 +1,4 @@
+base=2a2171ead9a727686afe671e7aec2209c61bd713
+head=79302d00953686dea66e21d671cc17a0fc242553
+changed R1/R2 modules: []
+No eligible modules: no mutants generated, no numeric mutation score, no MU003 emitted.

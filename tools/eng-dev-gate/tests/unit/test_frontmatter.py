@@ -1,0 +1,211 @@
+"""Tests of the spec and plan front matter (spec section 5; AC13)."""
+
+from __future__ import annotations
+
+import pytest
+from eng_dev_gate.frontmatter import (
+    FrontMatterError,
+    parse_plan,
+    parse_spec,
+    safe_relative_path,
+    uncovered_criteria,
+)
+from support.pullrequest import plan_text, spec_text
+
+
+def _task(task_id: str, **fields: str) -> str:
+    values = {
+        "title": "t",
+        "files": '["a/**"]',
+        "max_changed_lines": "100",
+        "max_sessions": "2",
+        "tests_first": "[]",
+        "covers": "[AC1]",
+        "depends_on": "[]",
+        **fields,
+    }
+    return f"  - id: {task_id}\n" + "".join(f"    {k}: {v}\n" for k, v in values.items())
+
+
+def _plan(tasks: str, **header: str) -> str:
+    values = {
+        "id": "p",
+        "issue": '"B-1"',
+        "spec": "a/docs/specs/s.md",
+        "status": "draft",
+        "size": "small",
+        "risk": "r1",
+    }
+    values.update(header)
+    return "---\n" + "".join(f"{k}: {v}\n" for k, v in values.items()) + "tasks:\n" + tasks + "---\n\nbody\n"
+
+
+def test_valid_plan_and_spec() -> None:
+    """A plan and a spec parse; risk is one class or a list; issue may be a number or a string."""
+    plan = parse_plan(plan_text())
+    assert [t.id for t in plan.tasks] == ["T1", "T2"]
+    assert plan.tasks[0].files == ["pkg/src/**"]
+    assert plan.tasks[0].max_changed_lines == 10
+    assert (plan.status, plan.risk, plan.spec) == ("approved", ["r1"], "pkg/docs/specs/0001-x.md")
+    assert parse_plan(_plan(_task("T2a"), risk="[r1, r3]", issue="42")).risk == ["r1", "r3"]
+    spec = parse_spec(spec_text("draft"))
+    assert (spec.status, spec.size, spec.risk) == ("draft", "small", ["r1"])
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "no front matter\n",
+        "---\nid: x\n",  # not closed
+        "---\n- a\n- b\n---\n",  # not a mapping
+        "---\nid: [unclosed\n---\n",  # not YAML
+        "",
+    ],
+)
+def test_front_matter_must_be_a_yaml_mapping_between_dashes(text: str) -> None:
+    """A document without a closed YAML mapping at its start is invalid."""
+    with pytest.raises(FrontMatterError):
+        parse_spec(text)
+    with pytest.raises(FrontMatterError):
+        parse_plan(text)
+
+
+def test_crlf_front_matter() -> None:
+    """Line endings are normalized: a CRLF file parses like an LF file."""
+    assert parse_plan(plan_text().replace("\n", "\r\n")).id == "plan-1"
+
+
+def test_plan_front_matter_rules() -> None:
+    """AC13: invalid fields, repeated task ids, unknown or cyclic depends_on are rejected."""
+    bad_header = [
+        {"status": "maybe"},
+        {"size": "huge"},
+        {"risk": "r4"},
+        {"risk": "[]"},
+        {"id": '""'},
+        {"spec": "../escape.md"},
+        {"spec": "/abs/spec.md"},
+    ]
+    for header in bad_header:
+        with pytest.raises(FrontMatterError):
+            parse_plan(_plan(_task("T1"), **header))
+    bad_task = [
+        {"files": "[]"},
+        {"files": '[""]'},
+        {"max_changed_lines": "0"},
+        {"max_changed_lines": "-1"},
+        {"max_changed_lines": "true"},
+        {"max_changed_lines": "1.5"},
+        {"max_changed_lines": '"12"'},
+        {"max_sessions": "-1"},
+        {"max_sessions": "true"},
+        {"covers": "[X1]"},
+        {"depends_on": "[T"},
+        {"title": '""'},
+        {"surprise": "1"},
+    ]
+    for fields in bad_task:
+        with pytest.raises(FrontMatterError):
+            parse_plan(_plan(_task("T1", **fields)))
+    with pytest.raises(FrontMatterError, match="id"):
+        parse_plan(_plan(_task("task-1")))
+    with pytest.raises(FrontMatterError):
+        parse_plan(_plan(""))
+    with pytest.raises(FrontMatterError, match="T1"):
+        parse_plan(_plan(_task("T1") + _task("T1")))
+    with pytest.raises(FrontMatterError, match="T9"):
+        parse_plan(_plan(_task("T1", depends_on="[T9]")))
+    with pytest.raises(FrontMatterError, match="cycl"):
+        parse_plan(
+            _plan(_task("T1", depends_on="[T2]") + _task("T2", depends_on="[T3]") + _task("T3", depends_on="[T1]"))
+        )
+    with pytest.raises(FrontMatterError, match="cycl"):
+        parse_plan(_plan(_task("T1", depends_on="[T1]")))
+    ok = _plan(
+        _task("T1", max_changed_lines="400") + _task("T2", depends_on="[T1]") + _task("T3", depends_on="[T1, T2]")
+    )
+    assert len(parse_plan(ok).tasks) == 3
+
+
+@pytest.mark.parametrize("estimate", [401, 10000])
+def test_task_estimate_above_400_parses(estimate: int) -> None:
+    """AC13: positive line estimates have no upper cap."""
+    assert parse_plan(plan_text(max_changed_lines=estimate)).tasks[0].max_changed_lines == estimate
+
+
+def test_spec_front_matter_rules() -> None:
+    """A spec needs id, issue, status, size and risk with valid values."""
+    for broken in (
+        spec_text().replace("status: approved", "status: done"),
+        spec_text().replace("size: small\n", ""),
+        spec_text().replace("risk: r1", "risk: r9"),
+    ):
+        with pytest.raises(FrontMatterError):
+            parse_spec(broken)
+
+
+def test_uncovered_criteria() -> None:
+    """AC13 (GC016): acceptance criteria of the spec (`AC<n>.` lines, including AC5a) missing from every `covers`."""
+    spec = (
+        "---\nx: 1\n---\n- AC1. Given a\n- AC2. Given b\n- AC5a. Given c\nAC7. bare line\n"
+        "| AC9. in a table |\nAC10 no dot\n"
+    )
+    plan = parse_plan(_plan(_task("T1", covers="[AC1, AC7]") + _task("T2", covers="[AC5a]")))
+    assert uncovered_criteria(plan, spec) == ["AC2"]
+    full = parse_plan(_plan(_task("T1", covers="[AC1, AC2, AC5a, AC7]")))
+    assert uncovered_criteria(full, spec) == []
+
+
+@pytest.mark.parametrize(
+    ("path", "ok"),
+    [
+        ("a/docs/plans/x.md", True),
+        ("x.md", True),
+        ("../x.md", False),
+        ("a/../x.md", False),
+        ("/x.md", False),
+        ("a\\x.md", False),
+        ("", False),
+        ("./x.md", False),
+        ("a//x.md", False),
+    ],
+)
+def test_safe_relative_path(path: str, ok: bool) -> None:
+    """Plan and spec paths are workspace-relative POSIX paths without `..`, absolute or backslash forms."""
+    assert safe_relative_path(path) is ok
+
+
+CLAUSES = "a/docs/clauses/pk/"
+BP_CLAUSE = "---\nx: 1\n---\n- BP-AC1. Given a\n- BP-AC2. Given b\n- BP-AC3a. Given c\n"
+OV_CLAUSE = "---\nx: 1\n---\n- OV-AC1. Given d\n"
+
+
+def _clause_plan(covers: str) -> str:
+    return _plan(_task("T1", covers=covers), spec=CLAUSES)
+
+
+def test_clause_spec_directory_plan() -> None:
+    """AC13a: a spec path ending in `/` and prefixed `covers` ids parse; GC016 counts the covered prefixes' criteria."""
+    plan = parse_plan(_clause_plan("[BP-AC1, AC4, PK-AC1]"))
+    assert plan.spec == CLAUSES
+    assert plan.tasks[0].covers == ["BP-AC1", "AC4", "PK-AC1"]
+    for bad in ("[bp-AC1]", "[B-AC1]", "[ABCD-AC1]", "[BP-AC]", "[BP-ac1]", "[BP_AC1]"):
+        with pytest.raises(FrontMatterError, match="covers"):
+            parse_plan(_clause_plan(bad))
+    for bad_spec in ("a//", "/a/", "a/../", "a\\b/", "/", "a/./"):
+        with pytest.raises(FrontMatterError, match="spec"):
+            parse_plan(_plan(_task("T1"), spec=f"'{bad_spec}'"))
+    clauses = [BP_CLAUSE, OV_CLAUSE]
+    own = "\n# Plan\n\n- PK-AC1. Given the package, then it imports.\nPK-AC2. bare line\nPK-AC3 no dot\n"
+    # only the prefix BP is covered: OV-AC1 of the other clause spec is not demanded; the plan's own PK criteria are
+    part = parse_plan(_clause_plan("[BP-AC1, BP-AC3a]"))
+    assert uncovered_criteria(part, clauses, own) == ["BP-AC2", "PK-AC1", "PK-AC2"]
+    full = parse_plan(_clause_plan("[BP-AC1, BP-AC2, BP-AC3a, PK-AC1, PK-AC2]"))
+    assert uncovered_criteria(full, clauses, own) == []
+    both = parse_plan(_clause_plan("[BP-AC1, BP-AC2, BP-AC3a, OV-AC1, PK-AC1, PK-AC2]"))
+    assert uncovered_criteria(both, clauses, own) == []
+    none = parse_plan(_clause_plan("[PK-AC1, PK-AC2]"))  # no clause prefix covered: no clause criterion demanded
+    assert uncovered_criteria(none, clauses, own) == []
+    # a plan whose spec is a file ignores prefixed lines of the spec and the plan's own text
+    single = parse_plan(_plan(_task("T1", covers="[AC1]")))
+    assert uncovered_criteria(single, "- AC1. a\n- BP-AC1. b\n", own) == []

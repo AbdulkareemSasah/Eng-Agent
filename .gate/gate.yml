@@ -1,0 +1,32 @@
+# Root gate configuration of eng-dev-gate (spec 4.4, section 5). Protected path (.gate/**).
+# The mode comes only from bootstrap.enabled in this file (AC4). Owner switches it off and fills identities.
+bootstrap:
+  enabled: true
+  gate_branch: build/v1
+main_branch: main
+identities:  # all three must be set before bootstrap.enabled can be false (CF008)
+  owner_login: AbdulkareemSasah
+  agent_logins: []
+  reviewer_app: ""
+# Workflow documents (AC12a) and clause specs, at any depth under docs/clauses/ (AC12b), are specs (4.5 step 8).
+spec_globs: ["**/docs/specs/*.md", "**/docs/workflows/*.md", "**/docs/clauses/**/*.md"]
+plan_globs: ["**/docs/plans/*.md"]
+test_globs: ["**/tests/**", "**/test_*.py", "**/conftest.py"]
+generated_globs: ["uv.lock", "**/AGENTS.md", "**/docs/schema/**"]  # B-360: JSON Schema snapshots are generated (AC12c)
+spike_globs: ["spikes/**"]
+agents:
+  unmanaged_ok: ["design/**"]
+limits:  # Gate settings proposed here (owner queue).
+  diff_lines: 200
+  test_run_seconds: 600
+  max_file_bytes: 1048576
+  mutation_run_seconds: 7200
+license_exceptions:  # B-440: cffi (ADR-0001 (mcp-python-sdk), ADR-0002) and regex (ADR-0001 (pydantic-ai-slim)), recorded in ADR-0005
+  - {distribution: cffi, license: MIT-0, adr: packages/eng-harness/docs/adr/0005-transitive-licenses.md}
+  - {distribution: regex, license: Apache-2.0 AND CNRI-Python, adr: packages/eng-harness/docs/adr/0005-transitive-licenses.md}
+secrets:
+  allow:
+    # Reviewed false positive: the JOBS table maps the command name "secrets" to the job name "security".
+    - rule: credential-assignment
+      path: tools/eng-dev-gate/src/eng_dev_gate/gate_root.py
+      fingerprint: 10b725ce507c

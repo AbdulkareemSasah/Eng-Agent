@@ -1,0 +1,19 @@
+# Case file of sbc304_2018.unconfirmed_aci_318_14_10_6_1_1.longitudinal_reinforcement_limits (plan 0003 T3; spec 0003 §9). Protected test oracle.
+# The pack evaluates no SBC equation: the single boundary case expects NEEDS_ENGINEER on the gap path
+# (core spec 4.9.4 (3)). Inputs are synthetic ACI HC-1 values, not project values. No worked example (G-WE).
+# Derivation (hand): Spec 0003 §4.3 and clause-map §3 G-9: SBC_CONFIRMED raises NotImplementedGap before any ACI reinforcement ratio step, so status is NEEDS_ENGINEER. Inputs are the ACI longitudinal_reinforcement_limits HC-1 set.
+format: structural-codes-verification/1
+check_id: sbc304_2018.unconfirmed_aci_318_14_10_6_1_1.longitudinal_reinforcement_limits
+program_comparison:
+  not_available: "returns NEEDS_ENGINEER until the SBC row is confirmed"
+cases:
+  - id: BD-1
+    kind: boundary
+    subject: {kind: frame, id: C1}
+    inputs:
+      Ag_mm2: 250000
+      Ast_mm2: 4000
+    covers: [G-9, SBC_CONFIRMED]
+    expected:
+      status: NEEDS_ENGINEER
+review: null

@@ -1,0 +1,40 @@
+{
+  "change_set": "res_00000000000000000000000005",
+  "effects": [
+    {
+      "item_id": "i1",
+      "key": [
+        "F1"
+      ],
+      "op": "set",
+      "pointer": "/section",
+      "section": "model.frame_placements/1",
+      "unit": null,
+      "value": "C40"
+    },
+    {
+      "item_id": "i2",
+      "key": [
+        "F9"
+      ],
+      "op": "add",
+      "pointer": null,
+      "section": "model.frame_placements/1",
+      "unit": null,
+      "value": {
+        "id": "F9"
+      }
+    },
+    {
+      "item_id": "i3",
+      "key": [
+        "F2"
+      ],
+      "op": "remove",
+      "pointer": null,
+      "section": "model.frame_placements/1",
+      "unit": null
+    }
+  ],
+  "model_id": "mdl_00000000000000000000000000"
+}

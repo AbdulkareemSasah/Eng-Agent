@@ -1,0 +1,66 @@
+[project]
+name = "eng-contract"
+version = "0.1.0.dev0"
+description = "Contract package of the Eng-Agent platform: error codes, canonical JSON, identifiers, units, envelopes and records (eng-contract/1)."
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+dependencies = ["pydantic>=2.14,<3"]
+
+# Test-only dependencies of this package, declared here so the package keeps them when it leaves the workspace
+# (imports rule IM006 of the gate, spec 4.10); the versions follow the workspace root's dev group.
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "hypothesis>=6.170.14",
+    "jsonschema>=4.26.0",
+    "types-jsonschema>=4.26.0.20261006",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "eng_contract"
+
+# Only keys of the gate's allowed set (eng-dev-gate spec 4.12). ruff: `src` keeps eng_contract first-party for import
+# sorting, and the rule set is the workspace root's (a superset of the baseline); the target version comes from
+# requires-python. mypy takes the workspace root's configuration. The gate runs coverage itself, with a generated
+# configuration and the thresholds of [tool.eng-gate].
+[tool.ruff]
+line-length = 120
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "N", "S", "T20", "C4", "PIE", "RUF", "PT"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --strict-config"
+testpaths = ["tests"]
+markers = [
+    "windows: needs Windows; runs in the Windows CI job",
+]
+
+# Key names follow the eng-dev-gate spec (B-004), which differs from the plan text of T1:
+# profile/import_names/coverage_line/coverage_branch/mutation_min/r2_modules in place of
+# layer_name/risk_floor/may_import/[tool.eng-gate.coverage]/[tool.eng-gate.mutation].
+[tool.eng-gate]
+profile = "contract"
+windows_tests = ["tests/windows"]  # AC15 runs on the Windows CI job (B-029)
+layer = 1
+import_names = ["eng_contract"]
+public_modules = [
+  "eng_contract", "eng_contract.canonical", "eng_contract.ids", "eng_contract.errors",
+  "eng_contract.envelope", "eng_contract.records", "eng_contract.store", "eng_contract.refs",
+  "eng_contract.units", "eng_contract.quantity", "eng_contract.cited", "eng_contract.params",
+  "eng_contract.verdicts", "eng_contract.issues", "eng_contract.trace", "eng_contract.kinds",
+  "eng_contract.kinds.model", "eng_contract.kinds.forces", "eng_contract.kinds.basis",
+  "eng_contract.kinds.verdicts", "eng_contract.kinds.issues", "eng_contract.mcp",
+]
+coverage_line = 95
+coverage_branch = 90
+mutation_min = 80
+r2_modules = ["src/eng_contract/**"]

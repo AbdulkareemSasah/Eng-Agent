@@ -1,0 +1,146 @@
+{
+  "source": "eng-harness spec 0011 \u00a74.11 (structure join after M3/M5; OQ-Q104); synthetic missing structure row, no project value",
+  "method_ref": "\u00a74.11 M3",
+  "synthetic": true,
+  "derivation": "t = 5 mm; offsets zero. Frame F1 matches element U1 uniquely (end d\u00b2 = 0). structure.elements is empty, so the join finds no row whose unique_id equals U1. Spec 0011 \u00a74.11: the matched pair is not in pairs and goes to conflicts with unique_id = geometric_unique_id = U1 (the only conflicts row where the two ids are equal). complete = true (input refs complete).",
+  "inputs": {
+    "input": {
+      "frames": {
+        "frames": [
+          {
+            "id": "F1",
+            "kind": "column",
+            "section": "C400",
+            "i": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          }
+        ]
+      },
+      "elements": {
+        "frames": [
+          {
+            "id": "U1",
+            "kind": "column",
+            "section": "Concrete Rectangular Column: 400 x 400",
+            "i": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          }
+        ]
+      },
+      "structure": {
+        "elements": [],
+        "types": []
+      },
+      "links": null,
+      "basis": {
+        "template": null,
+        "fields": {
+          "compare.length_mm": {
+            "value": 5.0,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "mapping.offset_x_mm": {
+            "value": 0,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "mapping.offset_y_mm": {
+            "value": 0,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "mapping.offset_z_mm": {
+            "value": 0,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          }
+        }
+      }
+    },
+    "meta": {
+      "refs": {
+        "frames": {
+          "result_id": "res_00000000000000000000000001",
+          "ref": "res_00000000000000000000000001",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "elements": {
+          "result_id": "res_00000000000000000000000002",
+          "ref": "res_00000000000000000000000002",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 4,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "structure": {
+          "result_id": "res_00000000000000000000000003",
+          "ref": "res_00000000000000000000000003",
+          "kind": "harness.revit_structure/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 5,
+          "parents": [],
+          "producer_tool": "revit"
+        },
+        "basis": {
+          "result_id": "res_00000000000000000000000009",
+          "ref": "res_00000000000000000000000009",
+          "kind": "basis.design_basis/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        }
+      }
+    }
+  },
+  "expected": {
+    "pairs": [],
+    "ambiguous": [],
+    "unmatched_frames": [],
+    "unmatched_elements": [],
+    "conflicts": [
+      {
+        "frame_id": "F1",
+        "unique_id": "U1",
+        "geometric_unique_id": "U1"
+      }
+    ],
+    "complete": true
+  }
+}

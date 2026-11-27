@@ -1,0 +1,290 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.5 (rules U1 to U10); synthetic data, no project value",
+  "method_ref": "§4.4.5 U4",
+  "synthetic": true,
+  "derivation": "t = compare.length_mm = 5 mm (confirmed, mm). U1: the pairs are (C1, u-b) and (C2, u-a); both frames have ETABS section C30S at frame_sections index 0, rectangular 300 x 300, so both targets are section_b -> res_01KRC000000000000000000003#/frame_sections/0/shape/b_mm and section_h -> res_01KRC000000000000000000003#/frame_sections/0/shape/h_mm. U2: F1 section_b and section_h are both reference, so both pairs proceed. U3: the current type 21 (Told) has b_mm and h_mm 400.0, |400 - 300| = 100 > 5 on both roles, so neither pair is no_change. U4: type 21 is the only type of family F1 and is outside, so no type is within; one new type per (family, ETABS section name) gives a single new type named 'C30S' after the section, duplicated from the current type of the first pair by unique_id (u-a, element 102), with from_unique_id 'u-a' and the U1 role references above; no type of that name is in the family, so there is no NAME_CONFLICT. Both assignments name new_type_name 'C30S'. U5: the target is square (300 = 300), so there is no orientation row. U6: changed is empty, so both origins are preexisting, and the new type lists one origin per pair in ascending unique_id order, ['preexisting', 'preexisting'], retaining the repetition. U7: expected.elements holds one row per assignment, [{unique_id u-a, family F1, type_name 'C30S'}, {unique_id u-b, family F1, type_name 'C30S'}] with the new-type identity (type_id null); expected.types holds the one new type [{family F1, name 'C30S'}] with the U1 role references; the plan carries no expected_instances for the new type (R7 supplies it). U8: all seven referenced records are complete, so complete is true. U9: assignments and expected.elements are ordered by unique_id (u-a before u-b, although the map pairs are ordered by frame_id); new_types and expected.types hold one row.",
+  "input": {
+    "map": {
+      "calc": {
+        "id": "harness.frame_element_map",
+        "version": 1,
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.frame_element_map",
+        "calc_version": "1",
+        "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "pairs": [
+        {
+          "frame_id": "C1",
+          "unique_id": "u-b",
+          "element_id": 101,
+          "type_id": 21,
+          "basis": "geometry",
+          "lower_distance_mm": 0.0,
+          "upper_distance_mm": 0.0
+        },
+        {
+          "frame_id": "C2",
+          "unique_id": "u-a",
+          "element_id": 102,
+          "type_id": 21,
+          "basis": "geometry",
+          "lower_distance_mm": 0.0,
+          "upper_distance_mm": 0.0
+        }
+      ],
+      "ambiguous": [],
+      "unmatched_frames": [],
+      "unmatched_elements": [],
+      "conflicts": [],
+      "complete": true
+    },
+    "frames": {
+      "frames": [
+        {
+          "id": "C1",
+          "kind": "other",
+          "section": "C30S",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "C2",
+          "kind": "other",
+          "section": "C30S",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "C30S",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 300,
+            "h_mm": 300
+          }
+        }
+      ],
+      "area_sections": []
+    },
+    "revit": {
+      "elements": [
+        {
+          "unique_id": "u-a",
+          "element_id": 102,
+          "category": "column",
+          "family": "F1",
+          "type_id": 21,
+          "type_name": "Told",
+          "level_id": 1,
+          "level_name": "L1",
+          "location_kind": "point",
+          "i": null,
+          "j": null,
+          "rotation_deg": 0,
+          "parameters": {}
+        },
+        {
+          "unique_id": "u-b",
+          "element_id": 101,
+          "category": "column",
+          "family": "F1",
+          "type_id": 21,
+          "type_name": "Told",
+          "level_id": 1,
+          "level_name": "L1",
+          "location_kind": "point",
+          "i": null,
+          "j": null,
+          "rotation_deg": 0,
+          "parameters": {}
+        }
+      ],
+      "types": [
+        {
+          "type_id": 21,
+          "family": "F1",
+          "name": "Told",
+          "instance_ids": [
+            101,
+            102
+          ],
+          "parameters": {
+            "section_b": {
+              "value": 400.0,
+              "unit": "mm"
+            },
+            "section_h": {
+              "value": 400.0,
+              "unit": "mm"
+            }
+          }
+        }
+      ]
+    },
+    "role_statuses": {
+      "F1": {
+        "section_b": "reference",
+        "section_h": "reference"
+      }
+    },
+    "revit_placements": {
+      "frames": [
+        {
+          "id": "u-a",
+          "kind": "column",
+          "section": "F1: Told",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "u-b",
+          "kind": "column",
+          "section": "F1: Told",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "changed": [],
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.length_mm": {
+          "value": 5,
+          "unit": "mm",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "map": "res_01KRC000000000000000000001",
+    "frames": "res_01KRC000000000000000000002",
+    "sections": "res_01KRC000000000000000000003",
+    "revit": "res_01KRC000000000000000000004",
+    "revit_placements": "res_01KRC000000000000000000005",
+    "changed": "res_01KRC000000000000000000006#/changed",
+    "basis": "res_01KRC000000000000000000007"
+  },
+  "expected": {
+    "new_types": [
+      {
+        "family": "F1",
+        "section": "C30S",
+        "name": "C30S",
+        "from_unique_id": "u-a",
+        "origins": [
+          "preexisting",
+          "preexisting"
+        ],
+        "roles": {
+          "section_b": "res_01KRC000000000000000000003#/frame_sections/0/shape/b_mm",
+          "section_h": "res_01KRC000000000000000000003#/frame_sections/0/shape/h_mm"
+        }
+      }
+    ],
+    "assignments": [
+      {
+        "unique_id": "u-a",
+        "element_id": "102",
+        "from_type_id": "21",
+        "type_id": null,
+        "new_type_name": "C30S",
+        "origin": "preexisting"
+      },
+      {
+        "unique_id": "u-b",
+        "element_id": "101",
+        "from_type_id": "21",
+        "type_id": null,
+        "new_type_name": "C30S",
+        "origin": "preexisting"
+      }
+    ],
+    "no_change": [],
+    "not_updatable": [],
+    "orientation": [],
+    "expected": {
+      "elements": [
+        {
+          "unique_id": "u-a",
+          "type_id": null,
+          "family": "F1",
+          "type_name": "C30S"
+        },
+        {
+          "unique_id": "u-b",
+          "type_id": null,
+          "family": "F1",
+          "type_name": "C30S"
+        }
+      ],
+      "types": [
+        {
+          "family": "F1",
+          "name": "C30S",
+          "roles": {
+            "section_b": "res_01KRC000000000000000000003#/frame_sections/0/shape/b_mm",
+            "section_h": "res_01KRC000000000000000000003#/frame_sections/0/shape/h_mm"
+          }
+        }
+      ]
+    },
+    "complete": true
+  }
+}

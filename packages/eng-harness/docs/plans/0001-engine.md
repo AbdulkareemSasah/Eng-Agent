@@ -1,0 +1,1184 @@
+---
+id: plan-b060-engine
+issue: "B-060"
+spec: packages/eng-harness/docs/specs/0001-engine.md
+status: draft            # draft | approved (approved only by merging this file's own pull request)
+size: large
+risk: [r1, r2, r3]       # binding for every pull request of this plan; r3 because T1 and later tasks touch pyproject.toml
+tasks:
+  - id: T1
+    title: Package skeleton, gate configuration and workspace member
+    files:
+      - "pyproject.toml"
+      - "uv.lock"
+      - "packages/eng-harness/pyproject.toml"
+      - "packages/eng-harness/README.md"
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/AGENTS.md"
+      - "packages/eng-harness/CLAUDE.md"
+      - "packages/eng-harness/.gate/agents.yml"
+      - "packages/eng-harness/.gate/risk-map.yml"
+      - "packages/eng-harness/docs/local-testing.md"
+      - "packages/eng-harness/src/eng_harness/__init__.py"
+      - "packages/eng-harness/src/eng_harness/py.typed"
+      - "packages/eng-harness/tests/unit/test_package.py"
+    max_changed_lines: 200
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_package.py::test_version_matches_project"
+      - "packages/eng-harness/tests/unit/test_package.py::test_public_modules_import"
+      - "packages/eng-harness/tests/unit/test_package.py::test_private_modules_are_underscored"
+    covers: [AC1]
+    depends_on: []
+  - id: T2
+    title: Harness codes, EngineStop and StepError families
+    files:
+      - "packages/eng-harness/pyproject.toml"
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/errors.py"
+      - "packages/eng-harness/tests/unit/test_errors.py"
+    max_changed_lines: 240
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_errors.py::test_engine_stop_is_not_exception"
+      - "packages/eng-harness/tests/unit/test_errors.py::test_codes_per_exception"
+    covers: [AC10]
+    depends_on: [T1]
+  - id: T3
+    title: Journal event payload models and the harness kinds module
+    files:
+      - "packages/eng-harness/pyproject.toml"
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/journal/__init__.py"
+      - "packages/eng-harness/src/eng_harness/journal/_events.py"
+      - "packages/eng-harness/src/eng_harness/_kinds.py"
+      - "packages/eng-harness/tests/unit/test_journal_events.py"
+    max_changed_lines: 400
+    max_sessions: 3
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_journal_events.py::test_event_models_forbid_extra_fields"
+      - "packages/eng-harness/tests/unit/test_journal_events.py::test_every_event_type_has_a_model"
+      - "packages/eng-harness/tests/unit/test_journal_events.py::test_harness_kinds_are_registered"
+    covers: [AC26]
+    depends_on: [T2]
+  - id: T3b
+    title: Journal schema, append-only writer, hash chain, durability, payloads by reference
+    files:
+      - "packages/eng-harness/pyproject.toml"
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/journal/__init__.py"
+      - "packages/eng-harness/src/eng_harness/journal/_schema.py"
+      - "packages/eng-harness/src/eng_harness/journal/_writer.py"
+      - "packages/eng-harness/tests/unit/test_journal.py"
+      - "packages/eng-harness/tests/conftest.py"
+    max_changed_lines: 260
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_journal.py::test_append_only"
+      - "packages/eng-harness/tests/unit/test_journal.py::test_hash_chain_detects_tampering"
+      - "packages/eng-harness/tests/unit/test_journal.py::test_durability_policy"
+      - "packages/eng-harness/tests/unit/test_journal.py::test_large_payloads_by_reference"
+      - "packages/eng-harness/tests/unit/test_journal.py::test_payload_models"
+    covers: [AC20, AC21, AC22, AC24, AC26]
+    depends_on: [T3]
+  - id: T4
+    title: Journal reader API and views
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.journal (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/journal/__init__.py"
+      - "packages/eng-harness/src/eng_harness/journal/_reader.py"
+      - "packages/eng-harness/src/eng_harness/_runlock.py"
+      - "packages/eng-harness/tests/unit/test_journal_reader.py"
+    max_changed_lines: 300
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_journal_reader.py::test_views_and_follow"
+      - "packages/eng-harness/tests/unit/test_journal_reader.py::test_run_class_and_unreleased_tools"
+    covers: [AC25, AC68]
+    depends_on: [T3b]
+  - id: T5
+    title: Blocks, workflows, registry, code hash and the block lock file
+    files:
+      - "packages/eng-harness/pyproject.toml"
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/block.py"
+      - "packages/eng-harness/src/eng_harness/blocks.lock.json"
+      - "packages/eng-harness/tests/unit/test_block.py"
+      - "packages/eng-harness/tests/contract/test_block_lock.py"
+      - "packages/eng-harness/tests/data/blocks/**"
+    max_changed_lines: 260
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_block.py::test_registration_rules"
+      - "packages/eng-harness/tests/unit/test_block.py::test_code_hash_is_stable"
+      - "packages/eng-harness/tests/unit/test_block.py::test_check_lock"
+      - "packages/eng-harness/tests/contract/test_block_lock.py::test_lock_matches_registry"
+    covers: [AC2, AC3, AC4]
+    depends_on: [T2]
+  - id: T6
+    title: Ports, port data types and in-memory fakes
+    files:
+      - "packages/eng-harness/pyproject.toml"
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/ports.py"
+      - "packages/eng-harness/tests/fakes/**"
+      - "packages/eng-harness/tests/contract/test_ports_conformance.py"
+    max_changed_lines: 380
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/contract/test_ports_conformance.py::test_fakes_conform"
+    covers: [AC57]
+    depends_on: [T3b]
+  - id: T7
+    title: ctx types, basis view and the result codec
+    files:
+      - "packages/eng-harness/pyproject.toml"
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/ctx.py"
+      - "packages/eng-harness/src/eng_harness/engine/_codec.py"
+      - "packages/eng-harness/tests/unit/test_codec.py"
+      - "packages/eng-harness/tests/unit/test_ctx_basis.py"
+    max_changed_lines: 350
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_codec.py::test_live_equals_replayed"
+      - "packages/eng-harness/tests/unit/test_ctx_basis.py::test_basis_view"
+    covers: [AC11, AC17]
+    depends_on: [T6]
+  - id: T8
+    title: Step paths, scopes, op_id, overlap detection, parallel and attempts scopes
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_steps.py"
+      - "packages/eng-harness/tests/unit/test_steps.py"
+    max_changed_lines: 300
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_steps.py::test_paths_independent_of_completion_order"
+      - "packages/eng-harness/tests/unit/test_steps.py::test_op_id"
+      - "packages/eng-harness/tests/unit/test_steps.py::test_overlap_outside_parallel"
+      - "packages/eng-harness/tests/unit/test_steps.py::test_parallel_error_choice"
+    covers: [AC5, AC6, AC7, AC8]
+    depends_on: [T7]
+  - id: T9
+    title: Engine start, run lock, run header, input and output validation, run-class and unreleased_tools records
+    # Amendment (B-424, documents only): the original T9 (477 lines) exceeded limits.max_task_lines (400, gate GC005);
+    # lead decision D-12: split. T9 keeps start; T9b keeps resume and replay.
+    files:
+      - "packages/eng-harness/pyproject.toml"
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/docs/local-testing.md"  # the Windows run-lock item
+      - "packages/eng-harness/src/eng_harness/engine/__init__.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/unit/test_runner.py"
+      - "packages/eng-harness/tests/unit/test_run_lock.py"
+      - "packages/eng-harness/tests/windows/test_run_lock_windows.py"
+    max_changed_lines: 360
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_runner.py::test_input_and_output_validation"
+      - "packages/eng-harness/tests/unit/test_run_lock.py::test_one_engine_per_run"
+      - "packages/eng-harness/tests/unit/test_runner.py::test_run_class_recorded_and_checked"
+      - "packages/eng-harness/tests/unit/test_runner.py::test_unreleased_tools_recorded"
+    covers: [AC16, AC28, AC29, AC65, AC68]
+    depends_on: [T4, T5, T8]
+  - id: T9b
+    title: Engine resume, version rule, replay index, divergence variants, code-hash warning, completed-run return
+    files:
+      - "packages/eng-harness/pyproject.toml"
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/__init__.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/src/eng_harness/engine/_replay.py"
+      - "packages/eng-harness/tests/unit/test_runner.py"
+      - "packages/eng-harness/tests/replay/test_resume.py"
+      - "packages/eng-harness/tests/replay/test_divergence.py"
+      - "packages/eng-harness/tests/workflows/**"
+    max_changed_lines: 260
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/replay/test_resume.py::test_completed_run"
+      - "packages/eng-harness/tests/replay/test_divergence.py::test_divergence_variants"
+      - "packages/eng-harness/tests/replay/test_divergence.py::test_hash_change_warns"
+    covers: [AC23, AC35, AC68]  # AC68 for resume
+    depends_on: [T9]
+  - id: T10
+    title: ctx implementation of tool, read, calc, block, parallel, attempts, escalate
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/unit/test_ctx_tool.py"
+      - "packages/eng-harness/tests/unit/test_ctx_read.py"
+      - "packages/eng-harness/tests/unit/test_ctx_calc.py"
+      - "packages/eng-harness/tests/unit/test_ctx_block.py"
+      - "packages/eng-harness/tests/unit/test_ctx_attempts.py"
+      - "packages/eng-harness/tests/unit/test_ctx_escalate.py"
+      - "packages/eng-harness/tests/replay/test_resume.py"
+      - "packages/eng-harness/tests/workflows/**"
+    max_changed_lines: 400
+    max_sessions: 3
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_ctx_tool.py::test_tool_result_and_failure"
+      - "packages/eng-harness/tests/unit/test_ctx_read.py::test_read"
+      - "packages/eng-harness/tests/unit/test_ctx_calc.py::test_calc_step"
+      - "packages/eng-harness/tests/unit/test_ctx_block.py::test_child_block"
+      - "packages/eng-harness/tests/unit/test_ctx_attempts.py::test_attempts_rules"
+      - "packages/eng-harness/tests/unit/test_ctx_escalate.py::test_escalate"
+      - "packages/eng-harness/tests/replay/test_resume.py::test_pause_and_resume"
+    covers: [AC9, AC11, AC12, AC13, AC14, AC15, AC27]
+    depends_on: [T9b]
+  - id: T11
+    title: Input requests (the x-eng-input marker, choice schemas, answer checks) and the escalation request
+    # Amendment (B-342, documents only): the original T11 (440 lines) exceeded limits.max_task_lines (400, gate GC005);
+    # lead decision D-12: split. T11 keeps the input-request builders of B-068 (`_inputs.py`, AC67); T11b keeps the
+    # in-flight reconciliation and the host-state check, which present their requests through T11.
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_inputs.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/unit/test_inputs.py"
+    max_changed_lines: 140
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_inputs.py::test_input_request_markers"
+    covers: [AC67]
+    depends_on: [T10]
+  - id: T11b
+    title: In-flight reconciliation at resume (the journal fold, step_rerun, the adapter outcomes, engine.in_flight)
+    # Amendment (B-427, documents only): the original T11b measured 516 lines (B-349) against its 300 and
+    # limits.max_task_lines (400, gate GC005); lead decision D-12: split. T11b keeps the in-flight reconciliation
+    # (`_inflight.py`); T11c keeps the host-state check (`_hoststate.py`) and extends T11b's resume fold in
+    # `_inflight.py` (bindings, saves, restored cuts, `lacking`, the restore cut in `ResumeIndex`).
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/docs/local-testing.md"  # the reconcile item against a real adapter
+      - "packages/eng-harness/src/eng_harness/engine/_inflight.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/replay/test_in_flight.py"
+      - "packages/eng-harness/tests/workflows/**"  # the scripted host shared with T11c's tests
+    max_changed_lines: 300
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/replay/test_in_flight.py::test_write_in_flight"
+      - "packages/eng-harness/tests/replay/test_in_flight.py::test_read_in_flight"
+    covers: [AC31, AC32]
+    depends_on: [T11]
+  - id: T11c
+    title: Host-state check before live execution (model binding, lost and reopened models, the three choices)
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/docs/local-testing.md"  # the host-crash, reopen and restore items
+      - "packages/eng-harness/src/eng_harness/engine/_hoststate.py"
+      - "packages/eng-harness/src/eng_harness/engine/_inflight.py"  # the resume fold's host-state part (B-427)
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/replay/test_host_state.py"
+      - "packages/eng-harness/tests/workflows/**"  # the scripted host shared with T11b's tests
+    max_changed_lines: 320
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/replay/test_host_state.py::test_three_choices"
+      - "packages/eng-harness/tests/replay/test_host_state.py::test_host_crash_with_write_in_flight"
+      - "packages/eng-harness/tests/replay/test_host_state.py::test_reopened_in_new_instance"
+    covers: [AC34, AC63, AC64]  # AC64 shared with T13b, which completes the first-use ordering (B-427, B-454)
+    depends_on: [T11b]
+  - id: T12
+    title: Invariants 1, 2, 3 and 7 (check after write, references, staleness, save before analysis)
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_invariants.py"
+      - "packages/eng-harness/src/eng_harness/engine/_steps.py"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"  # two edits only: ports.host into Ctx, await Ctx.finish() (B-434)
+      - "packages/eng-harness/src/eng_harness/journal/_events.py"  # StepStarted.action, optional (B-434)
+      - "packages/eng-harness/tests/unit/test_steps.py"
+      - "packages/eng-harness/tests/workflow/test_invariants.py"
+      - "packages/eng-harness/tests/property/test_check_after_write.py"
+      - "packages/eng-harness/tests/replay/test_divergence.py"
+      - "packages/eng-harness/tests/workflows/**"
+      # Amendment (B-445): the journals these tests pin gain the root block's `~end.check_model` steps (spec 4.6 #1,
+      # AC37); T12 changes only those journal assertions there.
+      - "packages/eng-harness/tests/unit/test_runner.py"
+      - "packages/eng-harness/tests/replay/test_resume.py"
+      - "packages/eng-harness/tests/replay/test_in_flight.py"
+      - "packages/eng-harness/tests/replay/test_host_state.py"
+    max_changed_lines: 380
+    max_sessions: 3
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_steps.py::test_sibling_model_conflict"
+      - "packages/eng-harness/tests/workflow/test_invariants.py::test_check_after_write"
+      - "packages/eng-harness/tests/property/test_check_after_write.py::test_no_unchecked_use_after_write"
+      - "packages/eng-harness/tests/workflow/test_invariants.py::test_engineering_literal_rejected"
+      - "packages/eng-harness/tests/workflow/test_invariants.py::test_stale_ref"
+      - "packages/eng-harness/tests/workflow/test_invariants.py::test_save_before_analysis"
+      - "packages/eng-harness/tests/replay/test_divergence.py::test_inserted_steps_are_replayed"
+    covers: [AC5, AC37, AC38, AC39, AC43, AC47]
+    depends_on: [T10, T11c]  # T11c, not T11b, since the B-427 split
+  - id: T13
+    title: Invariants 5, 6 and 8 at start (basis, honest outcomes, server checks)
+    # Amendment (B-454, documents only): the original T13 (B-112 draft, about 453 counted lines) exceeded
+    # limits.max_task_lines (400, gate GC005); lead decision D-12: split. T13 keeps invariants 5, 6 and 8 at start;
+    # T13b keeps invariant 9 and the first-use binding (B-427); T13c keeps invariant 10 and resume steps 4 and 5.
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_hostsafety.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/tests/workflow/test_invariants.py"
+      - "packages/eng-harness/tests/workflow/test_honest_outcomes.py"
+      - "packages/eng-harness/tests/workflows/**"  # the rig's design bases and scripted server checks
+    max_changed_lines: 220
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/workflow/test_invariants.py::test_basis_incomplete_refused"
+      - "packages/eng-harness/tests/workflow/test_honest_outcomes.py::test_unknown_outcome_reconciled_first"
+      - "packages/eng-harness/tests/workflow/test_honest_outcomes.py::test_reconcile_before_next_step_on_host"
+      - "packages/eng-harness/tests/workflow/test_invariants.py::test_server_check"
+    covers: [AC33, AC41, AC42, AC44]  # AC44 at start; at resume it is T13c's
+    depends_on: [T11c, T12]  # T11c, not T11b, since the B-427 split
+  - id: T13b
+    title: Invariant 9 and the first-use binding (units reads, the model_open refusal, resume step 6)
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_hostsafety.py"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"  # drops the BindingTools wrapper only
+      - "packages/eng-harness/src/eng_harness/engine/_hoststate.py"  # the binding seam and resume step 6 (B-427)
+      - "packages/eng-harness/tests/workflow/test_invariants.py"
+      - "packages/eng-harness/tests/replay/test_host_state.py"  # the binding seam and resume step 6 (B-427)
+      - "packages/eng-harness/tests/workflows/**"  # the rigs open their models
+      # The model_open refusal: the rigs of these tests open their models, and the journals they pin gain the
+      # binding and the ~pre.units steps; T13b changes only those journal and port-log assertions there (as B-445).
+      - "packages/eng-harness/tests/unit/test_runner.py"
+      - "packages/eng-harness/tests/unit/test_ctx_tool.py"
+      - "packages/eng-harness/tests/unit/test_run_lock.py"
+      - "packages/eng-harness/tests/unit/test_steps.py"
+      - "packages/eng-harness/tests/unit/test_ctx_escalate.py"
+      - "packages/eng-harness/tests/unit/test_ctx_block.py"
+      - "packages/eng-harness/tests/property/test_check_after_write.py"
+      - "packages/eng-harness/tests/replay/test_divergence.py"
+      - "packages/eng-harness/tests/replay/test_resume.py"
+      - "packages/eng-harness/tests/replay/test_in_flight.py"
+      - "packages/eng-harness/tests/windows/test_run_lock_windows.py"  # its host opens m1
+    max_changed_lines: 200
+    max_sessions: 3
+    tests_first:
+      - "packages/eng-harness/tests/workflow/test_invariants.py::test_units_after_reconnect"
+      - "packages/eng-harness/tests/workflow/test_invariants.py::test_model_not_open_refused"
+      - "packages/eng-harness/tests/replay/test_host_state.py::test_reopened_in_new_instance"  # extended: model_bound before step_started
+    covers: [AC45, AC64]  # AC64 shared with T11c: the first-use ordering (B-427)
+    depends_on: [T13]
+  - id: T13c
+    title: Invariant 10 and the resume order (host leases, host_started, close_started, resume steps 4 and 5)
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_hostsafety.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/tests/workflow/test_invariants.py"
+      - "packages/eng-harness/tests/replay/test_resume.py"
+      - "packages/eng-harness/tests/replay/test_in_flight.py"
+      - "packages/eng-harness/tests/workflows/**"
+      # The resume preflight, the leases, started_instances and close_started at run end: T13c changes only the
+      # port-log and journal assertions there.
+      - "packages/eng-harness/tests/replay/test_host_state.py"
+      - "packages/eng-harness/tests/replay/test_divergence.py"
+      - "packages/eng-harness/tests/unit/test_ctx_escalate.py"
+      - "packages/eng-harness/tests/unit/test_ctx_block.py"
+    max_changed_lines: 240
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/workflow/test_invariants.py::test_host_lease_and_close"
+      - "packages/eng-harness/tests/replay/test_resume.py::test_close_started_after_resume"
+      - "packages/eng-harness/tests/replay/test_in_flight.py::test_resume_order_guards_reconciliation"
+    covers: [AC44, AC46, AC62]  # AC44 at resume (step 4)
+    depends_on: [T13b]
+  - id: T14
+    title: ctx.decide and ctx.decide_many over the DecisionPort, with engineer-tier requests (invariant 4)
+    # Amendment (B-412, documents only): the DecisionPort field T14 adds to EnginePorts defaults to None (section 3 rule; plan 0006 T16b binds it in production).
+    # Amendment (B-342, documents only): the original T14 (450 lines) exceeded limits.max_task_lines (400, gate GC005);
+    # lead decision D-12: split. T14 keeps the DecisionPort, `decide`, `decide_many` and the engineer-tier request
+    # (B-068); T14b keeps `ctx.ask` and the decision runtime record of amendment B-098.
+    # Amendment (B-481, documents only): the B-113 writer measured 387 lines in these files against 330; a decision
+    # step journals `step_started` only with its answer, so one in flight at resume is a `decide` or `decide_many`
+    # step, which spec 4.5.3 and AC32 rerun: T14 adds both kinds to `_inflight.py`'s rerun set (3 lines). Budget 390.
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine, eng_harness.ports (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/ports.py"
+      - "packages/eng-harness/src/eng_harness/engine/_decide.py"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/src/eng_harness/engine/_inflight.py"  # the rerun set (B-481)
+      - "packages/eng-harness/tests/fakes/**"
+      - "packages/eng-harness/tests/contract/test_ports_conformance.py"
+      - "packages/eng-harness/tests/unit/test_ctx_decide.py"
+    max_changed_lines: 390
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_ctx_decide.py::test_decisions_cannot_produce_numbers"
+      - "packages/eng-harness/tests/unit/test_ctx_decide.py::test_engineer_tier_through_input_port"
+    covers: [AC40, AC66, AC67]
+    depends_on: [T13c]  # T13c, the last part of the B-454 split
+  - id: T14b
+    title: ctx.ask and the decision runtime record (run header and reader view)
+    # Amendment (B-414, documents only): the payload field and RunView.decision_runtime were merged with T3 and T4 (B-103);
+    # the journal globs and the reader test are dropped, because a reader-only first-commit test passes at the base (TF004).
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine, eng_harness.journal, eng_harness.ports (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/ports.py"
+      - "packages/eng-harness/src/eng_harness/engine/_decide.py"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/fakes/**"
+      - "packages/eng-harness/tests/contract/test_ports_conformance.py"
+      - "packages/eng-harness/tests/unit/test_ctx_ask.py"
+      - "packages/eng-harness/tests/unit/test_runner.py"
+    max_changed_lines: 120
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_ctx_ask.py::test_ask_stores_engineer_input"
+      - "packages/eng-harness/tests/unit/test_ctx_ask.py::test_input_request_markers"
+      - "packages/eng-harness/tests/unit/test_runner.py::test_decision_runtime_recorded"
+    covers: [AC61, AC67, AC69]
+    depends_on: [T14]
+  - id: T15
+    title: Approvals (binding, single use, re-check before the write, items, pause and re-presentation)
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_approvals.py"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"  # one line: ports.approvals into Ctx (amendment B-492)
+      - "packages/eng-harness/src/eng_harness/engine/_inflight.py"  # "approve" into the rerun set, spec 4.5.3 (amendment B-492)
+      - "packages/eng-harness/src/eng_harness/ports.py"  # ToolPort.preview (amendment B-388)
+      - "packages/eng-harness/tests/unit/test_approvals.py"
+      - "packages/eng-harness/tests/replay/test_in_flight.py"  # pins the approval in flight at resume (amendment B-492)
+      - "packages/eng-harness/tests/replay/test_resume.py"
+      - "packages/eng-harness/tests/workflow/test_pause.py"
+      - "packages/eng-harness/tests/workflows/**"
+      - "packages/eng-harness/tests/fakes/**"
+      - "packages/eng-harness/tests/contract/test_ports_conformance.py"
+    max_changed_lines: 380
+    max_sessions: 3
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_approvals.py::test_binding_and_single_use"
+      - "packages/eng-harness/tests/unit/test_approvals.py::test_recheck_before_write"
+      - "packages/eng-harness/tests/unit/test_approvals.py::test_per_item_rejection_and_expiry"
+      - "packages/eng-harness/tests/replay/test_resume.py::test_pending_requests_represented"
+      - "packages/eng-harness/tests/workflow/test_pause.py::test_except_exception_cannot_swallow_pause"
+    covers: [AC10, AC36, AC54, AC55, AC56]
+    depends_on: [T12, T14b]
+  - id: T16
+    title: Permission modes, always-ask list and working copies
+    # Amendment (B-499, D-12): the B-115 draft of the former T16 measured 408 counted lines against 380 and touched
+    # _runner.py and six existing tests; split, never stretched. This half keeps the modes, the always-ask list and the
+    # working copies; file-copy promotion is T16b (work item B-500). Measured on the B-115 branch with promotion taken
+    # out (trial, gate pass): _modes.py 221, _ctx_impl.py 35, _runner.py 5, _steps.py 4, CHANGELOG 1, local-testing 2:
+    # 268; budget 295. It also takes the resume_path defect (spec 4.3.1 hash form; working copies make such keys).
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_modes.py"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"  # _drive gives Ctx the header's mode, always_ask and the run folder (B-499)
+      - "packages/eng-harness/src/eng_harness/engine/_steps.py"  # resume_path takes the hash form of a model key, spec 4.3.1 (B-499)
+      - "packages/eng-harness/tests/workflow/test_modes.py"
+      - "packages/eng-harness/tests/unit/test_steps.py"  # B-499
+      - "packages/eng-harness/tests/unit/test_approvals.py"  # each run names its mode, one to three lines (B-499)
+      - "packages/eng-harness/tests/unit/test_runner.py"  # as above (B-499)
+      - "packages/eng-harness/tests/unit/test_run_lock.py"  # as above (B-499)
+      - "packages/eng-harness/tests/workflow/test_pause.py"  # as above (B-499)
+      - "packages/eng-harness/tests/replay/test_resume.py"  # as above (B-499)
+      - "packages/eng-harness/tests/replay/test_in_flight.py"  # as above (B-499)
+      - "packages/eng-harness/tests/workflows/**"
+      - "packages/eng-harness/docs/local-testing.md"
+    max_changed_lines: 295
+    max_sessions: 3
+    tests_first:
+      - "packages/eng-harness/tests/workflow/test_modes.py::test_work_on_copy"
+      - "packages/eng-harness/tests/workflow/test_modes.py::test_approve_each_write"
+      - "packages/eng-harness/tests/workflow/test_modes.py::test_autonomous_logged"
+      - "packages/eng-harness/tests/workflow/test_modes.py::test_always_ask_in_every_mode"
+      - "packages/eng-harness/tests/unit/test_steps.py::test_resume_path_hashes_model_keys"  # B-499
+    # AC51's promotion (B-499): the PROMOTION approval no mode resolves is proved here; ctx.promote's refusal of an
+    # unapproved or wrong-kind approval is proved by T16b's test_promote.py::test_promotion_rechecks_approval.
+    covers: [AC48, AC49, AC50, AC51]
+    depends_on: [T15]
+  - id: T16b
+    title: File-copy promotion
+    # Amendment (B-499, D-12): the promotion half of the former T16 (work item B-500). Measured on the B-115 branch:
+    # _promote.py 73, ctx.promote in _ctx_impl.py 50, ModeApprovals.promotable in _modes.py 21, CHANGELOG 1,
+    # local-testing 2: 147. It also takes `ask` into the rerun set of _inflight.py (spec 4.5.3, AC36; about 3) and the
+    # promote step in flight (the writer's recommendation of spec 11 Q40; about 15, an estimate): about 165; budget 180.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_promote.py"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/engine/_modes.py"
+      - "packages/eng-harness/src/eng_harness/engine/_inflight.py"  # ask in the rerun set; the promote in flight (B-499)
+      - "packages/eng-harness/tests/unit/test_promote.py"
+      - "packages/eng-harness/tests/replay/test_in_flight.py"  # B-499
+      - "packages/eng-harness/tests/workflows/**"
+      - "packages/eng-harness/docs/local-testing.md"
+    max_changed_lines: 180
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_promote.py::test_file_copy_promotion"
+      - "packages/eng-harness/tests/unit/test_promote.py::test_replay_promotion_is_a_gap"
+      - "packages/eng-harness/tests/unit/test_promote.py::test_promotion_rechecks_approval"
+      - "packages/eng-harness/tests/replay/test_in_flight.py::test_ask_in_flight_is_asked_again"  # B-499
+      - "packages/eng-harness/tests/replay/test_in_flight.py::test_promote_in_flight_goes_to_the_engineer"  # B-499
+    covers: [AC52, AC53, AC36]  # AC36: an ask in flight at resume (B-499)
+    depends_on: [T16]
+  - id: T17
+    title: Runtime guard for block and rule code, and the block-module rules test
+    # Amendment (B-509, documents only): pre-flight audit. The rules test passes over the merged workflow modules, whose
+    # imports spec 4.1.2 now admits by name; tests/rules/test_block_modules.py leaves tests_first (it imports nothing
+    # T17 adds, so it is green at the base: TF004) and stays in files; AC19 stays covered here.
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/__init__.py"
+      - "packages/eng-harness/src/eng_harness/engine/_guard.py"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/tests/unit/test_guard.py"
+      - "packages/eng-harness/tests/rules/**"
+      # Amendment (B-529, documents only): a writer's trial (gate pass with exactly this file set, 122 counted lines).
+      # Engine._drive in _runner.py is the only place that can make the root block block code (AC18 "directly"); three
+      # existing tests ran I/O inside block code, which the guard now refuses (no expectation changes).
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/unit/test_ctx_block.py"
+      - "packages/eng-harness/tests/unit/test_ctx_decide.py"
+      - "packages/eng-harness/tests/unit/test_promote.py"
+    max_changed_lines: 250
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_guard.py::test_guard_blocks_io_in_block_code"
+      - "packages/eng-harness/tests/unit/test_guard.py::test_guard_covers_parallel_children_and_child_blocks"
+      - "packages/eng-harness/tests/unit/test_guard.py::test_rule_guard_factory"
+    covers: [AC18, AC19]
+    depends_on: [T16b]  # B-499: after both halves of the former T16; T16b also edits _ctx_impl.py
+  - id: T18
+    title: Resource limits, progress sink, run control and the overhead benchmark
+    # Amendment (B-412, documents only): adds the ProgressSink and RunControlPort fields of EnginePorts (None defaults, section 3) and the stop check between steps (spec 4.8 RunControlPort row); budget 220 -> 250.
+    # Amendment (B-509, documents only): pre-flight audit. The sink's seam is a hook in journal/_writer.py (AC58);
+    # estimate from merged engine tasks (_ctx_impl 45 to 83, _runner 1 to 40 in B-350, B-113, B-114, B-428):
+    # _resources.py about 100, _ctx_impl.py about 45, _runner.py about 40, _writer.py about 14, CHANGELOG 1: about 200,
+    # within 250 (an estimate, not a measurement).
+    files:
+      - "packages/eng-harness/pyproject.toml"
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_resources.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/journal/_writer.py"  # optional on_commit hook, spec 4.10, AC58 (B-509)
+      - "packages/eng-harness/tests/unit/test_resources.py"
+      - "packages/eng-harness/tests/unit/test_progress.py"
+      - "packages/eng-harness/tests/unit/test_run_control.py"
+      - "packages/eng-harness/tests/perf/test_overhead.py"
+    # About 30 lines for the run-control field and the check between steps (an estimate, not a measurement).
+    max_changed_lines: 250
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_resources.py::test_limits"
+      - "packages/eng-harness/tests/unit/test_progress.py::test_sink_order_and_failure"
+      - "packages/eng-harness/tests/unit/test_run_control.py::test_stop_requested_pauses_between_steps"
+      - "packages/eng-harness/tests/perf/test_overhead.py::test_engine_overhead_p95"
+    covers: [AC58, AC59, AC60]
+    depends_on: [T14b, T17]
+  - id: T19
+    title: Crash-matrix replay suite with a worker process
+    # Amendment (B-414, documents only): depends on T18, whose ProgressSink.emit is the only public seam right after each
+    # journal commit; the worker crashes through it and through a ToolPort wrapper, and persists the fake ledger to a file.
+    # Amendment (B-509, documents only): pre-flight audit. The matrix passes against the merged engine, so this is a
+    # test-only pull request (title type test, test files only, no failing-first run; gate spec 4.7), as eng-contract
+    # plan T17; CHANGELOG.md and docs/local-testing.md leave files.
+    files:
+      - "packages/eng-harness/tests/replay/test_crash_matrix.py"
+      - "packages/eng-harness/tests/replay/_worker.py"
+      - "packages/eng-harness/tests/workflows/**"
+    max_changed_lines: 60
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/replay/test_crash_matrix.py::test_crash_matrix"
+    covers: [AC30]
+    depends_on: [T13c, T15, T16, T18]  # T13c: the B-454 split; T16: the modes its runs use, T16b comes through T18 (B-499)
+  - id: T20
+    title: Caller-chosen run id at start (RunRequest.run_id)
+    # Amendment (B-471, documents only): new; spec 0006 Q20 answer A (owner instruction of 2026-11-12), spec AC70;
+    # implemented as work item B-472. Plan 0006 T18b waits for it.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/unit/test_runner.py"
+    # About 15 lines in _runner.py (the field, the pattern and folder check before any port call, the id choice) and 5 of
+    # CHANGELOG.md (an estimate, not a measurement).
+    max_changed_lines: 40
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_runner.py::test_caller_chosen_run_id"
+    covers: [AC70]
+    depends_on: [T9]
+  - id: T21
+    title: One automatic rerun of a write reconciled not_applied, then the engineer
+    # Amendment (B-495, documents only): new; owner answer of 2026-11-14 (spec section 11 Q39, AC71). After T20 so
+    # that the chain T15 to T19 is not disturbed; depends on T15, which also edits _inflight.py and test_in_flight.py.
+    # Amendment (B-499, documents only): T16 and T16b also edit test_in_flight.py, T16b also _inflight.py: after T16b.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_inflight.py"
+      - "packages/eng-harness/tests/workflow/test_honest_outcomes.py"
+      - "packages/eng-harness/tests/replay/test_in_flight.py"
+    # About 15 lines in _inflight.py (the previous attempt's adapter outcome read from the journal, the branch to the
+    # engineer request) and 3 of CHANGELOG.md (an estimate, not a measurement).
+    max_changed_lines: 30
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/workflow/test_honest_outcomes.py::test_not_applied_write_reruns_once"
+      - "packages/eng-harness/tests/replay/test_in_flight.py::test_second_not_applied_stops_for_the_engineer"
+    covers: [AC71]
+    depends_on: [T16b]
+  - id: T22
+    title: A check_model result whose summary is not clean stops the run (invariant 1)
+    # Amendment (B-503, documents only): new; the merged Guard.check raises only for a failure envelope or a
+    # ContractError and clears the dirty flag for any success envelope, so a READBACK_MISMATCH does not stop a run
+    # (spec 4.6 row 1, AC37). After T15 (merged), the last task that edited the test fakes; it shares only CHANGELOG.md
+    # with T16 to T21, so it does not wait for them. Plan 0007 T6 also edits _invariants.py and waits for T22 (that
+    # plan's section 3).
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_invariants.py"
+      - "packages/eng-harness/tests/workflow/test_invariants.py"
+      - "packages/eng-harness/tests/fakes/ports.py"  # the fake's passing check answers a clean CheckModelSummary
+    # About 14 lines in _invariants.py (the summary validated as CheckModelSummary, the failed check journaled as for a
+    # failure envelope) and 1 of CHANGELOG.md (an estimate, not a measurement).
+    max_changed_lines: 30
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/workflow/test_invariants.py::test_unclean_check_stops_run"
+    covers: [AC37]
+    depends_on: [T15]
+  - id: T23
+    title: Preview.models and ctx.promote take a model key
+    # Amendment (B-543, documents only): new (spec 4.3.2, 4.9, AC72). No component gives block code a ModelHandle, so
+    # spec 0007 steps 6 and 16 could only pass invented model ids and revisions. ctx.py: Preview.models and the Ctx
+    # protocol's promote take ModelHandle | str (about 4 lines); one helper for the key and its use in _approvals.py
+    # _request, _modes.py enter and _ctx_impl.py promote and _promoted (about 10); 1 of CHANGELOG.md: budget 30 (an
+    # estimate). After T16b and plan 0007 T6 (merged), the last tasks that edited these modules; it shares only
+    # CHANGELOG.md with T19. Plan 0007 T8 waits for it.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/ctx.py"
+      - "packages/eng-harness/src/eng_harness/engine/_approvals.py"
+      - "packages/eng-harness/src/eng_harness/engine/_modes.py"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/tests/workflow/test_model_keys.py"
+      # Amendment (B-560): test-only collateral; compare the supplied handle instead of accessing .revision on the union.
+      - "packages/eng-harness/tests/unit/test_ctx_basis.py"
+    max_changed_lines: 30
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/workflow/test_model_keys.py::test_preview_and_promote_take_a_key"
+    covers: [AC72]
+    depends_on: [T16b]  # external: plan 0007 T6 (merged; also edits _modes.py and _ctx_impl.py)
+  - id: T24
+    title: The first ctx.basis read is engine work (StoreBasisPort under the runtime guard)
+    # Amendment (B-569, documents only): new (spec 4.3.2 row basis, 4.3.4 rule 1, AC18; spec 0004 AC28; spec section 11
+    # Q45). Found by the B-202 writer (plan 0007 T8) and reproduced by its verifiers: Ctx.basis loads the stored basis
+    # lazily from block code, so the production StoreBasisPort (a ResultStore read, audit event open) is refused by the
+    # guard and every block that reads ctx.basis before a decide ends NEEDS_ENGINEER (block_rule_violation); the fakes
+    # answer from memory. A synchronous engine section in _guard.py (about 10 lines) around port.load only, in the
+    # runner's basis loader that serves ctx.basis and the Decider (about 3), 1 of CHANGELOG.md: budget 30 (an estimate).
+    # After T17 (merged; _guard.py, test_guard.py) and T23 (merged; the last task that edited CHANGELOG.md); external:
+    # plan 0004 T10 (merged, B-164) wrote the lazy loader in _runner.py and owns test_basis_workflow.py. Plan 0007 T8
+    # waits for it (it removes the _Loaded workaround of its conftest.py then).
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_guard.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/unit/test_guard.py"
+      - "packages/eng-harness/tests/workflow/test_basis_workflow.py"  # the AC28 run over StoreBasisPort (spec 0004)
+    max_changed_lines: 30
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_guard.py::test_basis_load_is_engine_work"
+      - "packages/eng-harness/tests/workflow/test_basis_workflow.py::test_basis_reaches_ctx_over_the_store_port"  # spec 0004 AC28
+    covers: [AC18]  # and spec 0004 AC28 (its StoreBasisPort run), which plan 0004 T10 covers
+    depends_on: [T17, T23]
+---
+
+# Implementation plan: eng-harness engine
+
+## 1. Approach
+
+The engine is built bottom-up in the order its own imports require: errors, the journal (the most safety-relevant
+storage, built and tested before anything writes to it), the reader, blocks and the registry, ports with their fakes,
+the ctx types and codec, step paths, then the run loop with replay and divergence, the ctx calls, the input-request
+builders, in-flight reconciliation (T11b) and the host-state check (T11c), the invariants, decisions and inputs, approvals, permission modes and
+promotion, the runtime guard, resources and the benchmark, and last the crash matrix that exercises everything
+together. Risky parts come early: the journal (T3 and T3b), path identity (T8) and replay (T9b) are the core S-10 proved, so a
+defect there shows before the invariants are built on them. The tasks that edit `engine/_ctx_impl.py` are serialized
+by `depends_on` (T10, T12, T13, T13b, T13c, T14, T14b, T15, T16, T16b, T17, T18 in that order), so no two of them run in parallel;
+templates plan 0004 T10, which needs T19, also edits `_ctx_impl.py` and `_runner.py` to wire `ctx.basis` (B-474). T11b
+and T11c share `CHANGELOG.md` and `tests/workflows/**` with T12 and `_runner.py` with T13, so T12 depends on T11c and
+T13 on both; T11b follows T11 (the input requests it presents), T11c follows T11b (B-427), and T14b follows T14: the
+tasks from T10 to T18 run one after
+another. Every task adds a `CHANGELOG.md` line, and some add `public_modules` entries
+to `pyproject.toml`, so tasks that may run in parallel (T5 beside T3, T3b, T6 and T7) share those two
+files only: their lines are merged in pull-request order, and they share no other file. T19 follows T18 (amendment
+B-414: its worker crashes through T18's progress sink). T16 and T16b (the B-499 split) also share `_modes.py`,
+`tests/workflows/**` and `tests/replay/test_in_flight.py`, and T16b shares `_inflight.py` with T15 and T21, so T21
+follows T16b. T22 (B-503) follows T15 and shares only `CHANGELOG.md` with T16 to T21. T23 (B-543) follows T16b
+(`_modes.py`, `_ctx_impl.py`) and shares only `CHANGELOG.md` with T19; plan 0007 T8 waits for it. T24 (B-569)
+follows T17 (`_guard.py`, `test_guard.py`) and T23 (`CHANGELOG.md`), all merged; it edits `_runner.py` after plan 0004
+T10 (merged) and that plan's `tests/workflow/test_basis_workflow.py`; plan 0007 T8 waits for it.
+
+Every task is test-first: its first commit is `test:` with the tests in `tests_first`, failing on `build/v1`
+([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds the public modules it
+creates to `[tool.eng-gate] public_modules` (the gate checks that each listed module exists) and a `CHANGELOG.md`
+line. Tests use the fakes of T6, the contract's `FixedClock` and `SeededIdSource`, and a real SQLite journal in a
+temporary workspace.
+
+Reuse (spec §2): the S-10 design (not its code), the standard library (`sqlite3`, `asyncio`, `fcntl`, `msvcrt`,
+`sys.addaudithook`), and `eng-contract` 0.1 for canonical JSON, ids, envelopes, the store, references, `Quantity` and
+kinds. Test workflows used by the workflow and replay tests live in `tests/workflows/` (test doubles, never shipped).
+
+## 2. Tasks
+
+**T1 Skeleton.** `packages/eng-harness/pyproject.toml` with `name = "eng-harness"`, `version = "0.1.0.dev0"`,
+`requires-python = ">=3.14,<3.15"` ([ADR-0028](../../../../design/docs/adr/0028-build-v1-in-this-repository.md) §5),
+`dependencies = ["eng-contract", "pydantic>=2.14,<3"]` with `[tool.uv.sources] eng-contract = { workspace = true }`,
+the uv build backend, the tool configuration of [process/11](../../../../design/process/11-repository-standard.md) §3,
+and the gate table in the format of the
+[eng-dev-gate spec](../../../../tools/eng-dev-gate/docs/specs/0001-eng-dev-gate-0.1.md) §5 (profile `harness`,
+layer 4):
+
+```toml
+[tool.eng-gate]
+profile = "harness"
+layer = 4
+import_names = ["eng_harness"]
+public_modules = ["eng_harness"]          # each later task adds the public modules it creates
+coverage_line = 85                        # process/05 section 2
+coverage_branch = 75
+r1_modules = [
+  "src/eng_harness/engine/_inflight.py", "src/eng_harness/engine/_hoststate.py",
+  "src/eng_harness/engine/_invariants.py", "src/eng_harness/engine/_hostsafety.py",
+  "src/eng_harness/engine/_approvals.py", "src/eng_harness/engine/_modes.py",
+  "src/eng_harness/engine/_promote.py", "src/eng_harness/engine/_replay.py",
+]
+r2_modules = ["src/eng_harness/journal/**", "src/eng_harness/ctx.py", "src/eng_harness/block.py",
+              "src/eng_harness/ports.py", "src/eng_harness/errors.py"]
+mutation_min = 80                         # required when R1 or R2 globs exist (gate spec section 5)
+block_modules = ["src/eng_harness/workflows/**", "src/eng_harness/blocks/**"]
+rule_modules = ["src/eng_harness/rules/**"]
+calc_modules = ["src/eng_harness/calcs/**"]
+windows_tests = ["tests/windows", "tests/perf"]
+```
+
+The [eng-contract plan](../../../eng-contract/docs/plans/0001-eng-contract-0.1.md) T1 uses other key names
+(`layer_name`, `risk_floor`, `may_import`, a `coverage` subtable); this plan follows the gate spec, which defines the
+table, and T1's pull request notes any rename the merged gate requires. T1 also adds `"packages/eng-harness"` to
+`[tool.uv.workspace] members` in the root `pyproject.toml` (lead decision D-10) and updates `uv.lock`; `README.md`
+(purpose, `uv sync`, limits: no host program in CI); `CHANGELOG.md` (Unreleased); `.gate/agents.yml` and `AGENTS.md`
+rendered from [AGENTS.template.md](../../../../design/process/templates/AGENTS.template.md) by `eng-gate agents render`
+(filled by hand only if the renderer is not merged yet, then re-rendered by the first `agents-drift` run); `CLAUDE.md`
+containing `@AGENTS.md`; `.gate/risk-map.yml` mapping the `r1_modules` globs to `r1` and the `r2_modules` globs to
+`r2`; `docs/local-testing.md` with the items of §4; `src/eng_harness/py.typed`; and `__init__.py` with `__version__`.
+
+**T2 Errors** (spec §6). `HarnessCode`, `EngineStop` (a `BaseException`) and its subclasses, `StepError` and its
+subclasses, `RunRefused`, `RunLocked`, `JournalIntegrityError`. Imports `eng_contract.errors` only.
+Budget amendment (B-101-amend): `max_changed_lines` raised from 150 to 240 because the 19 exception classes and the 18-member `HarnessCode` enum with their docstrings measured 221 changed non-test lines in the B-101 writer's run (`errors.py` 218, `pyproject.toml` 2, `CHANGELOG.md` 1), which rounds up to 240.
+
+**T3 Journal events** (spec §4.4.2). The 21 event payload models (with the B-068 fields `run_class`,
+`unreleased_tools`, `item_reasons`, `acknowledged_unreleased`, `decision_made.request_id`, `model_bound.file_names`,
+`model_saved.origin_file_names` and the kind `engine.decision`), the event type enumeration and the model for each
+type, and the harness kinds module (`_kinds.py`: `harness.run_input/1`, `harness.run_output/1`,
+`harness.approval_preview/1`, `harness.journal_blob/1`, registered with `KindRegistry.extend`). The tests check the
+models directly (every type has a model, `extra="forbid"`, the B-068 fields) and the kind registration; AC26 on
+append and on read is tested through T3b's writer and T4's reader.
+
+**T3b Journal writer** (spec §4.4.1 and §4.4.3). Schema and triggers (including the `BEFORE INSERT` triggers that
+close the `REPLACE` path and enforce gap-free `seq`), the writer with the hash chain, per-event durability, the inline
+limit and `harness.journal_blob/1` payloads by reference, and payload validation on append (AC26). AC22 is tested by
+wrapping the connection and recording the `synchronous` value of each commit.
+
+Split (B-366): the B-102 writer measured 617 changed non-test lines for the former T3 (`_events.py` 340, `_writer.py`
+146, `_schema.py` 84, `_kinds.py` 29, `journal/__init__.py` 15, `pyproject.toml` 2, `CHANGELOG.md` 1), above the
+400-line task cap, so the payload models and the kinds module stay in T3 (about 390 lines) and the schema and the
+writer move to T3b (about 240 lines). T4 and T6 depend on T3b. The count of event types is 21, as the table of spec
+§4.4.2 lists (the earlier "20" was a miscount, corrected in the spec's schema comment as well).
+
+**T4 Journal reader** (spec §4.4.5). Read-only connection, chain verification, the views and `follow`, and
+`is_locked` over the run-lock helper `_runlock.py` (`fcntl` and `msvcrt`), which T9's engine uses to hold the lock.
+`RunView.run_class` (from `run_started`) and `RunView.unreleased_tools` (the union over `run_started` and every
+`run_resumed`, AC68), and `RequestView` resolution per kind, an `engine.decision` request by the first `decision_made`
+that names its `request_id` (AC25). The tests write the events through T3b's writer, so no engine is needed.
+
+**T5 Registry** (spec §4.2). Decorators, `BlockDef`, `WorkflowDef`, `Registry`, the code hash, `check_lock`, the
+`--write-lock` entry point and an empty `blocks.lock.json` (no blocks exist yet). AC4's contract test runs on fixture
+blocks in `tests/data/blocks/` and on the real (empty) registry.
+
+**T6 Ports** (spec §4.8). Eight of the nine protocols and their data types (including `RunClass`,
+`CalcPort.run_class`, `CalcInfo.basis_fields` and `ref_rules`, `ToolPort.unreleased_tools`, and the approval and input
+request and answer models of spec §4.9, §4.9.1, with `ApprovalAnswer.acknowledged_unreleased`). `DecisionPort` is not
+built here: its data types are owned by `eng_harness.decisions.interfaces` (spec §4.8 "Decision port types"), which
+needs this task and T7 first, so T14 adds the protocol, its fake and its conformance case. Fakes in `tests/fakes/`: a
+fake host with a ledger
+of every call and `op_id` (S-10's reconciler stand-in), scripted outcomes per call (success, failure envelope,
+`TIMEOUT_UNKNOWN_OUTCOME`, `HOST_WEDGED`, raise), model state with revision and fingerprint, units, a host crash (models reported not loaded), session epochs,
+leases; fake CalcPort, BasisPort, ApprovalPort and InputPort with scripted answers; a recording
+ProgressSink; a RunControlPort. The fakes count as tests for the budget.
+
+**T7 ctx types and codec** (spec §4.3.2, §4.5.2 "Codec"). The result models, `Preview`, `Approval`, `ModelHandle`,
+`BasisView` with `ref`, `quantity`, `count` and `choice`, `BasisCount`, and the codec that rebuilds `Quantity`
+objects after the canonical round trip.
+
+**T8 Steps** (spec §4.3.1). Scopes as context variables, the path grammar, inserted and housekeeping paths,
+`op_id`, overlap detection, the parallel driver (all children finish; error choice by rank and index) and the attempts
+iterator. Tested with a stub step executor, before the runner exists.
+
+**T9 Engine start** (spec §4.5.1, §4.4.4). `Engine.start`, input and output validation, holding the run lock of
+`_runlock.py` (with the Windows test under the `windows` marker, and its item in `docs/local-testing.md`), the run
+header, the run-class check at start and the `unreleased_tools` record (AC65, AC68). A minimal `ctx.tool` is wired here
+so the T9b divergence tests can run; T10 completes it. Budget 360 lines (the original T9 measured 477 and was split by
+B-424, D-12).
+
+**T9b Engine resume and replay** (spec §4.5.2 steps 1 to 3 and 9, §4.4.4). `Engine.resume`, the version rule, the
+run-class check at resume (AC68), the replay index (`_replay.py`), divergence (all S-10 variants), the code-hash warning
+and the completed-run return. Budget 260 lines (the original 477 less T9's 360 plus the shared edits; B-424, D-12).
+
+**T10 ctx calls** (spec §4.3.2, §4.3.3). `tool` (with retries), `read`, `calc`, `block`, `parallel`, `attempts`,
+`escalate`, and pause and resume through a test approval stub (the full approval rules come in T15); `CalcRefused`
+from the CalcPort becomes a failed step (AC13).
+
+**T11 Input requests** (spec §4.9.1, AC67; B-068). The first input requests the engine presents are built in
+`engine/_inputs.py`: the `x-eng-input` marker, the choice-schema builder of spec §4.9.1, the refusal of a schema without
+`data` or `choice` before `present`, and the answer-shape check (`values` against `choices`). The `engine.escalation`
+request (from `_runner.py`) is built with it, and `tests/unit/test_inputs.py` covers the marker, the refusals, the
+answer-shape check and that request. Budget 140 lines (the original T11 measured 440 and was split by B-342, D-12).
+
+**T11b In-flight reconciliation at resume** (spec §4.5.3; AC31, AC32). The journal fold for a resume (which steps
+are in flight), reconciliation before the block runs, `step_rerun` for a read in flight, and the adapter outcomes:
+`applied` and `not_applied` as `step_reconciled`; `partial`, `unknown`, no reconciler or a reconciler error as an
+`engine.in_flight` request built with T11's `_inputs.py` (its tests assert the `choice` marker of AC67), with the
+empty-summary result when the adapter has no read-back. It builds the part of the resume fold and of `Resume` that
+reconciliation uses (in-flight steps, the rerun index, the `engine.in_flight` request); the host-state part of the
+fold is T11c's. Budget 300 lines (about 229 of `_inflight.py` and its share of `_runner.py`; the original T11b
+measured 516 and was split by B-427, D-12).
+
+**T11c Host-state check before live execution** (spec §4.5.4; AC34, AC63, AC64). The instance binding (`model_bound`
+at first use, after a restore and for a reopened model, with `model_bound.file_names` from `HostPort.model_files`),
+lost or reopened models (no reconciliation, `model_not_loaded`, `model_reopened`, units read against the new binding),
+the three-way comparison with the choices `accept`, `restore` and `abandon` through an `engine.host_state` request
+built with T11's `_inputs.py` (its tests assert the `choice` marker of AC67), the restore with its replay cut, and the
+`accept` baseline. It extends T11b's resume fold in `_inflight.py` with the model bindings, saves and restored cuts
+and `lacking` (the writes a reopened model lacks), and `ResumeIndex` and `Resume` with the restore cut (a rerun as a
+new attempt, reason `restored`), the `@resume<n>.model_state` and units reads, the `host_state_mismatch` and
+`units_mismatch` stops and the `engine.host_state` request. The first-use binding is a seam in `_hoststate.py` that
+T13b moves before `step_started`: T11c's AC64 test asserts the instance naming and the reopened case, and T13b completes
+the before-`step_started` part. Budget 320 lines (`_hoststate.py`, about 51 of `_inflight.py` and its share of
+`_runner.py`; B-427, D-12).
+
+**T12 Invariants 1, 2, 3, 7** (spec §4.6, §4.3.1 "Models in parallel children"). The model tracker with per-child
+dirty flags and the sibling model-conflict check, inserted `check_model` and `save` steps, the
+engineering-parameter check, the staleness check with `resolve_ref` and each calc argument's `RefRule` from
+`CalcInfo.ref_rules` (default `stale_ok` false), the property test over generated step programs,
+and the test that inserted steps are replayed. Amendment B-434: T12 makes two edits in `engine/_runner.py`: it passes
+`ports.host` into `Ctx` as a constructor parameter, and inside `_drive`'s `try` block, after the root block returns,
+awaits a new `Ctx.finish()` that runs the `~end.check_model` steps for the models still dirty (spec §4.6 #1, AC37);
+T13 still owns the rest of `_runner.py`. In `journal/_events.py`, `StepStarted` gains an optional `action` field,
+absent in older journals (spec §4.4.2). Budget stays 380 lines (estimate about 310).
+Amendment B-445: a run whose root block leaves a model dirty now journals `~end.check_model` before `run_completed`,
+so four earlier test files whose journals end after a write (`tests/unit/test_runner.py`, `tests/replay/test_resume.py`,
+`test_in_flight.py`, `test_host_state.py`) are in T12's files for those journal assertions only; nothing else in them
+changes.
+
+**T13 Invariants 5, 6, 8 at start** (spec §4.5.1 `start`, §4.6 #5, #6, #8; AC33, AC41, AC42, AC44). Amendment B-454
+(D-12): the B-112 writer measured about 453 counted lines for the former T13 (`_hostsafety.py` 237, `_runner.py`
++72/-38, `_hoststate.py` +6/-52, `_ctx_impl.py` +42/-6) against the 400-line cap, so it is split along the seams of
+spec §4.6 into T13, T13b and T13c, which run in that order (all three edit `_hostsafety.py`, `_runner.py` and
+`_ctx_impl.py`). A dependency on engine T13 named in another plan means T13, T13b and T13c. T13 creates
+`_hostsafety.py` with basis completeness before the run folder exists (`BASIS_INCOMPLETE`), the server checks in
+`start` before `run_started`, which records them in `servers` (`SERVER_CHECK_FAILED`), and per-host reconciliation
+pending: a write step whose call raises, returns `TIMEOUT_UNKNOWN_OUTCOME` or returns `HOST_WEDGED` marks its host, and
+spec §4.5.3 runs for that host before its next step while other hosts continue. The server check at resume (step 4)
+is T13c's. Budget 220 lines (about 165 estimated).
+
+**T13b Invariant 9 and the first-use binding** (spec §4.6 #9, §4.8 "Instance binding", §4.5.1 step 6; AC45, AC64).
+Draft decision B-427 (spec §11 Q29): T13b owns the `PRECONDITION_FAILED` refusal (condition `model_open`) when
+`locate` returns `None` before a step, and replaces T11c's first-use binding seam in `_hoststate.py` with a binding in
+its `_ctx_impl.py` path, so the `first_use` `model_bound` lands before that step's `step_started`. Then come the units
+reads: `p~pre.units.<model_key>` right after that binding (replayed like the other inserted steps),
+`p~host.units.<model_key>` after a session-epoch change or an observed timeout on the host within this engine process,
+and resume step 6 for every model key the journal addressed (T11c reads it for the models the run wrote, as built by
+B-349; T13b widens `locate_models`). T13b extends `test_host_state.py::test_reopened_in_new_instance` to assert
+`model_bound` before `step_started` (AC64, shared with T11c); `test_invariants.py::test_model_not_open_refused` tests
+the refusal (no engine acceptance criterion names it yet; adding one is a lead item for the next engine spec
+amendment). Because the refusal stops a step on a model no instance holds, the rigs of earlier tests open their models
+(`tests/workflows/**` and the Windows run-lock test's host), and the journals those tests pin gain the binding and the
+`~pre.units` steps: the listed test files are in T13b's files for those journal and port-log assertions only, as B-445
+did for T12. Budget 200 lines (about 155 estimated, most of it the removed `BindingTools`).
+
+**T13c Invariant 10 and the resume order** (spec §4.6 #10, §4.5.1 steps 2, 4 and 5; AC44 at resume, AC46, AC62). Host
+leases: `HostPort.acquire` before the first step on a host and at resume step 5 for every host with a write in flight
+or a model the run wrote (a refused lease is `HOST_LOCKED`), released when the engine returns; `host_started` (FULL)
+after every live step for each instance `started_instances` lists that the journal lacks; `close_started` with the
+journaled instances after `run_completed` or `run_failed` (never at a pause, an escalation, a divergence or a refusal),
+and again at a resume of a terminal run (T9b). The server check at resume (step 4) is T13c's, so steps 4 to 6 run in
+the order of spec §4.5.1 before T11b's reconciliation (AC62). The resume port logs of earlier tests gain `preflight`,
+`acquire` and `started_instances`, and `test_resume.py::test_completed_run` closes its instances once more (at run
+completion): those files are in T13c's files for the port-log and journal assertions only. Budget 240 lines (about 175
+estimated, much of `_runner.py`'s share being the re-indented `try`/`finally` that releases the leases).
+
+**T14 Decisions** (spec §4.3.2, §4.6 item 4). `decide` and `decide_many` over the ports; option and answer validation;
+`decision_made`; engineer-tier pauses; the `DecisionPort` protocol in `ports.py` over the types of
+`eng_harness.decisions.interfaces`, its fake in `tests/fakes/` and its case in the conformance test (AC57); the
+`DecisionCall` with `sensitive_values` (from the journal's `model_bound.file_names`, `model_saved.origin_file_names`
+and `file_name`), the `engine.decision` request through T11's `_inputs.py` and `InputPort`, `decision_made.request_id`,
+the `EngineerChoice` round trip (AC66), and the `choice` marker of `engine.decision` (AC67). `DecisionRequest` is the
+frozen dataclass of spec §4.3.2. A decision step in flight at resume gets `step_rerun` (§4.5.3, AC32): T14 adds
+`decide` and `decide_many` to the rerun set of `_inflight.py`. Budget 390 lines (amendment B-481). Build order: T14 starts only
+after decision plan T1, T4 and T5 are merged (they need this plan's T6 and T7), because `DecisionCall` and the other
+port types live in `decisions.interfaces` (spec §4.8); it is the only task of this plan that waits for the decision
+plan.
+
+**T14b Ask and the decision runtime record** (spec §4.3.2, §4.6 item 4, AC61, AC67, AC69). `ask`: the `data` marker
+(AC67), validation of the answer against `fields`, `input_requested` and the pause, and the answer stored as
+`basis.engineer_input/1` (AC61). Amendment B-098, narrowed by B-414: the payload field and `RunView.decision_runtime`
+were merged with T3 and T4 (B-103) and are tested by `test_journal_reader.py::test_run_class_and_unreleased_tools`, so
+T14b adds only `DecisionPort.runtime_summary()` (protocol, fake and conformance case) and calls it once at start and
+once per resume, recording `run_started.decision_runtime` and `run_resumed.decision_runtime` only when it differs
+(`test_runner.py::test_decision_runtime_recorded`; AC69's runner half). Budget
+120 lines. The original T14 (decisions and inputs: 280 lines at first, 420 with B-068, 450 with B-098) was split by
+B-342 (D-12) so that neither part exceeds the 400-line cap.
+
+**T15 Approvals** (spec §4.9). It adds `ToolPort.preview(tool, args) -> Preview` (spec §4.8; T6 left it out because
+`Preview` lives in `eng_harness.ctx`, T7) to the port, the fake host and the AC57 conformance case (amendment B-388,
+B-105 review). Request ids, previews as results, binding, single use, refusal and re-presentation,
+re-check before the first write under an approval, revision continuity, expiry, items and `item_reasons`,
+`acknowledged_unreleased` (journaled as given; the page decides when it is required, spec §4.9), `signed_off`, pause
+and the
+`except Exception` test. Amendment B-492: T15 makes one edit in `engine/_runner.py` (`ports.approvals` into `Ctx`, the only
+place `Ctx` is built) and one in `engine/_inflight.py` (`approve` joins the steps marked for a rerun, so an approval in
+flight at resume is presented again as spec §4.5.3 says, not reconciled); `tests/replay/test_in_flight.py` pins it.
+
+**T16 Modes and working copies** (spec §4.7). Working copies (with `origin_sha256` and `origin_file_names`), approval
+per write, mode-resolved approvals and the always-ask list (with the `PROMOTION` and `SIGN_OFF` approvals no mode
+resolves, AC51). Amendment B-499 (D-12): the former T16 is split, and file-copy promotion is T16b; a dependency on
+engine T16 named in another plan means T16 for the modes and T16b for promotion. `Ctx` is built only in
+`Engine._drive`, so T16 makes one edit in `engine/_runner.py`: the journaled run header's mode and always-ask list and
+the run folder go into `Ctx` (a resumed run keeps the always-ask list of its start). Six existing tests name their mode
+or an engineer-asking request, one to three lines each. `_steps.resume_path` takes the hash form of a model key
+outside the `key` grammar, as spec §4.3.1 states for every path key, so a resume on a real model key (a file path) no
+longer raises `ValueError` (`test_resume_path_hashes_model_keys`). Its open points are spec §11 Q41 and Q43 (owner
+queue): T16 builds the writer's recommendation of each unless the owner has answered otherwise when the task starts.
+
+**T16b File-copy promotion** (spec §4.7 "Promotion", AC52, AC53; amendment B-499, work item B-500). `ctx.promote`,
+file-copy promotion over the internal `FileOps` port with its fake (including the re-check of the `PROMOTION`
+approval's binding before copying, in `_modes.py`), and the `REPLAY_WRITES` gap. The `promote` step is journaled with
+effect `write`, as the table of spec §4.3.2 states; what a promote in flight does at resume is spec §11 Q40, built in
+`_inflight.py` (`test_promote_in_flight_goes_to_the_engineer`). `FileOps.sha256` hashes as the adapter's
+`file_sha256` does (spec §11 Q44). `ask` joins the rerun set of `_inflight.py`, since spec §4.5.3 presents an ask in
+flight again (AC36) and T14b left it out (an engineer-tier decision is a `decide` or `decide_many` step, already in the
+set by T14); `test_ask_in_flight_is_asked_again`. Its open points are spec §11 Q40, Q42 and Q44 (owner queue): T16b
+builds the writer's recommendation of each unless the owner has answered otherwise when the task starts, so it never
+waits on them.
+
+**T17 Guard and block rules** (spec §4.3.4, §4.1.2). The audit hook with its context variable, wired into every ctx
+call so that it is off only during the engine's own step work and back on in parallel children, child blocks and
+attempts bodies, the public `rule_guard()` factory for the decision layer (exported from `engine/__init__.py`;
+budget 250 lines with it, B-068), and the AST rules test over fixture modules and over the package's block and rule
+globs. Amendment B-509 (pre-flight audit): the merged workflow modules `model_edit_cycle` and `column_design` must pass; the
+allowlist of spec §4.1.2 admits by name the `eng_harness.kinds.edit_cycle` and `eng_contract.units` they import, and
+the `|` of their type unions is a bitwise operator, not one of AC19's arithmetic operators.
+`tests/rules/test_block_modules.py` is written in the implementation commits, not in the first test commit: it scans
+fixtures and existing modules with its own helpers and is green at the base by nature (gate TF004). Its tests still
+gate AC19 at the head.
+
+**T18 Resources, progress, benchmark** (spec §4.10). Semaphores and host locks, sink delivery and detachment, and the
+overhead benchmark (also listed in `windows_tests`). `test_engine_overhead_p95` runs the 1,000 write steps of AC60
+with a recording `ProgressSink` (defined in the test file) and `FakeRunControl` given as
+`EnginePorts(progress=..., run_control=...)`, so the measured overhead includes the sink delivery and the
+between-steps stop check. The test is red at the base because the fields do not exist. It still asserts a p95 below
+20 ms (amendment B-509). Every event goes through the one `JournalWriter`, whose `append` returns only the `seq`, so
+the sink's seam is in `journal/_writer.py` (amendment B-509, pre-flight audit): an optional
+`on_commit: Callable[[Event], None] | None` keyword, called after the commit and after `_seq` and `_chain` advance,
+with the `Event` built from the stored body (so `args_ref` is visible). `_resources.py` holds the sink fan-out, which
+catches every exception from `emit`, detaches the sink and logs; `_runner.py` passes it as `on_commit` at both
+`JournalWriter` constructions (start and resume, so `run_started` is delivered too). The hook tests go in
+`tests/unit/test_progress.py`: called once per append, not called when the write fails.
+Amendment B-412 (spec 0006 pre-flight): no other task wires the
+`RunControlPort`, so T18 adds the `progress` and `run_control` fields to `EnginePorts` (both `None` by default, §3) and
+the check of spec §4.8's `RunControlPort` row: between steps the runner calls `stop_requested(run_id)` when a port is
+given, and true pauses the run with `run_paused`, reason `stop_requested` (spec §4.4.2 event table), returning a paused
+`RunOutcome`. `tests/unit/test_run_control.py::test_stop_requested_pauses_between_steps` uses the fake
+`RunControlPort` of T6 (about 30 lines, hence 220 to 250). No engine acceptance criterion names this behaviour yet;
+adding one is a lead item for the next engine spec amendment. Plan 0006 T16b passes `FileRunControl` here in
+production.
+
+**T19 Crash matrix** (spec AC30). A worker process (`tests/replay/_worker.py`) runs a mixed test workflow and calls
+`os._exit` at each of S-10's four crash points for every step; the test resumes each and compares the fake host's
+ledger and the outputs with an uninterrupted run. Amendment B-509 (pre-flight audit): all of it is test code, and the
+matrix passes against the merged engine, so the gate's failing-first run cannot hold (TF004 for a `feat` pull
+request). T19 is a `test(eng-harness): ...` pull request: every commit changes test files only (TF007), its single
+commit is `test:`, and there is no `feat` commit and no CHANGELOG line. An engine defect the matrix finds is a separate
+work item with its own amendment, not part of T19. Amendment B-414: the worker crashes
+through a recording `ProgressSink` whose `emit` calls `os._exit` on the target event (before_started: on the event
+committed just before the step's `step_started`; after_started: on `step_started`; after_completed: on
+`step_completed` or `step_failed`) and through a wrapper of the fake `ToolPort` that exits right after the call
+returns (after_effect). The wrapper lives in `tests/replay/_worker.py` and appends each applied `op_id` to a ledger
+file in the test's temporary folder, so the resuming process and the comparison see every write the crashed process
+applied. T19 therefore follows T18 (the sink delivery of spec §4.10, AC58).
+
+**T20 Caller-chosen run id** (spec §4.4.1, §4.5.1, §5, AC70; amendment B-471, spec 0006 Q20 answer A, work item
+B-472). `RunRequest` gains the optional `run_id` (`run_` + ULID, the pattern of spec §4.4.1); `start` names the run
+folder by it when given and draws one from the `IdSource` otherwise. `start` checks a given `run_id` first, before any
+port call (so before the server checks of invariant 8, whose host port writes `<run_dir>/servers` and launches the
+server in the run folder): a value that does not match `_RUN_ID`, or whose run folder exists, raises `ContractError`
+`INVALID_ARGUMENT` and the engine creates nothing (folder, lock, stored input, event). The later creation of the run
+folder accepts the folder the server checks wrote (no `FileExistsError`). `test_caller_chosen_run_id` checks the
+cases of AC70 with a host-port fake whose server check writes under the run folder: the run is created under the
+given id; an existing folder and a malformed id (`../x`) are refused with no port called and nothing created; no id
+draws one from the `IdSource`. It needs only the merged start of T9; plan 0006 T18b makes `cli/_wiring.py` draw the id
+at step 1 of spec 0006 §4.2.2 and pass it here.
+
+**T21 One automatic rerun** (spec §4.5.3, AC31, AC71; amendment B-495, owner answer of 2026-11-14, spec §11 Q39).
+Today a write that the adapter reconciles `not_applied` runs again as the next attempt every time, so a write that
+keeps failing that way reruns without end (in one process, through the immediate reconciliation of `_ctx_impl.py`, or
+over resumes). `_inflight._write`, which both paths use, takes the adapter's `not_applied` only when the attempt is not
+itself the rerun of an attempt the adapter reconciled `not_applied` (read from the journal: that attempt's
+`step_reconciled`, `decided_by` `adapter`); otherwise it records no `step_reconciled` from the adapter and asks the
+engineer through the existing `engine.in_flight` request (`applied`, `not_applied`, `abandon`), so the run stops with
+`NEEDS_RECONCILIATION` and no new code. `test_not_applied_write_reruns_once` scripts two timeouts and two
+`not_applied` reconciliations of one write in one run: two calls, then the stop with no third call;
+`test_second_not_applied_stops_for_the_engineer` resumes a run whose rerun is in flight, then answers `not_applied` and
+checks that the next attempt runs. The merged T20 needs no change for spec Q38: a `SERVER_CHECK_FAILED` refusal removes
+nothing the server checks wrote, and `test_caller_chosen_run_id` already refuses a start whose run folder exists.
+
+**T22 An unclean check stops the run** (spec §4.6 row 1, AC37; amendment B-503). `Guard.check` takes a success
+envelope as clean only when its summary validates as `eng_contract.issues.CheckModelSummary` with `clean` true (the
+summary of `issues.model_check/1`, spec 0002 §4.5.8). Any other success envelope is handled as a failure envelope is
+today: the step fails with harness code `MODEL_INTEGRITY` (the message names the summary's error count), `check_enforced`
+is `fail`, the dirty flag stays set, and the block's call raises `ModelIntegrityError` whose `evidence` holds the
+envelope's `result_id` (the stored check, so a block can show it). A summary of another shape counts
+as not clean. `test_unclean_check_stops_run` scripts, through the rig's `script_check`, a success envelope whose summary
+has one error and `clean` false after a write. It checks that the next read raises `ModelIntegrityError` with that
+evidence, that no port call follows, and that the journal holds the failed `p~pre.check_model` step and
+`check_enforced` `fail`. The fake host
+port's passing check (`tests/fakes/ports.py`) answers a clean summary (zero counts, `clean` true), so the merged tests
+keep their expectations. What the edit cycle does with this error at its step 9 is spec 0007 §11 Q14.
+
+**T23 A model key in previews and promotion** (spec §4.3.2, §4.9, AC72; amendment B-543). `Preview.models` becomes
+`tuple[ModelHandle | str, ...]` and `promote` (the `Ctx` protocol and `_ctx_impl.py`) takes `ModelHandle | str`; one
+engine helper answers the key of either, and `Approvals._request` (the binding), `Modes.enter` (the models of an
+inserted preview) and `_promoted` use it in place of `.model_key`. A stored preview that names a key reads back as the
+key (`ModeApprovals.stored`). `ToolResult.model` stays `None`. `test_preview_and_promote_take_a_key` runs, on the fake
+rig in `work_on_copy` once the working copy is taken, a write under a `CHANGE_SET` approval whose preview names the
+original's key, then a `PROMOTION` approval and promotion given the key: the binding is the working copy's state, the
+stored preview holds the key, and the promotion returns the promoted handle as with a handle of the same key. It fails
+at the base, where `Preview` refuses a `str` model. Amendment B-560 adds the existing
+`test_ctx_basis.py::test_preview_and_approval` assertion to T23: compare `preview.models` with `(handle,)`, preserving
+the supplied revision-2 handle check while accepting the widened type. This collateral edit is in the implementation
+commit; the test already passes at the base. The budget, acceptance criteria and `tests_first` stay unchanged.
+
+**T24 The first `ctx.basis` read is engine work** (spec §4.3.2 row basis, §4.3.4 rule 1, AC18, §11 Q45; spec 0004
+AC28; amendment B-569). `Ctx.basis` is a synchronous property, not a step, and its first read calls the runner's lazy
+basis loader from block code, where `in_block_code` is true, so `StoreBasisPort.load` (a `ResultStore` read, audit
+event `open`) is refused and the run ends `NEEDS_ENGINEER` (`block_rule_violation`). `_guard.py` gains a synchronous
+engine section, the counterpart of `engine_work`: it sets the flag false and restores it in `finally`; it is engine
+internal, not exported to block code, installs nothing and runs no block-supplied code. In `_runner.py` only
+`port.load(basis_ref)` of the loader runs inside it; the `BasisView` is built after it. The one loader serves
+`ctx.basis` and the Decider (already guard-off; nesting is harmless). `Ctx.basis` keeps its cache, the load stays lazy
+(no eager load at start, which `tests/workflow/test_invariants.py::test_no_basis_read_when_nothing_is_required`
+refutes and which would change the port-call log the rig's tests pin), and that test stays unchanged.
+`test_basis_load_is_engine_work` builds an `Engine` with the workflows rig whose basis port is
+`StoreBasisPort(rig.store)` over a basis stored in the rig's store, and checks three cases: a root block whose first
+action is `ctx.basis.record_ref()` with no `required_basis` completes; a root block that reads a path declared in
+`required_basis` through `ctx.basis.quantity(...)` completes (the start's basis check does not mask the defect); and a
+root block that reads `ctx.basis` and then opens a file ends `NEEDS_ENGINEER`, reason `block_rule_violation`, detail
+naming the audit event `open` (the guard is back on after the section). At the base the first two end
+`block_rule_violation`, so the test is red for the right reason. A unit case may also show that the section restores
+the flag when its body raises. `test_basis_reaches_ctx_over_the_store_port` (spec 0004 AC28) runs the AC28 workflow
+over `StoreBasisPort` on the store where the basis was frozen, in place of the in-memory port, and completes with the
+same typed values; it fails at the base. Plan 0007 T8 waits for this task and then replaces the `_Loaded` workaround of
+its `tests/workflow/edit_cycle/conftest.py` by `StoreBasisPort(store)`. A separate observation, not built here: the
+Decider reloads the basis through the port at every decision call instead of sharing the `Ctx` cache (correct, but
+redundant reads).
+
+## 3. Dependencies
+
+- Runtime: `eng-contract` (workspace member) and `pydantic` (named by
+  [ADR-0011](../../../../design/docs/adr/0011-harness-owns-workflow-engine.md); also required by `eng-contract`). No
+  other runtime dependency; no package-local ADR is needed.
+- Development: the root workspace's shared group (`pytest`, `pytest-cov`, `hypothesis`, `mypy`, `ruff`) and the
+  gate's mutation tool; no new development dependency.
+- Work items: `eng-contract` 0.1.0 merged (B-010 to B-025) before T1, because T2 onward import it; `eng-dev-gate`
+  `agents render` (B-030 to B-055) if available at T1, otherwise as described there. Specs 0002 to 0007 implement the
+  ports; their plans depend on this plan's T6 (ports) and, for workflows, on T19. T14 waits for decision plan T1, T4
+  and T5 (the decision port types, spec §4.8), which wait for this plan's T6 and T7; decision plan T7 and T10 wait for
+  T14 (T10 also for T14b, the run header's decision runtime), so the order has no cycle.
+- `EnginePorts` fields added after T9 (amendment B-412, from the spec 0006 pre-flight): the merged `EnginePorts` holds
+  tool, host, calc, basis, approvals and inputs. T14 adds `decision` and T18 adds `progress` and `run_control`; each
+  defaults to `None`, so an `EnginePorts` built before the field existed (plan 0006 `cli/_wiring.py`, tests) still
+  builds. `progress` `None` means no sink; `run_control` `None` means no stop request; `decision` `None` means
+  `runtime_summary` is taken as empty (the header's `decision_runtime` is then empty, spec §4.4.2) and a `decide` or
+  `decide_many` call is refused with the error T14 settles (a lead item if it needs a new code). Plan 0006 T14b passes
+  `decision` and plan 0006 T16b passes `progress` and `run_control` in production once T18 has merged (amendment B-510).
+- External amendments of this plan's files by tasks of other plans (amendment B-569, from the B-202 findings): plan 0007
+  T8b ("Sanctioned result accessors for block code"; spec §4.3.2, AC12, AC61, AC19, §11 Q48) adds the read-only
+  properties `ReadResult.data` and `Answered.answer` to `ctx.py` and the forms that reach `value` (and the attribute
+  `parser`, §4.1.2, Q47) to the scan of `tests/rules/test_block_modules.py`, with `tests/unit/test_ctx_read.py` and
+  `tests/unit/test_ctx_ask.py`, together with the switch of the edit-cycle blocks to the accessors, which must land in
+  the same pull request; plan 0007 T8 or plan 0006 T14c, whichever merges first, adds `ModelFile` to `block.py` and its
+  test to `tests/unit/test_block.py` (§4.1.2, Q47). T24 of this plan is the engine part of the same findings; plan 0007
+  T8 waits for it.
+- External amendment by plan 0007 T9b (amendment B-587, owner decision OQ-Q101 of 2026-11-20; spec §4.6 invariant 7,
+  §4.7 `approve_each_write`, AC43): the invariant-7 `p~pre.save` keeps its place after any working-copy swap, the
+  lease, literals, sibling admission and invariant-9 first-use binding and units read; only the `p~pre.approve`
+  preview moves after that save, before the write. T9b edits, for that order only, `engine/_ctx_impl.py` (the pre-step
+  order in `_tool_json`), `engine/_modes.py` (splitting `Modes.enter` into copy/swap and preview parts) and
+  `engine/_invariants.py` (`Guard.prepare` and `Guard.save`, whose path, arguments, role and `model_saved` stay), and
+  extends T12's `tests/workflow/test_invariants.py::test_save_before_analysis` with an `approve_each_write` case; the
+  limit of each file is its comment in plan 0007. It follows T22 (`_invariants.py`, `test_invariants.py`) and plan 0002 T19a
+  (`_modes.py`, `_ctx_impl.py`), both merged; no task of this plan waits for it.
+
+## 4. Verification
+
+- Local gate per task: `uv run eng-gate check` once `eng-dev-gate` exists; until then, from `packages/eng-harness/`,
+  `uv run ruff format --check`, `uv run ruff check`, `uv run mypy --strict src tests` and `uv run pytest` with
+  coverage. The pull request links its CI run; local output is not evidence (process/05 §8).
+- Windows: `tests/windows/` and `tests/perf/` run in the Windows CI job (run lock on NTFS, overhead on the Windows
+  runner's disk).
+- Needs local test (listed in `docs/local-testing.md` by T1, completed by T11b, T11c, T16 and T16b; items 1 to 4 need
+  no host program, but they need the owner's machine): (1) the overhead benchmark and the fsync cost on the owner's
+  workstation disk, with antivirus active, against the 20 ms target; (2) the run lock released after killing the engine
+  from Task Manager; (3) a resume after a forced power-off of a virtual machine (power loss is not covered by tests);
+  (4) file-copy promotion onto a folder the engineer uses, including a target file open in another program; (5) T11b
+  and T11c against a real host and adapter, once spec 0002's `HostPort` exists: the adapter's `reconcile` after the
+  host is killed during a write (T11b), and the host-crash, reopen and restore items (T11c). Only the fakes run them
+  here; every other step that drives a host program belongs to specs 0002 and 0007 (acceptance A2, A5, A6 of 18 §5).
+- Review: each pull request is reviewed by a subagent that did not write it, with the correctness, Python,
+  type-design, silent-failure and test lenses; T3, T3b, T9, T9b, T11b, T11c, T12, T13, T13b, T13c, T15, T16, T16b and T22 additionally against the invariant
+  and replay rules of the spec (R1: model writes); T16, T16b, T17 and T24 with the security lens (file paths, the audit
+  hook; T24: nothing block-supplied runs inside the engine section, amendment B-569).
+  The second-family review and the owner's approvals are `awaiting owner` in bootstrap mode (ADR-0028 §4).
+
+## 5. Rollback
+
+Each task is one squash-merged pull request into `build/v1`, with no consumer outside this package until specs 0002
+to 0007 build on it; reverting a task's commit removes it (later tasks depend on earlier ones, so a revert also
+reverts its dependants). After a run has been journaled with schema version 1, a defect in the journal is fixed
+forward with a reader that still reads version 1; journals are never rewritten.

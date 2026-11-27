@@ -1,0 +1,98 @@
+{
+  "rule": "out of range",
+  "payload": {
+    "verdicts": [
+      {
+        "source": "code_pack",
+        "check_id": "aci318_14.flexure.beam_moment",
+        "code": "ACI 318-14",
+        "clause": "22.3",
+        "subject": {
+          "kind": "frame",
+          "id": "B1"
+        },
+        "demand": {
+          "value": 100.0,
+          "unit": "kN.m"
+        },
+        "capacity": {
+          "value": 200.0,
+          "unit": "kN.m"
+        },
+        "ratio": 0.5,
+        "ratio_limit": 1.0,
+        "status": "PASS",
+        "governing": true,
+        "trace_ref": "#/traces/1",
+        "assumptions": []
+      },
+      {
+        "source": "host",
+        "check_id": "steel:stress-ratio",
+        "code": "AISC 360-16",
+        "subject": {
+          "kind": "frame",
+          "id": "C1"
+        },
+        "ratio": 1.2,
+        "ratio_limit": 1.0,
+        "status": "FAIL",
+        "trace_ref": null
+      }
+    ],
+    "traces": [
+      {
+        "calc_id": "aci318_14.flexure.beam_moment",
+        "calc_version": "1.0.0",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "subject": {
+          "kind": "frame",
+          "id": "B1"
+        },
+        "inputs": [
+          {
+            "name": "Mu",
+            "value": 100.0,
+            "unit": "kN.m",
+            "ref": null
+          }
+        ],
+        "constants": [
+          {
+            "name": "phi",
+            "cited": {
+              "value": 0.9,
+              "unit": "1",
+              "source": "ACI 318-14 Table 21.2.1(b)"
+            }
+          }
+        ],
+        "steps": [
+          {
+            "name": "phiMn",
+            "value": 200.0,
+            "unit": "kN.m",
+            "formula": "phi * Mn",
+            "source": "22.3",
+            "uses": [
+              "phi"
+            ]
+          }
+        ],
+        "outputs": [
+          "phiMn"
+        ],
+        "status": "PASS",
+        "messages": []
+      }
+    ],
+    "counts": {
+      "PASS": 1,
+      "FAIL": 1,
+      "NOT_APPLICABLE": 0,
+      "NEEDS_ENGINEER": 0,
+      "ERROR": 0
+    },
+    "draft": false
+  }
+}

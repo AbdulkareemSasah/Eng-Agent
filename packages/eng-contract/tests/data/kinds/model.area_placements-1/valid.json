@@ -1,0 +1,28 @@
+{
+  "areas": [
+    {
+      "id": "A1",
+      "kind": "slab",
+      "section": "S200",
+      "points": [
+        {
+          "x_mm": 0,
+          "y_mm": 0,
+          "z_mm": 3000
+        },
+        {
+          "x_mm": 5000,
+          "y_mm": 0,
+          "z_mm": 3000
+        },
+        {
+          "x_mm": 5000,
+          "y_mm": 5000,
+          "z_mm": 3000
+        }
+      ],
+      "joints": null,
+      "story": "S1"
+    }
+  ]
+}

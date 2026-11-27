@@ -1,0 +1,73 @@
+{
+  "source": "eng-harness spec 0003 §4.10 (N1 to N4) and §4.4; synthetic required size and basis, no project value",
+  "method_ref": "§4.10 N1",
+  "synthetic": true,
+  "derivation": "Required r = 400.00000000000006 mm: the binary64 value one unit in the last place above 400, that is 400 + 2^-44 = 400 + 1/17592186044416 mm (the smallest synthetic amount above a multiple that a stored float can carry). Increment i = 50 mm, rule up. N1 on exact fractions: r / i = 8 + 1/879609302220800, above 8; n = ceil = 9. N2: size = 9 x 50 = 450 mm, multiple 9: the next multiple, never the lower 400 (which is below r). 450 - r < 50. No allowance (Q14). Status PASS.",
+  "inputs": {
+    "input": {
+      "required": {
+        "value": 400.00000000000006,
+        "unit": "mm"
+      },
+      "basis": {
+        "template": null,
+        "fields": {
+          "modeling.section_increment_mm": {
+            "value": 50,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "modeling.section_rounding": {
+            "value": "up",
+            "unit": null,
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          }
+        }
+      }
+    },
+    "meta": {
+      "refs": {
+        "required": {
+          "result_id": "res_00000000000000000000000001",
+          "ref": "res_00000000000000000000000001",
+          "kind": "basis.engineer_input/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        },
+        "basis": {
+          "result_id": "res_00000000000000000000000009",
+          "ref": "res_00000000000000000000000009",
+          "kind": "basis.design_basis/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        }
+      }
+    }
+  },
+  "expected": {
+    "required": {
+      "value": 400.00000000000006,
+      "unit": "mm"
+    },
+    "increment": {
+      "value": 50.0,
+      "unit": "mm"
+    },
+    "multiple": 9,
+    "size": {
+      "value": 450.0,
+      "unit": "mm"
+    },
+    "status": "PASS"
+  }
+}

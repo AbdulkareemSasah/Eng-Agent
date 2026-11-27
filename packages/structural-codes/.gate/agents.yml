@@ -1,0 +1,19 @@
+template: ../../design/process/templates/AGENTS.template.md
+output: AGENTS.md
+values:  # key = the exact text between the double braces in the template
+  "package-name": "structural-codes"
+  "template-version": "sha256:a6f4a4f274b3"
+  "hub-path": "../../design"
+  "one-paragraph purpose": "The engineering-library folder of the Eng-Agent platform (architecture 10): the core framework (check metadata, inputs, applicability, trace recorder, verdict builder, registry, content hash, lifecycle, verification, overlays, notes) and, in later skeleton tasks, one package per code edition. It is pure computation over contract types: no host program, no network, no clock, no randomness. A check cites every constant and records every step in a trace; a wrong verdict is an R1 defect."
+  "1 contract / 2 MCP server / 3 engineering library / 4 harness / desktop add-in": "3 engineering library (import name `structural_codes`; folders `core/`, `aci318-14/`, `sbc304-2018/`, each a workspace member added by its own skeleton task)"
+  "packages": "`eng_contract` (public modules only), `pydantic`, `yaml` (PyYAML, `safe_load` only, package ADR-0001) and the standard library"
+  "for servers: other servers, structural-codes, eng-harness": "eng-harness, MCP servers, any host-program library and every product; only the public modules listed in the spec (section 4.1) are imported by other packages"
+  "links": "[docs/specs/0001-core-framework.md](docs/specs/0001-core-framework.md), [docs/plans/0001-core-framework.md](docs/plans/0001-core-framework.md), [docs/plans/0002-aci318-14-footing-checks.md](docs/plans/0002-aci318-14-footing-checks.md), [docs/plans/0003-sbc304-2018-footing-overlay.md](docs/plans/0003-sbc304-2018-footing-overlay.md), [docs/adr/0001-core-runtime-dependencies.md](docs/adr/0001-core-runtime-dependencies.md), [../../design/docs/architecture/10-structural-codes.md](../../design/docs/architecture/10-structural-codes.md), [../../design/process/11-repository-standard.md](../../design/process/11-repository-standard.md), [../../design/process/08-agent-operating-rules.md](../../design/process/08-agent-operating-rules.md)"
+  "entry-point": "eng-gate check (this folder holds libraries; the core has `python -m structural_codes` from a later task)"
+  "C# rows if applicable: dotnet build -warnaserror, dotnet test": "| Not applicable | This package has no C# code |"
+  "owner-login": "AbdulkareemSasah"
+  "The session's configured model provider; CI reviewer providers; PyPI and other package registries; official\ndocumentation sites listed here; this project's GitHub.": "The session's configured model provider (Anthropic); CI reviewer providers: awaiting owner (bootstrap mode); PyPI (pypi.org, files.pythonhosted.org); this project's GitHub (AbdulkareemSasah/Eng-Agent) and the Sasaah repository, read-only; official documentation: docs.python.org, docs.astral.sh, docs.pydantic.dev, pyyaml.org, docs.github.com."
+  "from CODEOWNERS": "as in `.github/CODEOWNERS` at the workspace root (engineering content under `checks/`, test oracles under `tests/data/golden/`, `approvals.yaml`)"
+  "for servers": "not applicable (this folder is not a server)"
+  "values": "line 95, branch 90, mutation score 80 on the R1 modules of each package (`[tool.eng-gate]` in its `pyproject.toml`; process/05 section 2)"
+  "links to acceptance records and spike reports": "none; the core needs no host program, and the ACI 318-14 pack lists its program comparisons in `docs/local-testing.md`"

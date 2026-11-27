@@ -1,0 +1,52 @@
+{
+  "verdicts": [
+    {
+      "source": "code_pack",
+      "check_id": "synthbase.3_1.sized",
+      "code": "Synthetic Code",
+      "clause": "3.1",
+      "subject": {"kind": "section", "id": "S1", "station_mm": 250.5, "case": "C1"},
+      "demand": {"value": 50.0, "unit": "mm"},
+      "capacity": {"value": 100.0, "unit": "mm"},
+      "ratio": 0.5,
+      "ratio_limit": 1.0,
+      "status": "PASS",
+      "governing": true,
+      "trace_ref": "#/traces/0",
+      "assumptions": ["synthetic assumption"]
+    }
+  ],
+  "traces": [
+    {
+      "calc_id": "synthbase.3_1.sized",
+      "calc_version": "1",
+      "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "subject": {"kind": "section", "id": "S1"},
+      "inputs": [
+        {"name": "width_mm", "value": 30.0, "unit": "mm", "ref": "res_01ARZ3NDEKTSV4RRFFQ69G5FAV"},
+        {"name": "demand_mm", "value": 50.0, "unit": "mm", "ref": null}
+      ],
+      "constants": [
+        {
+          "name": "limit_mm",
+          "cited": {"value": 100, "unit": "mm", "source": "synthetic test fixture, no engineering meaning"}
+        }
+      ],
+      "steps": [
+        {
+          "name": "ratio",
+          "value": 0.5,
+          "unit": "1",
+          "formula": "demand_mm / limit_mm",
+          "source": "synthetic test fixture, no engineering meaning",
+          "uses": ["demand_mm", "limit_mm"]
+        }
+      ],
+      "outputs": ["ratio"],
+      "status": "PASS",
+      "messages": ["synthetic message"]
+    }
+  ],
+  "counts": {"PASS": 1, "FAIL": 0, "NOT_APPLICABLE": 0, "NEEDS_ENGINEER": 0, "ERROR": 0},
+  "draft": true
+}

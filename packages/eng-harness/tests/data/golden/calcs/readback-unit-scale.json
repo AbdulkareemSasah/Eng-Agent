@@ -1,0 +1,256 @@
+{
+  "source": "eng-harness spec 0003 §4.8 (R0 to R4), §4.7 (D1 to D7) and §4.4; synthetic read sets, effects and tolerances, no project value",
+  "method_ref": "§4.8 R2",
+  "synthetic": true,
+  "derivation": "Revision 3: area section W1 (C30, wall) of thickness 250.0 mm. The change set writes a thickness of 0.2 and the model reads back 200.0 at revision 4 (a unit-scale error, 0.2 m taken as mm or the reverse). Tolerances 1 (compare.length_mm). R1: the row ['area_sections','W1'] changed at /thickness_mm, |200.0 - 250.0| = 50 > 1 (D3, length, mm). R2: e1 expects 0.2 at /thickness_mm and reads 200.0: |200.0 - 0.2| = 199.8 > 1, mismatch (D3, tolerance 1; the values are not converted, D6). R3: the change is explained by e1 (same section, key and pointer). R4: a mismatch: FAIL.",
+  "inputs": {
+    "input": {
+      "before_sections": {
+        "frame_sections": [],
+        "area_sections": [
+          {
+            "name": "W1",
+            "material": "C30",
+            "kind": "wall",
+            "thickness_mm": 250.0
+          }
+        ]
+      },
+      "after_sections": {
+        "frame_sections": [],
+        "area_sections": [
+          {
+            "name": "W1",
+            "material": "C30",
+            "kind": "wall",
+            "thickness_mm": 200.0
+          }
+        ]
+      },
+      "basis": {
+        "template": null,
+        "fields": {
+          "compare.length_mm": {
+            "value": 1.0,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.angle_deg": {
+            "value": 1.0,
+            "unit": "deg",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.stress_MPa": {
+            "value": 1.0,
+            "unit": "MPa",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.unit_weight_kN_m3": {
+            "value": 1.0,
+            "unit": "kN/m3",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.line_load_kN_m": {
+            "value": 1.0,
+            "unit": "kN/m",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.area_load_kPa": {
+            "value": 1.0,
+            "unit": "kPa",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.dimensionless_ratio": {
+            "value": 1.0,
+            "unit": "1",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          }
+        }
+      },
+      "effects": {
+        "change_set": "res_00000000000000000000000005",
+        "model_id": "mdl_00000000000000000000000000",
+        "effects": [
+          {
+            "item_id": "e1",
+            "section": "model.sections/1",
+            "key": [
+              "area_sections",
+              "W1"
+            ],
+            "op": "set",
+            "pointer": "/thickness_mm",
+            "value": 0.2,
+            "unit": "mm"
+          }
+        ]
+      }
+    },
+    "meta": {
+      "refs": {
+        "before_sections": {
+          "result_id": "res_00000000000000000000000003",
+          "ref": "res_00000000000000000000000003",
+          "kind": "model.sections/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "after_sections": {
+          "result_id": "res_00000000000000000000000004",
+          "ref": "res_00000000000000000000000004",
+          "kind": "model.sections/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 4,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "basis": {
+          "result_id": "res_00000000000000000000000009",
+          "ref": "res_00000000000000000000000009",
+          "kind": "basis.design_basis/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        },
+        "effects": {
+          "result_id": "res_00000000000000000000000008",
+          "ref": "res_00000000000000000000000008",
+          "kind": "harness.expected_effects/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [
+            "res_00000000000000000000000005",
+            "res_00000000000000000000000003"
+          ],
+          "producer_tool": "harness"
+        }
+      }
+    }
+  },
+  "expected": {
+    "status": "FAIL",
+    "items": [
+      {
+        "item_id": "e1",
+        "result": "mismatch",
+        "expected": 0.2,
+        "read": 200.0,
+        "tolerance": 1.0,
+        "rule": "D3"
+      }
+    ],
+    "unexpected": [],
+    "diff": {
+      "before": {
+        "model_id": "mdl_00000000000000000000000000",
+        "model_revision": 3,
+        "covered": [
+          "model.sections/1"
+        ]
+      },
+      "after": {
+        "model_id": "mdl_00000000000000000000000000",
+        "model_revision": 4,
+        "covered": [
+          "model.sections/1"
+        ]
+      },
+      "tolerances": {
+        "length": {
+          "value": 1.0,
+          "unit": "mm",
+          "ref": "res_00000000000000000000000009#/fields/compare.length_mm"
+        },
+        "angle": {
+          "value": 1.0,
+          "unit": "deg",
+          "ref": "res_00000000000000000000000009#/fields/compare.angle_deg"
+        },
+        "stress": {
+          "value": 1.0,
+          "unit": "MPa",
+          "ref": "res_00000000000000000000000009#/fields/compare.stress_MPa"
+        },
+        "unit_weight": {
+          "value": 1.0,
+          "unit": "kN/m3",
+          "ref": "res_00000000000000000000000009#/fields/compare.unit_weight_kN_m3"
+        },
+        "line_load": {
+          "value": 1.0,
+          "unit": "kN/m",
+          "ref": "res_00000000000000000000000009#/fields/compare.line_load_kN_m"
+        },
+        "area_load": {
+          "value": 1.0,
+          "unit": "kPa",
+          "ref": "res_00000000000000000000000009#/fields/compare.area_load_kPa"
+        },
+        "dimensionless": {
+          "value": 1.0,
+          "unit": "1",
+          "ref": "res_00000000000000000000000009#/fields/compare.dimensionless_ratio"
+        }
+      },
+      "changes": [
+        {
+          "section": "model.sections/1",
+          "key": [
+            "area_sections",
+            "W1"
+          ],
+          "change": "changed",
+          "before": null,
+          "after": null,
+          "properties": [
+            {
+              "pointer": "/thickness_mm",
+              "before": 250.0,
+              "after": 200.0,
+              "unit": "mm",
+              "quantity_kind": "length",
+              "tolerance": 1.0,
+              "rule": "D3"
+            }
+          ]
+        }
+      ],
+      "within_tolerance": [],
+      "not_compared": [],
+      "counts": {
+        "model.sections/1": {
+          "added": 0,
+          "removed": 0,
+          "changed": 1,
+          "ambiguous": 0,
+          "unchanged": 0,
+          "within_tolerance": 0
+        }
+      },
+      "identical": false,
+      "complete": true
+    },
+    "complete": true
+  }
+}

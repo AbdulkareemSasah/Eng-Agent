@@ -1,0 +1,12 @@
+{
+  "source": "design/docs/architecture/12-decision-layer.md section 3 (Policy); spec 0005 section 4.3 for the per-tier timeout split and require_engineer",
+  "defaults": {
+    "model": true,
+    "llm": false,
+    "min_confidence": 0.85,
+    "shadow": true,
+    "timeout_ms_model": 1500,
+    "timeout_ms_llm": 20000,
+    "require_engineer": false
+  }
+}

@@ -1,0 +1,230 @@
+"""Contract tests of the CSI allowlist side (plan 0002 T4; spec 0002 AC35)."""
+
+import json
+from pathlib import Path
+from typing import Any
+
+from helpers import load_json_dict as _load
+from helpers import load_repo_json
+
+PACKAGE_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = PACKAGE_ROOT.parents[1]
+INVENTORY = REPO_ROOT / "spikes" / "S-12-sasaah-tool-inventory" / "inventory" / "sasaah-csi-mcp.json"
+SCHEMAS = PACKAGE_ROOT / "tests" / "fakes" / "sasaah_csi" / "schemas.json"
+
+
+def _inventory() -> dict[str, Any]:
+    """The S-12 inventory at the repository root, outside this package."""
+    return load_repo_json(
+        INVENTORY,
+        reason="the S-12 inventory is outside the package copy that the mutation step runs (B-369); expires 2026-12-31",
+    )
+
+
+def test_fake_schemas_match_inventory() -> None:
+    """AC35: the fake's tools are the inventory's non-excluded tools with equal input schemas."""
+    inventory = _inventory()
+    fake = _load(SCHEMAS)
+    expected = {t["name"]: t["input_schema"] for t in inventory["tools"] if not t["excluded_from_allowlist"]}
+    actual = {t["name"]: t["input_schema"] for t in fake["tools"]}
+    assert fake["sasaah_commit"] == inventory["sasaah_commit"]
+    assert len(fake["tools"]) == len(actual)
+    assert actual == expected
+
+
+def test_fake_has_no_escape_hatch() -> None:
+    """No excluded tool (script, invoke, table write, generic object access) is in the fake's tool list."""
+    inventory = _inventory()
+    excluded = {t["name"] for t in inventory["tools"] if t["excluded_from_allowlist"]}
+    names = {t["name"] for t in _load(SCHEMAS)["tools"]}
+    assert excluded
+    assert names.isdisjoint(excluded)
+
+
+def test_fake_server_kinds_match_inventory() -> None:
+    """The fake classifies each tool by the inventory's server_kind, so its write set cannot drift."""
+    inventory = _inventory()
+    expected = {t["name"]: t["server_kind"] for t in inventory["tools"] if not t["excluded_from_allowlist"]}
+    actual = {t["name"]: t.get("server_kind") for t in _load(SCHEMAS)["tools"]}
+    assert actual == expected
+
+
+def _expected_units(tool: dict[str, Any]) -> str:
+    """The `units` handling the inventory's evidence implies (spec 0002 section 4.5.1)."""
+    change = tool["changes_host_units"]
+    if change["units_param_declared"]:
+        return "token" if change["applied"] else "declared_ignored"
+    return "present" if change["quantities_follow_present_units"] else "none"
+
+
+def test_against_inventory() -> None:
+    """AC16: the allowlist names only non-excluded inventory tools of the pinned build, and agrees with them."""
+    from eng_harness.adapters.csi import csi_allowlist
+
+    inventory = _inventory()
+    by_name = {t["name"]: t for t in inventory["tools"]}
+    allowlist = csi_allowlist().for_product("ETABS")
+    assert allowlist.sasaah_commit == inventory["sasaah_commit"]
+    assert allowlist.fingerprint_source == "s12-inventory"
+    assert allowlist.tools
+    for tool in allowlist.tools:
+        item = by_name[tool.name]  # a KeyError is a tool absent from the pinned build
+        assert not item["excluded_from_allowlist"], tool.name
+        assert item["classification"] != "escape-hatch", tool.name
+        assert tool.kind == ("session" if item["classification"] == "file" else item["classification"]), tool.name
+        if item["server_kind"] == "Read":
+            assert tool.effect == "read", tool.name
+        if item["server_kind"] in ("Write", "Destructive"):
+            assert tool.effect == "write", tool.name
+        assert (tool.confirm != "never") == item["confirm_required"], tool.name
+        assert tool.units == _expected_units(item), tool.name
+        assert "ETABS" in tool.products
+
+
+def test_allowlist_is_served_by_the_fake() -> None:
+    """AC35: every allowlisted tool is in the synthetic fake, which carries the inventory's schemas."""
+    from eng_harness.adapters.csi import csi_allowlist
+
+    served = {t["name"] for t in _load(SCHEMAS)["tools"]}
+    assert {tool.name for tool in csi_allowlist().tools} <= served
+
+
+def test_pinned_fingerprint_from_inventory() -> None:
+    """AC10: the fingerprint of the allowlisted tools, computed from the S-12 inventory, is the pinned one."""
+    from eng_harness.adapters.csi import csi_allowlist
+    from eng_harness.servers._buildcheck import tool_list_fingerprint
+
+    allowlist = csi_allowlist().for_product("ETABS")
+    assert allowlist.fingerprint_source == "s12-inventory"
+    schemas = {t["name"]: t["input_schema"] for t in _inventory()["tools"] if t["name"] in allowlist.tool_names}
+    assert set(schemas) == {tool.name for tool in allowlist.tools}
+    assert tool_list_fingerprint(schemas) == allowlist.fingerprint["ETABS"]
+
+
+def test_safe_fake_schemas_match_inventory(tmp_path: Path) -> None:
+    """AC28: the SAFE-mode process serves the pinned inventory schemas."""
+    from fakes.sasaah_csi.test_server import Rpc
+
+    control = tmp_path / "control.json"
+    control.write_text(json.dumps({"product": "SAFE"}))
+    rpc = Rpc(control)
+    try:
+        error, target = rpc.call("csi_launch")
+        assert not error
+        assert target["product"] == "SAFE"
+        listed = rpc.request("tools/list", {})["tools"]
+        actual = {tool["name"]: tool["inputSchema"] for tool in listed}
+        expected = {
+            tool["name"]: tool["input_schema"] for tool in _inventory()["tools"] if not tool["excluded_from_allowlist"]
+        }
+        assert len(listed) == len(actual)
+        assert actual == expected
+    finally:
+        rpc.close()
+
+
+def test_safe_against_inventory() -> None:
+    """AC3: SAFE allowlist entries match the non-excluded S-12 inventory tools and are served by the fake."""
+    from eng_harness.adapters.csi import csi_allowlist
+
+    inventory = _inventory()
+    by_name = {t["name"]: t for t in inventory["tools"]}
+    safe = csi_allowlist().for_product("SAFE")
+    assert safe.sasaah_commit == inventory["sasaah_commit"]
+    assert safe.fingerprint_source == "s12-inventory"
+    assert len(safe.tools) == 27
+    served = {t["name"] for t in _load(SCHEMAS)["tools"]}
+    for tool in safe.tools:
+        item = by_name[tool.name]
+        assert not item["excluded_from_allowlist"], tool.name
+        assert item["classification"] != "escape-hatch", tool.name
+        assert tool.kind == ("session" if item["classification"] == "file" else item["classification"]), tool.name
+        if item["server_kind"] == "Read":
+            assert tool.effect == "read", tool.name
+        if item["server_kind"] in ("Write", "Destructive"):
+            assert tool.effect == "write", tool.name
+        assert (tool.confirm != "never") == item["confirm_required"], tool.name
+        assert tool.units == _expected_units(item), tool.name
+        assert "SAFE" in tool.products
+        assert tool.name in served
+
+
+def test_safe_fingerprint_from_inventory() -> None:
+    """AC4: the SAFE tool-list fingerprint computed from S-12 equals the pinned one; ETABS is unchanged."""
+    from eng_harness.adapters.csi import csi_allowlist
+    from eng_harness.servers._buildcheck import tool_list_fingerprint
+
+    allowlist = csi_allowlist()
+    assert allowlist.fingerprint_source == "s12-inventory"
+    safe = allowlist.for_product("SAFE")
+    schemas = {t["name"]: t["input_schema"] for t in _inventory()["tools"] if t["name"] in safe.tool_names}
+    assert set(schemas) == {tool.name for tool in safe.tools}
+    assert tool_list_fingerprint(schemas) == allowlist.fingerprint["SAFE"] == safe.tool_fingerprint
+    assert allowlist.fingerprint["ETABS"] == "67e0f08ace144fdc41f43882b6671c4296899b36bbfb122433ef879c2e2ebdd1"
+
+
+def test_sap2000_against_inventory() -> None:
+    """AC2: SAP2000 allowlist entries match the non-excluded S-12 inventory tools and are served by the fake."""
+    from eng_harness.adapters.csi import csi_allowlist
+
+    inventory = _inventory()
+    by_name = {t["name"]: t for t in inventory["tools"]}
+    sap = csi_allowlist().for_product("SAP2000")
+    assert sap.sasaah_commit == inventory["sasaah_commit"]
+    assert sap.fingerprint_source == "s12-inventory"
+    assert len(sap.tools) == 33
+    served = {t["name"] for t in _load(SCHEMAS)["tools"]}
+    for tool in sap.tools:
+        item = by_name[tool.name]
+        assert not item["excluded_from_allowlist"], tool.name
+        assert item["classification"] != "escape-hatch", tool.name
+        assert tool.kind == ("session" if item["classification"] == "file" else item["classification"]), tool.name
+        if item["server_kind"] == "Read":
+            assert tool.effect == "read", tool.name
+        if item["server_kind"] in ("Write", "Destructive"):
+            assert tool.effect == "write", tool.name
+        assert (tool.confirm != "never") == item["confirm_required"], tool.name
+        assert tool.units == _expected_units(item), tool.name
+        assert "SAP2000" in tool.products
+        assert tool.name in served
+
+
+def test_sap2000_fingerprint_from_inventory() -> None:
+    """AC3: the SAP2000 tool-list fingerprint computed from S-12 equals the pinned one; ETABS and SAFE are unchanged."""
+    from eng_harness.adapters.csi import csi_allowlist
+    from eng_harness.servers._buildcheck import tool_list_fingerprint
+
+    allowlist = csi_allowlist()
+    assert allowlist.fingerprint_source == "s12-inventory"
+    sap = allowlist.for_product("SAP2000")
+    schemas = {t["name"]: t["input_schema"] for t in _inventory()["tools"] if t["name"] in sap.tool_names}
+    assert set(schemas) == {tool.name for tool in sap.tools}
+    assert tool_list_fingerprint(schemas) == allowlist.fingerprint["SAP2000"] == sap.tool_fingerprint
+    assert allowlist.fingerprint["ETABS"] == "67e0f08ace144fdc41f43882b6671c4296899b36bbfb122433ef879c2e2ebdd1"
+    assert allowlist.fingerprint["SAFE"] == "ccdab3c9461b60387569af2ec7acc214c0803bd7953a5d66ca380e1c87c38025"
+
+
+def test_sap2000_fake_schemas_match_inventory(tmp_path: Path) -> None:
+    """AC19: the SAP2000-mode process serves the pinned inventory schemas."""
+    from fakes.sasaah_csi.test_server import Rpc
+
+    control = tmp_path / "control.json"
+    control.write_text(json.dumps({"product": "SAP2000"}))
+    rpc = Rpc(control)
+    try:
+        error, target = rpc.call("csi_launch")
+        assert not error
+        assert target["product"] == "SAP2000"
+        # SAP2000 mode gaps of spec 0012 §4.1: stories are unsupported_by_version.
+        error, body = rpc.call("csi_list_stories")
+        assert error
+        assert body["code"] == "unsupported_by_version"
+        listed = rpc.request("tools/list", {})["tools"]
+        actual = {tool["name"]: tool["inputSchema"] for tool in listed}
+        expected = {
+            tool["name"]: tool["input_schema"] for tool in _inventory()["tools"] if not tool["excluded_from_allowlist"]
+        }
+        assert len(listed) == len(actual)
+        assert actual == expected
+    finally:
+        rpc.close()

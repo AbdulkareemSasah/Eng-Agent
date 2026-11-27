@@ -1,0 +1,102 @@
+# The blank template (spec 0004 section 4.8): structure only, no engineering value, so nothing to cite.
+# Every engineering value is asked at run start. ask_each_run lists the design basis fields of the model edit cycle
+# (spec 0007 section 4.8), paths and kinds only; each ask agrees with the workflow's FieldSpec (spec 0004 AC21).
+schema: eng-template/1
+meta:
+  name: blank
+  version: 0.1.0
+  description: Blank design basis template; it holds no value and every value is asked at run start.
+  author: Eng-Agent
+  code_pack: null
+  status: draft
+  synthetic: false
+  extends: null
+ask_each_run:
+  - path: compare.length_mm
+    label: Comparison tolerance of lengths
+    kind: quantity
+    unit: "mm"
+  - path: compare.angle_deg
+    label: Comparison tolerance of angles
+    kind: quantity
+    unit: "deg"
+  - path: compare.stress_MPa
+    label: Comparison tolerance of stresses
+    kind: quantity
+    unit: "MPa"
+  - path: compare.unit_weight_kN_m3
+    label: Comparison tolerance of unit weights
+    kind: quantity
+    unit: "kN/m3"
+  - path: compare.line_load_kN_m
+    label: Comparison tolerance of line loads
+    kind: quantity
+    unit: "kN/m"
+  - path: compare.area_load_kPa
+    label: Comparison tolerance of area loads
+    kind: quantity
+    unit: "kPa"
+  - path: compare.dimensionless_ratio
+    label: Comparison tolerance of dimensionless values
+    kind: quantity
+    unit: "1"
+  - path: checks.readback_relative_tolerance_ratio
+    label: Relative tolerance of the host read-back check
+    kind: quantity
+    unit: "1"
+  - path: report.top_n
+    label: Rows of the design summary
+    kind: count
+  - path: limits.ratio_limit_ratio
+    label: Limit of the host design ratio
+    kind: quantity
+    unit: "1"
+  - path: limits.drift_ratio
+    label: Limit of the story drift ratio
+    kind: quantity
+    unit: "1"
+  - path: bounds.thickness_min_mm
+    label: Smallest accepted thickness
+    kind: quantity
+    unit: "mm"
+  - path: bounds.thickness_max_mm
+    label: Largest accepted thickness
+    kind: quantity
+    unit: "mm"
+  - path: bounds.line_load_min_kN_m
+    label: Smallest accepted line load
+    kind: quantity
+    unit: "kN/m"
+  - path: bounds.line_load_max_kN_m
+    label: Largest accepted line load
+    kind: quantity
+    unit: "kN/m"
+  - path: bounds.area_load_min_kPa
+    label: Smallest accepted area load
+    kind: quantity
+    unit: "kPa"
+  - path: bounds.area_load_max_kPa
+    label: Largest accepted area load
+    kind: quantity
+    unit: "kPa"
+  - path: bounds.ratio_min_ratio
+    label: Smallest accepted self-weight multiplier or combination scale
+    kind: quantity
+    unit: "1"
+  - path: bounds.ratio_max_ratio
+    label: Largest accepted self-weight multiplier or combination scale
+    kind: quantity
+    unit: "1"
+  - path: design.run
+    label: Designs the host runs
+    kind: choice
+    choices: [steel, concrete, steel_and_concrete]
+  - path: attempts.cycles
+    label: Edit cycles before the run stops
+    kind: count
+  - path: attempts.change_set
+    label: Attempts to obtain a valid change set
+    kind: count
+  - path: attempts.approval_void
+    label: Returns to the model read after a voided approval
+    kind: count

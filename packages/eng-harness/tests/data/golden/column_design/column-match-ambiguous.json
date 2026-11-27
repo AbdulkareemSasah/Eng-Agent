@@ -1,0 +1,83 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.4 (rules M1, M2); synthetic data, no project value",
+  "method_ref": "\u00a74.4.4 M2",
+  "synthetic": true,
+  "derivation": "Tolerance t = 5 mm. Column C1 rectangular, material C30. Rounded sizes b = 400 mm, h = 600 mm (as column-match-one). M1: two rectangular C30 sections at exactly (400, 600): C40x60A and C40x60B. C40x60C is 410 x 600: |410 - 400| = 10 > 5, not a candidate. M2: several candidates => status ambiguous, section null, names sorted [C40x60A, C40x60B].",
+  "input": {
+    "column": {
+      "frame_id": "C1",
+      "section": "C30x30",
+      "shape": "rectangular",
+      "material": "C30",
+      "story": "L1",
+      "length_mm": 3000.0
+    },
+    "size_b": {
+      "value": 400.0,
+      "unit": "mm"
+    },
+    "size_h": {
+      "value": 600.0,
+      "unit": "mm"
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "C40x60B",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400,
+            "h_mm": 600
+          }
+        },
+        {
+          "name": "C40x60A",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400,
+            "h_mm": 600
+          }
+        },
+        {
+          "name": "C40x60C",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 410,
+            "h_mm": 600
+          }
+        }
+      ],
+      "area_sections": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.length_mm": {
+          "value": 5,
+          "unit": "mm",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "column": "res_01KCC000000000000000000021",
+    "size_b": "res_01KCC000000000000000000024#/size",
+    "size_h": "res_01KCC000000000000000000025#/size",
+    "sections": "res_01KCC000000000000000000022",
+    "basis": "res_01KCC000000000000000000023"
+  },
+  "expected": {
+    "status": "ambiguous",
+    "section": null,
+    "names": [
+      "C40x60A",
+      "C40x60B"
+    ]
+  }
+}

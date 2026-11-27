@@ -1,0 +1,64 @@
+[project]
+name = "structural-codes-core"
+version = "0.1.0.dev0"
+description = "Core framework of the structural-codes folder of the Eng-Agent platform: check metadata, inputs, trace, verdicts, registry, lifecycle and verification."
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+dependencies = ["eng-contract", "pydantic>=2.14,<3", "pyyaml>=6,<7"]
+
+# Test-only dependencies of this package (imports rule IM006 of the gate, spec 4.10); the versions follow the
+# workspace root's dev group. types-PyYAML lets `mypy --strict` type the yaml import (plan 0001 section 3).
+[dependency-groups]
+dev = ["pytest>=9.2.0", "hypothesis>=6.170.14", "types-pyyaml>=6"]
+
+[tool.uv.sources]
+eng-contract = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "structural_codes"
+
+# Only keys of the gate's allowed set (eng-dev-gate spec 4.12); mypy takes the workspace root's configuration and the
+# gate runs coverage itself with the thresholds of [tool.eng-gate].
+[tool.ruff]
+line-length = 120
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "N", "S", "T20", "C4", "PIE", "RUF", "PT"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --strict-config"
+testpaths = ["tests"]
+markers = [
+    "windows: needs Windows; runs in the Windows CI job",
+]
+
+# The core defines no check, so there is no check_modules (plan 0001 T1). R1 modules: spec 4.1; modules that do not
+# exist yet match nothing until their tasks add them.
+[tool.eng-gate]
+profile = "codes"
+layer = 3
+import_names = ["structural_codes"]
+coverage_line = 95
+coverage_branch = 90
+mutation_min = 80
+r1_modules = [
+  "src/structural_codes/trace.py", "src/structural_codes/check.py", "src/structural_codes/_verdict.py",
+  "src/structural_codes/applicability.py", "src/structural_codes/overlay.py", "src/structural_codes/lifecycle.py",
+  "src/structural_codes/content_hash.py", "src/structural_codes/verification.py", "src/structural_codes/_runner.py",
+]
+r2_modules = ["src/structural_codes/**"]
+# The spec 0001 section 4.1 modules (plan T14a, T14b and T14).
+public_modules = [
+  "structural_codes", "structural_codes.errors", "structural_codes.meta", "structural_codes.inputs",
+  "structural_codes.applicability", "structural_codes.trace", "structural_codes.check", "structural_codes.pack",
+  "structural_codes.overlay", "structural_codes.content_hash", "structural_codes.verification", "structural_codes.lifecycle",
+  "structural_codes.notes",
+]

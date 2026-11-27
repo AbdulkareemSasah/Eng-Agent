@@ -1,0 +1,31 @@
+# Path floors of design/process/01-lifecycle.md section 6, mapped to this workspace.
+# A change gets at least the risk of the highest entry it touches. Packages refine this map
+# with their own .gate/risk-map.yml.
+- paths:  # R1: engineering content
+    - "packages/**/checks/**"  # engineering checks; the gate's own checks/ code is r3 (B-099)
+    - "**/tests/data/golden/**"
+    - "**/approvals.yaml"
+    - "packages/eng-harness/src/eng_harness/calcs/**"
+    - "packages/eng-harness/src/eng_harness/templates/**"
+    - "packages/eng-harness/src/eng_harness/rules/**"
+    - "packages/eng-harness/src/eng_harness/policies/**"
+    - "packages/eng-harness/src/eng_harness/adapters/**"  # model writes
+    - "packages/eng-contract/src/eng_contract/units*"  # unit factors
+  risk: r1
+- paths:  # R2: contracts
+    - "packages/eng-contract/**"
+    - "**/kinds/**"
+    - "**/docs/tools/schema.json"
+    - "**/docs/schema/**"
+  risk: r2
+- paths:  # R3: configuration, dependency manifests, CI
+    - "pyproject.toml"
+    - "**/pyproject.toml"
+    - "uv.lock"
+    - ".python-version"
+    - ".github/**"
+    - ".gate/**"
+    - "tools/eng-dev-gate/**"
+    - "packages/eng-harness/src/eng_harness/providers/**"
+    - "packages/eng-harness/src/eng_harness/pages/**"
+  risk: r3

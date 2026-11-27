@@ -1,0 +1,18 @@
+# Policy of the forbidden check (spec 4.8). Protected path (.gate/**); read from the gate root.
+escape_hatch:  # FB001: exact names, and regexes that must fully match a function or class name (case-insensitive)
+  names: [csi_run_script, csi_db_tables_apply]
+  patterns:
+    - '(?i)(?:\w+_)?(?:run|exec|execute|eval|evaluate)_?(?:script|code|expr|expression|macro)s?(?:_\w+)?'
+    - '(?i)(?:\w+_)?(?:apply|write)_?(?:db|database)_?tables?(?:_\w+)?'
+    - '(?i)(?:\w+_)?(?:forward|proxy|passthrough)_?(?:arbitrary_|any_)?(?:api_)?(?:call|request)s?(?:_\w+)?'
+    - '(?i)(?:\w+_)?arbitrary_?(?:api_?)?(?:call|request)s?(?:_\w+)?'
+host_sdk:  # FB003: top-level modules of host program SDKs (ETABS, SAFE, SAP2000, IDEA StatiCa names are a gap, Q10)
+  modules: [win32com, pythoncom, pywintypes, comtypes, clr, System, Autodesk]
+io_modules:  # FB004: modules that block and rule modules never import (11 section 3, rules 1 and 4)
+  [os, sys, io, pathlib, shutil, tempfile, socket, ssl, http, urllib, subprocess, sqlite3, time, datetime, random, secrets, uuid, requests, httpx]
+cited:  # FB005 form A1: callables whose first argument is a literal with a source string (10 section 3)
+  callables: [Cited]
+versioned:  # FB005 form A4: callables whose version= keyword is an integer identity (spec 4.8, amendment B-438)
+  callables: [calc, CheckMeta, block, workflow, decision_point, rule]
+rationale:  # FB006: types that already forbid digits in a rationale (12 section 1)
+  types: [Rationale]

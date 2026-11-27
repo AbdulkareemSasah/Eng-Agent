@@ -1,0 +1,198 @@
+{
+  "source": "eng-harness spec 0010 section 4.4.1, synthetic fixture",
+  "method_ref": "\u00a74.4.1 S5",
+  "synthetic": true,
+  "derivation": "Tolerance 50 deg. 45 deg is 45 from 0 and 45 from 90: within both axes, so the orientation is not decided (COLUMN_ROTATED); 135 deg is 45 from 90 and from 180: the same. 10 deg is 10 from 0 and 80 from 90: along.",
+  "input": {
+    "placements": {
+      "frames": [
+        {
+          "id": "CW1",
+          "kind": "column",
+          "section": "SEC-A",
+          "i_joint": "W1",
+          "j_joint": "W1-top",
+          "i": {
+            "x_mm": 1000.0,
+            "y_mm": 0.0,
+            "z_mm": 0.0
+          },
+          "j": {
+            "x_mm": 1000.0,
+            "y_mm": 0.0,
+            "z_mm": 3000.0
+          },
+          "story": null,
+          "rotation_deg": 45.0
+        },
+        {
+          "id": "CW2",
+          "kind": "column",
+          "section": "SEC-A",
+          "i_joint": "W2",
+          "j_joint": "W2-top",
+          "i": {
+            "x_mm": 2000.0,
+            "y_mm": 0.0,
+            "z_mm": 0.0
+          },
+          "j": {
+            "x_mm": 2000.0,
+            "y_mm": 0.0,
+            "z_mm": 3000.0
+          },
+          "story": null,
+          "rotation_deg": 10.0
+        },
+        {
+          "id": "CW3",
+          "kind": "column",
+          "section": "SEC-A",
+          "i_joint": "W3",
+          "j_joint": "W3-top",
+          "i": {
+            "x_mm": 3000.0,
+            "y_mm": 0.0,
+            "z_mm": 0.0
+          },
+          "j": {
+            "x_mm": 3000.0,
+            "y_mm": 0.0,
+            "z_mm": 3000.0
+          },
+          "story": null,
+          "rotation_deg": 135.0
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "SEC-A",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400.0,
+            "h_mm": 600.0
+          }
+        },
+        {
+          "name": "SEC-B",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 300.0,
+            "h_mm": 500.0
+          }
+        },
+        {
+          "name": "SEC-C",
+          "material": "C30",
+          "shape": {
+            "type": "circular",
+            "D_mm": 450.0
+          }
+        },
+        {
+          "name": "SEC-D",
+          "material": "C30",
+          "shape": {
+            "type": "other",
+            "host_shape": "Tee"
+          }
+        }
+      ],
+      "area_sections": []
+    },
+    "reactions": {
+      "axes": "global",
+      "rows": [
+        {
+          "joint": "W1",
+          "case": {
+            "case": "D",
+            "case_type": "load_case",
+            "step": null
+          },
+          "FX_kN": 1.0,
+          "FY_kN": 2.0,
+          "FZ_kN": 300.0,
+          "MX_kNm": 4.0,
+          "MY_kNm": 5.0,
+          "MZ_kNm": 6.0
+        },
+        {
+          "joint": "W2",
+          "case": {
+            "case": "D",
+            "case_type": "load_case",
+            "step": null
+          },
+          "FX_kN": 1.0,
+          "FY_kN": 2.0,
+          "FZ_kN": 300.0,
+          "MX_kNm": 4.0,
+          "MY_kNm": 5.0,
+          "MZ_kNm": 6.0
+        },
+        {
+          "joint": "W3",
+          "case": {
+            "case": "D",
+            "case_type": "load_case",
+            "step": null
+          },
+          "FX_kN": 1.0,
+          "FY_kN": 2.0,
+          "FZ_kN": 300.0,
+          "MX_kNm": 4.0,
+          "MY_kNm": 5.0,
+          "MZ_kNm": 6.0
+        }
+      ]
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.angle_deg": {
+          "value": 50.0,
+          "unit": "deg",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "placements": "res_00000000000000000000000001",
+    "sections": "res_00000000000000000000000002",
+    "reactions": "res_00000000000000000000000003",
+    "basis": "res_00000000000000000000000004"
+  },
+  "expected": {
+    "subjects": [
+      {
+        "id": "W2",
+        "joint": "W2",
+        "column": "CW2",
+        "x_mm": 2000.0,
+        "y_mm": 0.0,
+        "cx_mm": 400.0,
+        "cy_mm": 600.0
+      }
+    ],
+    "excluded": [
+      {
+        "joint": "W1",
+        "column": "CW1",
+        "reason": "COLUMN_ROTATED"
+      },
+      {
+        "joint": "W3",
+        "column": "CW3",
+        "reason": "COLUMN_ROTATED"
+      }
+    ]
+  }
+}

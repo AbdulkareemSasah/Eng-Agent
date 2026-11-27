@@ -1,0 +1,23 @@
+# harness.frame_element_map
+
+- Calc id, version and content hash: `harness.frame_element_map` v1; the hash is the entry in `src/eng_harness/calcs/calcs.lock.json`
+- Status: draft (bootstrap mode, ADR-0028 section 4; owner approval awaited, spec 0011 §4.11)
+- Method source: spec 0011 section 4.11, rules M1 to M6; `compare.length_mm` (mm, >= 0) and confirmed `mapping.offset_x_mm` / `_y_mm` / `_z_mm` (mm, signed, no default) from the basis; offsets, translated ends and squared distances kept exact as fractions of the JSON doubles (M1, M2 inclusive `d² <= t²`, 0003 §4.11 P2); ends ordered by elevation then x then y (M1); optional `links` are hints only (M4 / M5), and a link naming a frame id not in `frames` is ignored (M4 names the frame under pairing; spec 0013 R4 passes only the selected columns); after geometric pairing, matched pairs take `element_id` and `type_id` from `harness.revit_structure/1` by `unique_id` (OQ-Q104 option (a)); a matched pair absent from structure goes to `conflicts` with both id fields equal; no input is `stale_ok` (any change of either model or of structure makes the map stale)
+- Golden cases (`tests/data/golden/calcs/`; each derived by hand in its `derivation` field):
+  - `frame-element-map-one-to-one.json` (M3, M5): unique mutual match, basis `geometry`, structure ids filled. Result: pass.
+  - `frame-element-map-offset.json` (M1): confirmed nonzero offsets translate ETABS ends into Revit coordinates before pairing. Result: pass.
+  - `frame-element-map-ambiguous.json` (M3): two elements within tolerance of one frame → `ambiguous` side `frame`; candidates not unmatched. Result: pass.
+  - `frame-element-map-unmatched.json` (M3): partners outside tolerance → unmatched on each side. Result: pass.
+  - `frame-element-map-link-conflict.json` (M4): link names the frame on a different element than the geometric match → `conflicts`; no pairs. Result: pass.
+  - `frame-element-map-upper-outside.json` (M2): lower end within, upper end outside → not candidates. Result: pass.
+  - `frame-element-map-at-tolerance.json` (M2): lower-end `d² = t²` inclusive within; display distance 5.0 mm. Result: pass.
+  - `frame-element-map-structure-absent.json` (structure join): geometric match with no structure row → `conflicts` with equal ids. Result: pass.
+  - `frame-element-map-link-agrees.json` (M5): agreeing link → basis `both`. Result: pass.
+  - `frame-element-map-offset-exact.json` (M1, M2): offset 100.7 mm with nominal dx = 5 mm = t; exact dx = 5 + 3·2^-46 mm, so d² > t² and both sides are unmatched (a float sum would give 5.0 within). Result: pass.
+  - `frame-element-map-reversed-ends.json` (M1): element drawn top-down is ordered by elevation and matches. Result: pass.
+  - `frame-element-map-incomplete.json` (output): an incomplete `elements` reference gives `complete = false`. Result: pass.
+- Boundary and unit tests: `tests/unit/calcs/test_frame_element_map.py` (basis refusals for missing, unconfirmed or non-numeric `compare.length_mm` and `mapping.offset_*`; exact offset translation; a link to a frame outside `frames` ignored); `tests/property/test_frame_element_map.py::test_permutation_invariant` (AC28); `tests/golden/test_calcs_golden.py` for the `frame-element-map-*` stems (AC27); stale-map workflow coverage stays in plan 0011 T15
+- Reviewer and date: awaiting review
+- Findings and open gaps:
+  - End elevation ties (identical `z_mm`) are ordered by `x_mm` then `y_mm` for a stable lower/upper assignment; the column workflow uses vertical members where elevations differ.
+  - Level names are not compared (spec 0011 §4.11); elevations participate only through M2.
