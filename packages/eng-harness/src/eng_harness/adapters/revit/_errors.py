@@ -54,6 +54,9 @@ _CONSUMED_TOKEN_TEXTS = (
     "expired",
 )
 _NOT_FOUND_TEXTS = ("was not found", "not found on element")
+_DUPLICATE_TOOL = "duplicate_family_type"
+"""The host tool whose "already exists" can follow a resend of its own applied call (spec 0011 §4.7)."""
+_ALREADY_EXISTS = "already exists"
 _NOT_EXECUTED = "was not executed"
 _ALREADY_EXECUTING = "already executing"
 _PREPARE_DESTRUCTIVE = "prepare_destructive"
@@ -125,6 +128,16 @@ def parse_revit_error_text(text: str) -> ErrorReply:
     return ErrorReply(code=None, message=stripped, data={})
 
 
+def _resent_duplicate(reply: ErrorReply, *, effect: CallEffect, tool: str) -> bool:
+    """Whether `reply` is the duplicate write's "already exists", which a resend of an applied call produces."""
+    return (
+        effect is CallEffect.WRITE
+        and tool.removeprefix("revit_") == _DUPLICATE_TOOL
+        and reply.code == "invalid_request"
+        and _ALREADY_EXISTS in reply.message.lower()
+    )
+
+
 class RevitErrorMapper:
     """Maps Revit error replies by the table of spec 0011 section 4.7."""
 
@@ -136,6 +149,8 @@ class RevitErrorMapper:
         """The contract error for `reply`; the original code and message stay in the message (2000 characters)."""
         normalized = self._normalize(reply)
         code, extra, message = self._decide(normalized, effect=effect)
+        if _resent_duplicate(normalized, effect=effect, tool=tool):
+            code = ErrorCode.TIMEOUT_UNKNOWN_OUTCOME  # T5b (B-632): reconciled by reading the family (§4.10, AC21)
         shown = f"{normalized.code or 'no code'}: {message}"[:1990]
         if code is ErrorCode.TIMEOUT_UNKNOWN_OUTCOME:
             extra["op_id"] = op_id

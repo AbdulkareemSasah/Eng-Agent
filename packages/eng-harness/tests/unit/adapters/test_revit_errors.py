@@ -219,3 +219,23 @@ def test_code_token_is_case_insensitive() -> None:
     # AC6: the parser lowercases the code token.
     detail, _ = _map("Invalid_Request", "Element 1 was not found.", W)
     assert detail.code is C.NOT_FOUND
+
+
+@pytest.mark.parametrize("tool", ["revit_duplicate_family_type", "duplicate_family_type"])
+def test_duplicate_already_exists_on_write_unknown(tool: str) -> None:
+    # Spec 0011 section 4.7: a resend of an applied duplicate answers "already exists", so on a write it is reconciled.
+    from eng_harness.adapters.revit._errors import write_certainty
+
+    message = "Family type 'C30S copy' already exists in family 'Concrete-Rectangular-Column'"
+    reply = ErrorReply(code="invalid_request", message=message, data={})
+    detail = _mapper().map(reply, effect=W, tool=tool, op_id="op-dup")
+    assert detail.code is C.TIMEOUT_UNKNOWN_OUTCOME
+    assert detail.op_id == "op-dup"
+    assert write_certainty(detail) == "unknown"
+    assert message in detail.message
+    # The exception is that tool's write only: a read, or another tool's write, keeps INVALID_ARGUMENT.
+    read = _mapper().map(reply, effect=R, tool=tool, op_id="")
+    assert read.code is C.INVALID_ARGUMENT
+    other = _mapper().map(reply, effect=W, tool="revit_set_element_parameter_values", op_id="op-set")
+    assert other.code is C.INVALID_ARGUMENT
+    assert write_certainty(other) == "not_applied"
