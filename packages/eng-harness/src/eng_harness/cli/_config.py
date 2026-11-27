@@ -1,16 +1,21 @@
-"""`harness.toml` discovery and the sections owned by spec 0006 (section 4.2.4, AC4)."""
+"""`harness.toml` discovery, the sections owned by spec 0006 (section 4.2.4, AC4) and `[tasklog]` (spec 0015 4.6)."""
 
 import tomllib
 from collections.abc import Mapping
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from eng_harness.decisions._policy import DecisionSettings
 from eng_harness.servers import ConfigError
 
 PosInt = Annotated[int, Field(strict=True, ge=1)]
+
+_MIN_NONEMPTY_LENGTH = 1
+"""Minimum length of a non-empty `[tasklog]` string: empty values are refused (spec 0015 4.6)."""
+_RUNS_DIRNAME = "runs"
+"""The run-folder directory a task-log worktree must not lie under (spec 0015 4.6)."""
 
 
 class _Model(BaseModel):
@@ -55,6 +60,29 @@ class ProjectLaneTool(_Model):
     record: str = Field(min_length=1)
 
 
+class TasklogSection(_Model):
+    """`[tasklog]`: task-log settings (spec 0015 section 4.6; owned by that spec, validated here)."""
+
+    worktree: str | None = None
+    integration_branch: str = Field(min_length=_MIN_NONEMPTY_LENGTH)
+    policy: Literal["full", "sanitized"]
+    agent: str | None = Field(default=None, min_length=_MIN_NONEMPTY_LENGTH)
+    require_task: bool
+    since: str | None = Field(default=None, min_length=_MIN_NONEMPTY_LENGTH)
+
+    @field_validator("worktree")
+    @classmethod
+    def _worktree_usable(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not (PurePosixPath(value).is_absolute() or PureWindowsPath(value).is_absolute()):
+            raise ValueError("worktree must be an absolute path")
+        parts = PureWindowsPath(value).parts  # also splits on "/"
+        if _RUNS_DIRNAME in parts:
+            raise ValueError("worktree must not lie under runs/")
+        return value
+
+
 class HarnessConfig(_Model):
     """The sections of `harness.toml`; the sections of other specs are kept as they are."""
 
@@ -63,6 +91,8 @@ class HarnessConfig(_Model):
     page: PageSection = PageSection()
     decisions: DecisionSettings = DecisionSettings()
     project_lane: Mapping[str, ProjectLaneTool] = Field(default_factory=dict)
+    # Spec 0015 owns [tasklog] and validates it (section 4.6); absent means nothing is logged, pushed or refused.
+    tasklog: TasklogSection | None = None
     # servers, cli_tools, host_programs and providers belong to specs 0002 and 0009, which validate them.
     servers: Mapping[str, Any] = Field(default_factory=dict)
     cli_tools: Mapping[str, Any] = Field(default_factory=dict)
